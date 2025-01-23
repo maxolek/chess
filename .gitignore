@@ -10,3 +10,6 @@ settings.json
 
 # Ignore log files
 *.log
+
+# ignore object files
+*.o
