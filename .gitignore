@@ -1,0 +1,12 @@
+# Ignore VS Code settings
+.vscode/
+
+# Ignore JSON configuration files
+launch.json
+settings.json
+
+# Ignore all JSON files
+*.json
+
+# Ignore log files
+*.log
