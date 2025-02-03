@@ -48,8 +48,23 @@ int main() {
         std::cout << std::endl;
         std::cout << "Your move (use format [a-h][0-7][a-h][0-7])" << std::endl;
         std::cin >> yourMove;
-        //if (yourMove == "break") break;
-        Move your_move = Move(algebraic_to_square(yourMove.substr(0,2)), algebraic_to_square(yourMove.substr(2,2)));
+        if (yourMove == "break") break;
+        Move your_move = Move(0); // needs some sort of default
+        if (yourMove.length() == 4) { your_move = Move(algebraic_to_square(yourMove.substr(0,2)), algebraic_to_square(yourMove.substr(2,2))); }
+        else if (yourMove.length() == 5) { //  e.g. a2a1Q
+            // enpassant
+            if (yourMove.substr(4,1) == "e")
+                your_move = Move(algebraic_to_square(yourMove.substr(0,2)), algebraic_to_square(yourMove.substr(2,2)), Move::enPassantCaptureFlag);
+            // captures
+            if (yourMove.substr(4,1) == "B")
+                your_move = Move(algebraic_to_square(yourMove.substr(0,2)), algebraic_to_square(yourMove.substr(2,2)), Move::promoteToBishopFlag);
+            if (yourMove.substr(4,1) == "N")
+                your_move = Move(algebraic_to_square(yourMove.substr(0,2)), algebraic_to_square(yourMove.substr(2,2)), Move::promoteToKnightFlag);
+            if (yourMove.substr(4,1) == "R")
+                your_move = Move(algebraic_to_square(yourMove.substr(0,2)), algebraic_to_square(yourMove.substr(2,2)), Move::promoteToRookFlag);
+            if (yourMove.substr(4,1) == "Q")
+                your_move = Move(algebraic_to_square(yourMove.substr(0,2)), algebraic_to_square(yourMove.substr(2,2)), Move::promoteToQueenFlag);
+        }
 
         your_move.PrintMove();
         board.MakeMove(your_move);

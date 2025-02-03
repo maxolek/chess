@@ -63,7 +63,7 @@ void Board::MakeMove(Move move, bool in_search) {
 
     // update bitboards
     MovePiece(moved_piece, start_square, target_square);
-    if (captured_piece > -1) { CapturePiece(captured_piece, target_square, is_enpassant); }
+    if (captured_piece > -1) { CapturePiece(captured_piece, target_square, is_enpassant, moved_piece == captured_piece); }
 
         // castling
     if (move_flag == Move::castleFlag) {
@@ -170,10 +170,12 @@ void Board::MovePiece(int piece, int start_square, int target_square) {
     pop_bit(colorBitboards[move_color],start_square);
 }
 
-void Board::CapturePiece(int piece, int target_square, bool is_enpassant) {
+void Board::CapturePiece(int piece, int target_square, bool is_enpassant, bool captured_is_moved_piece) {
     if (is_enpassant) {
         pop_bit(pieceBitboards[piece], target_square + std::pow(-1,1-move_color) * 8); // shift capture square by 1 rank
         pop_bit(colorBitboards[1-move_color], target_square + std::pow(-1,1-move_color) * 8);
+    } else if (captured_is_moved_piece) {
+        pop_bit(colorBitboards[1-move_color], target_square);
     } else {
         pop_bit(pieceBitboards[piece], target_square);
         pop_bit(colorBitboards[1-move_color], target_square);
@@ -241,6 +243,7 @@ bool Board::inCheck() {
     U64 pawns = colorBitboards[move_color] & pieceBitboards[pawn];
     U64 opp_king_bitboard = colorBitboards[1-move_color] & pieceBitboards[king];
     int opp_king_square = sqidx(opp_king_bitboard);
+    int bits;
 
     // sliding pieces
     while (diag) {
@@ -249,13 +252,19 @@ bool Board::inCheck() {
         // even idx are ortho directions
         if (direction_idx(piece_square,opp_king_square) % 2 == 0) continue;
 
-        if (opp_king_square > piece_square) {
-            if ( countBits((opp_king_bitboard - (1ULL << piece_square)) & align_masks.alignMasks[piece_square][opp_king_square] & (colorBitboards[0]&colorBitboards[1])) > 1 ) {
+        if (opp_king_square > piece_square) { // switch to ray_masks ? alignMasks should be working, so this should be tested more
+            bits = countBits((opp_king_bitboard - (1ULL << piece_square)) & align_masks.alignMasks[piece_square][opp_king_square] & (colorBitboards[0] | colorBitboards[1]));
+            std::cout << piece_square << std::endl;
+            std::cout << bits << std::endl;
+            if ( bits > 1 ) {
                 // opp_king_bitboard - (1ULL << piece_square) gives bits from piece_square to king_square-1 so 1 of the endpoints is included hence >1 
                 return false;
             }
         } else {
-            if ( countBits(((1ULL << piece_square) - opp_king_bitboard) & align_masks.alignMasks[piece_square][opp_king_square] & (colorBitboards[0]&colorBitboards[1])) > 1 ) {
+            bits = countBits(((1ULL << piece_square) - opp_king_bitboard) & align_masks.alignMasks[piece_square][opp_king_square] & (colorBitboards[0] | colorBitboards[1])) ;
+            std::cout << piece_square << std::endl;
+            std::cout << bits << std::endl;
+            if ( bits > 1 ) {
                 return false;
             }
         }
