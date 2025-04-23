@@ -9,10 +9,10 @@ struct GameState {
 private:
 public:
     // additional state information
-    static int capturedPieceType;
-    static int enPassantFile;
-    static int fiftyMoveCounter;
-    static int castlingRights;
+    int capturedPieceType;
+    int enPassantFile;
+    int fiftyMoveCounter;
+    int castlingRights;
 
     // remove bits
     static constexpr int clearWhiteKingSideMask = 0b1110;
@@ -29,6 +29,8 @@ public:
     bool HasQueensideCastleRight(bool white);
 
     int FiftyMoveCounter();
+
+    void PrintGamestate();
 
 };
 

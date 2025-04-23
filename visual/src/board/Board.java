@@ -6,13 +6,12 @@ import pieces.*;
 import java.util.*;
 
 public class Board {
-    public Tile[] boardTiles = new Tile[BoardUtils.NUM_TILES];;
+    public Tile[] boardTiles = new Tile[BoardUtils.NUM_TILES];
     public String fen;
 
     public Board() {
         setFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
         makeBoardTilesFromFEN();
-
     }
 
     public Board(String fen) {
@@ -34,11 +33,11 @@ public class Board {
             if (idx < 0) {break;}
             else if (Character.isDigit(fen_char)) {// if num
                 for (int blanks = 0; blanks < Character.getNumericValue(fen_char); blanks++) {
-                    idx-- ;
                     piece = null;
                     boardTiles[idx] = Tile.createTile(idx, piece);
+                    idx--;
                 }
-            } else if (fen_char == '/') { // if '/'
+            } else if (fen_char == '/') { 
                 continue;
             } else { // if piece
                 if (Character.isLowerCase(fen_char)) { piece = new Piece(idx, Character.toLowerCase(fen_char), Alliance.BLACK); }
@@ -50,11 +49,9 @@ public class Board {
     }
     
     public Tile getTile(final int tile_cord) {
-        System.out.println(tile_cord);
-        System.out.println(boardTiles[tile_cord].getPiece());
-        System.out.print(boardTiles[tile_cord].isTileOccupied());
         return boardTiles[tile_cord];
     }
+    
 
 
 }

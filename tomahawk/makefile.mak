@@ -1,33 +1,32 @@
-# compiler and flags
+# Source files (ensure all relevant .cpp files are listed)
+SRC_FILES = helpers.cpp PrecomputedMoveData.cpp gamestate.cpp board.cpp moveGenerator.cpp arbiter.cpp testing.cpp
+
+# Object files (compiled from the source files)
+OBJECTS = $(SRC_FILES:.cpp=.o)
+
+# Executable name
+EXEC_TARGET = testing.exe
+
+# Compiler flags
 CXX = g++
-CXXFLAGS = -g
+CXXFLAGS = -g -Wall
 
-# include directories (if any, useful for header files in different directories)
-INCLUDES = 
+# Default target (this will be the entry point)
+all: $(EXEC_TARGET)
 
-# source files
-SOURCES = helpers.cpp PrecomputedMoveData.cpp gamestate.cpp board.cpp moveGenerator.cpp arbiter.cpp testing.cpp
+# Rule to link object files to create the executable
+$(EXEC_TARGET): $(OBJECTS)
+	echo $(OBJECTS)
+	$(CXX) $(CXXFLAGS) $(OBJECTS) -o $(EXEC_TARGET)
 
-# object files
-OBJECTS = $(SOURCES:.cpp=.o)
 
-# output executable
-TARGET = testing.exe
-
-#default target
-all: $(TARGET)
-
-# link object files to create the final executable
-$(TARGET) : $(OBJECTS)
-	$(CXX) $(CXXFLAGS) $(OBJECTS) -o $(TARGET)
-
-# rule to compile .cpp files into .o (object files)
+# Rule to compile .cpp files into .o (object files)
 %.o: %.cpp
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-# clean up generated files
+# Clean up generated files
 clean:
-	rm -f $(OBJECTS) $(TARGET)
+	del -f $(OBJECTS) $(EXEC_TARGET)
 
-# rebuild the project from scratch
+# Rebuild the project from scratch (clean + build)
 rebuild: clean all

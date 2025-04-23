@@ -30,6 +30,7 @@ public abstract class Tile {
     public abstract boolean isTileOccupied();
     public abstract Piece getPiece();
 
+
     // subclasses
     public static final class EmptyTile extends Tile {
         private EmptyTile (int coordinate) {

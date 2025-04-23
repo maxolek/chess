@@ -18,7 +18,7 @@ public:
 
     // once building a more robust engine put this in the engine class not in movegen (to save time)
     //      based on the idea that MoveGenerator will be made new every turn
-    PrecomputedMoveData attack_masks = PrecomputedMoveData();
+    //PrecomputedMoveData attack_masks = PrecomputedMoveData();
 
     // instance variables
     bool in_check;
@@ -44,6 +44,7 @@ public:
     U64 pin_rays = 0ULL;
     U64 opponentAttackMap = 0ULL;
     U64 postEnpassantOpponentAttackMap = 0ULL; // used for isEnpassantCheck to see if making a move leads to check
+    U64 enPassantMaskBlockers = 0ULL; // used to check if a pawn is enpassant pinned (shows all blockers after enpassant is performed)
 
     // if an opponent piece is pinned then it is not added to opponentAttackMap
     //      it needs to be since the king still cannot enter this square
@@ -61,7 +62,7 @@ public:
     // easier code might be to generate it on iteration and not in this bool stuff
 
     void generateMoves();
-    void generateMoves(Board board);
+    void generateMoves(Board _board);
 
 
     // obstruction difference for sliding moves
@@ -98,6 +99,10 @@ public:
 
     // if going to be used in the same instance the bitboards need to be reupdated with the call commands
     void updateBitboards(Board board);
+
+    // tests
+    // returns all legal moves after each ply (complete) 
+    int MoveGenerationTest(int depth);
 
 };
 

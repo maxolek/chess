@@ -15,7 +15,7 @@
 class Board {
 private:
 public:
-    PrecomputedMoveData align_masks = PrecomputedMoveData();
+    //PrecomputedMoveData align_masks = PrecomputedMoveData();
 
     // default bitboards
     U64 colorBitboards[2];
@@ -42,7 +42,7 @@ public:
 
 
     Board();
-
+    Board(std::string _fen);
     Board(int side, U64 color_bitboards[2], U64 piece_bitboards[6], GameState currentGameState);
 
     // inSearch controls whether this move is recorded in the game history
@@ -53,7 +53,7 @@ public:
 
     // piece and color
     void MovePiece(int piece, int start_square, int target_square);
-    void CapturePiece(int piece, int target_square, bool is_enpassant);
+    void CapturePiece(int piece, int target_square, bool is_enpassant, bool captured_is_moved_piece);
 
     void PromoteToPiece(int piece, int target_square);
 
@@ -62,15 +62,16 @@ public:
     int getSideAt(int square);
     int getPieceAt(int square, int side);
 
-    void updateFiftyMoveCounter(int moved_piece, bool isCapture);
+    void updateFiftyMoveCounter(int moved_piece, bool isCapture, bool unmake);
 
     // called before side-to-move is updated
     //      attacks are from move_color
     // generate sliding, knight, pawn from king position
     // for opp_sliding_piece: countBits((opp_square - king_square) & align_mask[opp][king] & occ) == 0 -> check
-    bool inCheck();
+    bool inCheck(bool init);
 
     // <board layout> <castling rights> <en passant> <half-move clock> <full move number>
+    void setFromFEN(std::string _fen);
     void setBoardFEN();
     std::string getBoardFEN();
     void print_board();

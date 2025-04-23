@@ -2,14 +2,29 @@
 
 #include "PrecomputedMoveData.h"
 
+// Define static members
+U64 PrecomputedMoveData::blankPawnMoves[64][2];
+U64 PrecomputedMoveData::fullPawnAttacks[64][2];
+SMasks PrecomputedMoveData::blankBishopAttacks[64][2];
+SMasks PrecomputedMoveData::blankRookAttacks[64][2];
+SMasks PrecomputedMoveData::blankQueenAttacks[64][4];
+U64 PrecomputedMoveData::blankKnightAttacks[64];
+U64 PrecomputedMoveData::blankKingAttacks[64];
+
+U64 PrecomputedMoveData::rayMasks[64][64];
+U64 PrecomputedMoveData::alignMasks[64][64];
+int PrecomputedMoveData::distToEdge[64][8];
+
 PrecomputedMoveData::PrecomputedMoveData() {
     generateFullPawnMoves();
+    generateFullPawnAttacks();
     generateBlankKnightAttacks();
     generateBlankBishopAttacks();
     generateBlankRookAttacks();
     generateBlankQueenAttacks();
     generateBlankKingAttacks();
 
+    generateDistToEdge();
     generateAlignMasks();
     generateRayMasks();
 }
@@ -224,7 +239,7 @@ void PrecomputedMoveData::generateBlankQueenAttacks() {
 
 // straight line mask that contains the entire line in the direction of a->b
 void PrecomputedMoveData::generateAlignMasks() {
-    alignMasks[64][64] = {0};
+    alignMasks[64][64] = {0ULL};
     int a_rank, b_rank, a_file, b_file;
     int rank_dir, file_dir; // {-1,0,1}
     int target_rank, target_file;
@@ -296,7 +311,7 @@ void PrecomputedMoveData::generateRayMasks() {
 }
 
 // direction = N, NE, E, SE, S, SW, W, NW
-void PrecomputedMoveData::generateDistToEdge(int direction_idx, int square) {
+void PrecomputedMoveData::generateDistToEdge() {
     int rank, file;
 
     for (int square = 0; square < 64; square++) {

@@ -8,17 +8,17 @@
 class PrecomputedMoveData {
 private:
 public:
-    U64 blankPawnMoves[64][2];
-    U64 fullPawnAttacks[64][2];
-    SMasks blankBishopAttacks[64][2]; // lower, upper, lineEx=lower|upper // direction
-    SMasks blankRookAttacks[64][2]; // lower, upper, lineEx=lower|upper // direction
-    SMasks blankQueenAttacks[64][4]; // bishop | rook // direction
-    U64 blankKnightAttacks[64];
-    U64 blankKingAttacks[64];
+    static U64 blankPawnMoves[64][2];
+    static U64 fullPawnAttacks[64][2];
+    static SMasks blankBishopAttacks[64][2]; // lower, upper, lineEx=lower|upper // direction
+    static SMasks blankRookAttacks[64][2]; // lower, upper, lineEx=lower|upper // direction
+    static SMasks blankQueenAttacks[64][4]; // bishop | rook // direction
+    static U64 blankKnightAttacks[64];
+    static U64 blankKingAttacks[64];
 
-    U64 rayMasks[64][64]; // square_a, square_b
-    U64 alignMasks[64][64]; // square_a, square_b 
-    int distToEdge[64][8]; // square, direction (cardinal)
+    static U64 rayMasks[64][64]; // square_a, square_b
+    static U64 alignMasks[64][64]; // square_a, square_b 
+    static int distToEdge[64][8]; // square, direction (cardinal)
 
     PrecomputedMoveData();
 
@@ -38,7 +38,7 @@ public:
     // ray between 2 squares (if squares are not connected by straight line, empty bitboard)
     void generateRayMasks();
     // direction = N, NE, E, SE, S, SW, W, NW
-    void generateDistToEdge(int direction_idx, int square);
+    void generateDistToEdge();
 
 };
 

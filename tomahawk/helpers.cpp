@@ -1,5 +1,7 @@
 #include "helpers.h"
 
+std::string file_char = "abcdefgh";
+
 // print bitboard
 void print_bitboard(U64 bitboard) {
     // loop over board ranks
@@ -29,11 +31,10 @@ void print_bitboard(U64 bitboard) {
 
 //                 N,   NE,    E,    SE,    S,     SW,     W,     NW
 // (rank,file) = (1,0) (1,1) (0,1) (-1,1) (-1,0) (-1,-1) (0,-1) (1,-1)
-int direction_idx(int start_square, int target_square) {
-    int rank_dir = std::copysign(1.0,target_square/8 - start_square/8);
-    int file_dir = std::copysign(1.0,target_square%8 - start_square%8);
-    // 0 direction means no movement
-
+int direction_index(int start_square, int target_square) {
+   std::pair<int,int> map = direction_map(start_square,target_square);
+   int rank_dir = map.first; int file_dir = map.second;
+    
     switch (rank_dir) {
         case -1:
             switch (file_dir) {
@@ -79,39 +80,10 @@ int direction_idx(int start_square, int target_square) {
 }
 
 // rank, file direction map
-std::pair<int,int> direction_map(int direction_idx) {
-    switch (direction_idx) {
-        case -1: 
-            return std::make_pair(0,0);
-            break;
-        case 0: 
-            return std::make_pair(1,0);
-            break;
-        case 1: 
-            return std::make_pair(1,1);
-            break;
-        case 2: 
-            return std::make_pair(0,1);
-            break;
-        case 3: 
-            return std::make_pair(-1,1);
-            break;
-        case 4: 
-            return std::make_pair(-1,0);
-            break;
-        case 5: 
-            return std::make_pair(-1,-1);
-            break;
-        case 6: 
-            return std::make_pair(0,-1);
-            break;
-        case 7: 
-            return std::make_pair(1,-1);
-            break;
-        default:
-            return std::make_pair(0,0);
-            break;
-    }
+std::pair<int,int> direction_map(int start_square, int target_square) {
+    int rank_dir = (target_square/8 - start_square/8 > 0) ? 1 : (target_square/8 - start_square/8 < 0) ? -1 : 0;
+    int file_dir = (target_square%8 - start_square%8 > 0) ? 1 : (target_square%8 - start_square%8 < 0) ? -1 : 0;
+    return std::make_pair(rank_dir,file_dir);
 }
 
 int countBits(U64 x) {
@@ -192,6 +164,24 @@ char piece_label(int piece) {
     }
 
     return '/';
+}
+
+int piece_int(char piece) {
+    switch (piece) {
+        case 'p':
+            return 0;
+        case 'n':
+            return 1;
+        case 'b':
+            return 2;
+        case 'r':
+            return 3;
+        case 'q':
+            return 4;
+        case 'k':
+            return 5;
+    }
+    return -1;
 }
 
 // Converts a square index (0-63) to algebraic notation (a1-h8)

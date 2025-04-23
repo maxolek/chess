@@ -14,6 +14,8 @@
 #include <cstdlib>  
 #include <ctime>  
 #include <random> 
+#include <cctype>
+#include <sstream>
 
 typedef uint64_t U64;
 typedef unsigned short ushort;
@@ -53,6 +55,8 @@ enum Result
     BlackIllegalMove
 };
 
+extern std::string file_char;
+
 // set/get/pop macros
 inline void set_bit(U64 &bitboard, int square) {
     bitboard |= (1ULL << square);
@@ -78,8 +82,8 @@ struct SMasks {
 
 // function to get the cardinal direction from start_square -> target_square
 //      clockwise from N indexing
-int direction_idx(int start_square, int target_square); 
-std::pair<int,int> direction_map(int direction_idx);
+std::pair<int,int> direction_map(int start_square, int target_square);
+int direction_index(int start_square, int target_square);
 // function to count the number of set bits
 int countBits(U64 x);
 // function to get leading zero count
@@ -92,6 +96,7 @@ int sqidx(U64 bitboard);
 //int countPosDuplicates(std::vector<U64> &vec);
 
 char piece_label(int piece);
+int piece_int(char piece);
 std::string square_to_algebraic(int square);
 int algebraic_to_square(std::string square);
 

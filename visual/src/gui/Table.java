@@ -1,3 +1,13 @@
+/*
+ * 
+ * time to bring the engine in to apply updates
+ * it will need to rerecord the fen to load the board state
+ * and then update tile icons, tile states, tilepanesl, etc
+ */
+
+
+
+
 package gui;
 
 import pieces.*;
@@ -16,12 +26,14 @@ public class Table {
     private final BoardPanel boardPanel;
     private final Board chessBoard;
     private final int TILE_PANEL_DIM_WIDTH, TILE_PANEL_DIM_HEIGHT;
+    private int selectedTileID = -1;
 
     public Table() {
         System.out.println("Table constructor started.");
 
         // Basic JFrame setup
         this.chessBoard = new Board();
+        this.chessBoard.setFEN("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1");
         this.gameFrame = new JFrame("Chess Game");
         this.gameFrame.setSize(600, 600);
         TILE_PANEL_DIM_WIDTH = this.gameFrame.getWidth() / 8;
@@ -76,7 +88,7 @@ public class Table {
             System.out.println("BoardPanel created.");
 
             // Add TilePanel instances to the grid
-            for (int i = 0; i < 64; i++) {
+            for (int i = BoardUtils.NUM_TILES-1; i >= 0; i--) {
                 TilePanel tilePanel = new TilePanel(i); // Passing tile ID
                 add(tilePanel);
             }
@@ -85,14 +97,91 @@ public class Table {
 
     private class TilePanel extends JPanel {
         private final int tileID;
+        private boolean isSelected = false;
 
         TilePanel(final int tile_id) {
             super(new GridBagLayout());
             this.tileID = tile_id;
+            // Add mouse listener for click events
+            this.addMouseListener(new MouseAdapter() {
+                @Override
+                public void mousePressed(MouseEvent e) {
+                    handleTileClick();
+                }
+            });
+
             setPreferredSize(new Dimension(50, 50));  // Setting tile size to 50x50
             assignTileColor();
             assignTilePieceIcon();  // Load image for this tile asynchronously
         }
+
+        private void handleTileClick() {
+            // If there's no selected piece, select the piece at this tile
+            if (chessBoard.getTile(tileID).isTileOccupied()) {
+                if (!isSelected) {
+                    // Mark this tile as selected (highlight it)
+                    isSelected = true;
+                    setBorder(BorderFactory.createLineBorder(Color.RED, 3));  // Change this to whatever highlight style you want
+    
+                    // Store the selected piece
+                    selectedTileID = tileID;
+                    System.out.println("Selected tile: " + selectedTileID);
+                } else {
+                    // If the piece is already selected, move it
+                    movePiece(selectedTileID, tileID);
+                }
+            } else {
+                // If the tile is empty, we can deselect the piece and reset the border
+                if (isSelected) {
+                    isSelected = false;
+                    setBorder(null); // Remove the border
+                }
+            }
+        }
+
+        private void movePiece(int fromTile, int toTile) {
+            Piece pieceToMove = chessBoard.getTile(fromTile).getPiece();
+
+            chessBoard.boardTiles[fromTile] = Tile.createTile(fromTile, null);
+            chessBoard.boardTiles[toTile] = Tile.createTile(toTile, pieceToMove);
+
+            // Update tile pieces after move
+            updateTileIcon(fromTile);  
+            updateTileIcon(toTile);
+    
+            // Optionally, reset selection
+            isSelected = false;
+            setBorder(null);
+    
+            System.out.println("Moved piece from " + fromTile + " to " + toTile);
+        }
+
+        /*
+        public void updateTile(int idx) {
+            Tile tile = chessBoard.getTile(idx);  // Get the tile at the specified index.
+            if (tile.isTileOccupied()) {
+                // Update the tile with the piece's image/icon.
+                Piece piece = tile.getPiece();
+                String pieceIconPath = "C:\\Users\\maxol\\code\\chess\\visual\\piece_icons\\" +
+                    chessBoard.getTile(this.tileID).getPiece().lowerCharAlliance() +
+                    chessBoard.getTile(this.tileID).getPiece().upperCharType() + ".png";
+                tilePanel.setPieceIcon(pieceIconPath);
+            } else {
+                // If the tile is empty, make sure it's clear (remove the image/icon).
+                tilePanel.removePieceIcon();
+            }
+        }
+        */
+
+        private void updateTileIcon(int tile_id) {
+            this.removeAll();
+            if (chessBoard.getTile(tile_id).isTileOccupied()) {
+                assignTilePieceIcon();
+            }
+            revalidate();
+            repaint();
+        }
+
 
         private void assignTilePieceIcon() {
             this.removeAll();  // Clear the previous icon if any
@@ -110,7 +199,7 @@ public class Table {
                         BufferedImage image = ImageIO.read(pngFile);
         
                         // Resize the image to fit the tile size
-                        Image scaledImage = image.getScaledInstance(TILE_PANEL_DIM_WIDTH, TILE_PANEL_DIM_HEIGHT, Image.SCALE_SMOOTH);
+                        Image scaledImage = image.getScaledInstance(TILE_PANEL_DIM_WIDTH-10, TILE_PANEL_DIM_HEIGHT-10, Image.SCALE_SMOOTH);
         
                         // Use ImageIcon to display the resized image in the JLabel
                         add(new JLabel(new ImageIcon(scaledImage)));
@@ -122,6 +211,13 @@ public class Table {
                 }
             }
         }
+
+        private void removePieceIcon() {
+            this.removeAll();
+            //assignTileColor();  // Optionally reset the tile color
+            revalidate();
+            repaint();
+        }
         
 
         private void assignTileColor() {
@@ -131,6 +227,7 @@ public class Table {
             boolean isLightTile = (tileID + tileID / 8) % 2 == 0;  // Chessboard tile color logic
             setBackground(isLightTile ? lightSquareColor : darkSquareColor);
         }
+
     }
 }
 
