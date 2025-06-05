@@ -16,7 +16,7 @@ public:
     static bool isWinResult(Result result);
     static bool isWhiteWinResult(Result result);
     static bool isBlackWinResult(Result result);
-    static Result GetGameState(Board board);
+    static Result GetGameState(Board& board);
 
 /*
     static bool InsufficientMaterial(Board &board) {

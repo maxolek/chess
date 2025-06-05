@@ -93,6 +93,7 @@ void Board::MakeMove(Move move, bool in_search) {
     currentGameState.capturedPieceType = captured_piece;
     currentGameState.enPassantFile = (move_flag == Move::pawnTwoUpFlag) ? start_square % 8 : -1;
     updateFiftyMoveCounter(moved_piece, captured_piece > -1, false);
+
     if (currentGameState.castlingRights != 0) {
         if (moved_piece == king) {
             if (is_white_move) {
@@ -106,24 +107,32 @@ void Board::MakeMove(Move move, bool in_search) {
             switch (start_square) {
                 case a1:
                     currentGameState.castlingRights &= GameState::clearWhiteQueenSideMask;    
+                    break;
                 case h1:
                     currentGameState.castlingRights &= GameState::clearWhiteKingSideMask; 
+                    break;
                 case a8:
                     currentGameState.castlingRights &= GameState::clearBlackQueenSideMask; 
+                    break;
                 case h8:
                     currentGameState.castlingRights &= GameState::clearBlackKingSideMask;    
+                    break;
             }
         }
         if (captured_piece == rook) {
-            switch (start_square) {
+            switch (target_square) {
                 case a1:
                     currentGameState.castlingRights &= GameState::clearWhiteQueenSideMask;    
+                    break;
                 case h1:
                     currentGameState.castlingRights &= GameState::clearWhiteKingSideMask; 
+                    break;
                 case a8:
                     currentGameState.castlingRights &= GameState::clearBlackQueenSideMask; 
+                    break;
                 case h8:
                     currentGameState.castlingRights &= GameState::clearBlackKingSideMask;    
+                    break;
             }
         }
     }
@@ -140,7 +149,6 @@ void Board::MakeMove(Move move, bool in_search) {
 void Board::UnmakeMove(Move move, bool in_search) {
     is_white_move = !is_white_move;
     move_color = 1-move_color;
-    currentGameState = gameStateHistory.back();
 
     // get move info
     int moved_from = move.StartSquare();
@@ -178,11 +186,11 @@ void Board::UnmakeMove(Move move, bool in_search) {
 
     // detect rules after undoing move
     is_in_check = inCheck(true);
-
-    plyCount--;
-    updateFiftyMoveCounter(-1,false,true); // -1/false cause it doesnt matter
-    allGameMoves.pop_back();
     gameStateHistory.pop_back();
+    currentGameState = gameStateHistory.back();
+    plyCount--;
+    //updateFiftyMoveCounter(-1,false,true); // -1/false cause it doesnt matter
+    allGameMoves.pop_back();
     setBoardFEN();
 
 }
@@ -248,17 +256,13 @@ int Board::getPieceAt(int square, int side) {
 }
 
 void Board::updateFiftyMoveCounter(int moved_piece, bool isCapture, bool unmake) {
-    if (!unmake) {
-        if (isCapture || moved_piece == pawn) {
-            currentGameState.fiftyMoveCounter = 0;
-            //repetitionPosHistory.clear();
-        } else {
-            currentGameState.fiftyMoveCounter++;
-            //repetitionPosHistory.push_back({colorBitboards[0],colorBitboards[1],pieceBitboards[0],pieceBitboards[1],pieceBitboards[2],pieceBitboards[3],pieceBitboards[4],pieceBitboards[5]});
-        }
+    if (isCapture || moved_piece == pawn) {
+        currentGameState.fiftyMoveCounter = 0;
+        //repetitionPosHistory.clear();
     } else {
-        currentGameState = gameStateHistory.back();
-    }
+        currentGameState.fiftyMoveCounter++;
+        //repetitionPosHistory.push_back({colorBitboards[0],colorBitboards[1],pieceBitboards[0],pieceBitboards[1],pieceBitboards[2],pieceBitboards[3],pieceBitboards[4],pieceBitboards[5]});
+    }   
 }
 
 // called before side-to-move is updated
@@ -282,6 +286,8 @@ bool Board::inCheck(bool init) {
         diag &= diag - 1;
         // if not aligned then move to next piece
         if (!PrecomputedMoveData::alignMasks[piece_square][king_square]) continue;
+        // diag dir (odd idx)
+        if (direction_index(piece_square, king_square) % 2 == 0) continue;
 
         if (king_square > piece_square) { // switch to ray_masks ? alignMasks should be working, so this should be tested more
             bits = countBits((king_bitboard - (1ULL << piece_square)) & PrecomputedMoveData::rayMasks[piece_square][king_square] & (colorBitboards[0] | colorBitboards[1]));
@@ -305,6 +311,8 @@ bool Board::inCheck(bool init) {
         piece_square = tzcnt(ortho) - 1;
         ortho &= ortho - 1;
         // even idx are ortho directions
+        if (direction_index(piece_square, king_square) % 2 == 1) continue;
+        // not aligned
         if (PrecomputedMoveData::alignMasks[piece_square][king_square] == 0) continue;
 
         if (king_square > piece_square) {
@@ -380,13 +388,12 @@ void Board::setFromFEN(std::string _fen) {
     // non-visual state
     //  w KQkq - 0 1
     is_white_move = (turn == "w");
+    currentGameState.castlingRights = 0;
     if (castling_rights != "-") {
         if (castling_rights.find("K") != std::string::npos) currentGameState.castlingRights |= 0x1;
         if (castling_rights.find("Q") != std::string::npos) currentGameState.castlingRights |= 0x2;
         if (castling_rights.find("k") != std::string::npos) currentGameState.castlingRights |= 0x4;
         if (castling_rights.find("q") != std::string::npos) currentGameState.castlingRights |= 0x8;
-    } else {
-        currentGameState.castlingRights = 0;
     }
     currentGameState.enPassantFile = (ep == "-") ? -1 : file_char.find(ep.substr(0,1));
     currentGameState.fiftyMoveCounter = int(fifty_move);
@@ -395,6 +402,7 @@ void Board::setFromFEN(std::string _fen) {
     // self generated
     move_color = is_white_move ? 0 : 1;
     is_in_check = inCheck(true);
+    gameStateHistory.push_back(currentGameState);
 }
 
 void Board::setBoardFEN() {
@@ -434,8 +442,8 @@ void Board::setBoardFEN() {
     std::string castling_rights = "";
     if (currentGameState.HasKingsideCastleRight(true)) castling_rights += "K";
     if (currentGameState.HasKingsideCastleRight(true)) castling_rights += "Q";
-    if (currentGameState.HasKingsideCastleRight(true)) castling_rights += "k";
-    if (currentGameState.HasKingsideCastleRight(true)) castling_rights += "q";
+    if (currentGameState.HasKingsideCastleRight(false)) castling_rights += "k";
+    if (currentGameState.HasKingsideCastleRight(false)) castling_rights += "q";
     if (castling_rights == "") castling_rights = "-";
     fen += ' ';
     fen += castling_rights;

@@ -23,8 +23,10 @@ public:
     // castle masks
     static constexpr U64 whiteKingsideMask = 1ULL << f1 | 1ULL << g1;
     static constexpr U64 whiteQueensideMask = 1ULL << d1 | 1ULL << c1;
+    static constexpr U64 whiteQueensideMaskExt = whiteQueensideMask  | 1ULL << b1;
     static constexpr U64 blackKingsideMask = 1ULL << f8 | 1ULL << g8;
     static constexpr U64 blackQueensideMask = 1ULL << d8 | 1ULL << c8;
+    static constexpr U64 blackQueensideMaskExt = blackQueensideMask | 1ULL << b8;
 
 
     // file-rank masks

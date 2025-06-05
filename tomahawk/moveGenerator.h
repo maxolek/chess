@@ -40,7 +40,9 @@ public:
 
     // if in check, bitboard contains squares in line from checking piece up to king
     // rays include the attacking piece (as a capture of the pinning/checking piece is still valid during pin/check)
-    U64 check_ray_mask = 0ULL;
+    // _ext is for removing king moves that go undetected as the king blocks the ray 
+    // (i.e. in check and directly away from the check)
+    U64 check_ray_mask = 0ULL, check_ray_mask_ext = 0ULL;
     U64 pin_rays = 0ULL;
     U64 opponentAttackMap = 0ULL;
     U64 postEnpassantOpponentAttackMap = 0ULL; // used for isEnpassantCheck to see if making a move leads to check
@@ -51,7 +53,7 @@ public:
 
 
     MoveGenerator();
-    MoveGenerator(Board _board);
+    MoveGenerator(Board& _board);
 
     // look up kings last 
     //      have to generate opponenent attack map
@@ -62,7 +64,7 @@ public:
     // easier code might be to generate it on iteration and not in this bool stuff
 
     void generateMoves();
-    void generateMoves(Board _board);
+    void generateMoves(Board& _board);
 
 
     // obstruction difference for sliding moves

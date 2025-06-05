@@ -15,7 +15,7 @@ bool Arbiter::isBlackWinResult(Result result) {
     return result == WhiteIsMated || result == WhiteTimeout || result == WhiteIllegalMove;
 }
 
-Result Arbiter::GetGameState(Board board) {
+Result Arbiter::GetGameState(Board& board) {
     MoveGenerator movegen = MoveGenerator(board);
     movegen.generateMoves();
 

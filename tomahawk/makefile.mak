@@ -1,32 +1,30 @@
-# Source files (ensure all relevant .cpp files are listed)
-SRC_FILES = helpers.cpp PrecomputedMoveData.cpp gamestate.cpp board.cpp moveGenerator.cpp arbiter.cpp testing.cpp
-
-# Object files (compiled from the source files)
-OBJECTS = $(SRC_FILES:.cpp=.o)
-
-# Executable name
-EXEC_TARGET = testing.exe
-
-# Compiler flags
+# Compiler and flags
 CXX = g++
-CXXFLAGS = -g -Wall
+CXXFLAGS = -std=c++17 -Wall
 
-# Default target (this will be the entry point)
-all: $(EXEC_TARGET)
+# Toggle debug mode: make DEBUG=1
+ifeq ($(DEBUG),1)
+    CXXFLAGS += -g -DDEBUG
+    TARGET = testing_debug.exe
+else
+    CXXFLAGS += -O2
+    TARGET = testing.exe
+endif
 
-# Rule to link object files to create the executable
-$(EXEC_TARGET): $(OBJECTS)
-	echo $(OBJECTS)
-	$(CXX) $(CXXFLAGS) $(OBJECTS) -o $(EXEC_TARGET)
+# Source files
+SRCS = arbiter.cpp board.cpp gamestate.cpp helpers.cpp moveGenerator.cpp \
+       PrecomputedMoveData.cpp searcher.cpp testing.cpp
 
+OBJS = $(SRCS:.cpp=.o)
 
-# Rule to compile .cpp files into .o (object files)
+# Default build
+all: $(TARGET)
+
+$(TARGET): $(OBJS)
+	$(CXX) $(CXXFLAGS) -o $@ $^
+
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-# Clean up generated files
 clean:
-	del -f $(OBJECTS) $(EXEC_TARGET)
-
-# Rebuild the project from scratch (clean + build)
-rebuild: clean all
+	rm -f *.o *.exe

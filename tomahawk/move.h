@@ -56,7 +56,13 @@ public:
     void PrintMove() { 
         int start = StartSquare();
         int target = TargetSquare();
-        std::cout << square_to_algebraic(start) << "->" << square_to_algebraic(target) << "\n" << std::endl; 
+        std::cout << square_to_algebraic(start) << "->" << square_to_algebraic(target) << std::endl; 
+    }
+    std::string uci() {
+        int start = StartSquare(); int target = TargetSquare(); 
+        if (IsPromotion())
+            return square_to_algebraic(start) + square_to_algebraic(target) + piece_label(PromotionPieceType()+10); // +10 is lower case
+        return square_to_algebraic(start) + square_to_algebraic(target);
     }
 
     int PromotionPieceType() {

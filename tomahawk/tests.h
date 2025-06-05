@@ -13,6 +13,7 @@ public:
     Board board = Board();
     MoveGenerator movegen = MoveGenerator(board);
     Arbiter arbiter = Arbiter();
+    std::vector<Move> finalPlyMovesList;
     //std::vector<Move> fullMovesList;
     //std::vector<Move> whiteMoves;
     //std::vector<Move> blackMoves;
@@ -27,6 +28,7 @@ public:
         bishops = 0, rooks = 0, queens = 0, kings = 0;
         castles = 0, promotions = 0, enpassants = 0, captures = 0, checks = 0;
         checkmates = 0, total = 0;
+        finalPlyMovesList.clear();
     }
 
     void resetBoard() {
@@ -64,7 +66,7 @@ public:
     // movegen is not setting the correct side
     // depth = 1 is correct ... depth = 2 is set to black_to_move for first set of moves (should still be white)
 
-    void runMoveGenTest(int depth, bool init_moves, std::string _fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1") {
+    void runPerft(int depth, bool init_moves, std::string _fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1") {
         int res = 0;
         //std::vector<Move> first_moves;
 
@@ -76,7 +78,7 @@ public:
         double duration;
 
         for (int i = 2; i <= depth; i++) {
-            res = MoveGenerationTest(i);
+            res = perft(i);
 
             end = clock();
             duration = double(end-start) / CLOCKS_PER_SEC;
@@ -86,46 +88,121 @@ public:
             std::cout << res << std::endl;
             std::cout << "--------------------------------------------\n";
             PrintMoveBreakdown();
-            if (init_moves && i==1) {
+            std::cout << "\nmovegen total moves" << std::endl;
+            std::cout << sizeof(movegen.moves) / sizeof(movegen.moves[0]) << std::endl;
+            if (init_moves && i==2) {
                 for (Move move : movegen.moves) {
                     move.PrintMove();
                 }
             }
 
+            for (Move move : finalPlyMovesList) {
+                move.PrintMove();
+            }
             setBoard(_fen);
         }
     }
 
-    int MoveGenerationTest(int depth) {
+    int perft(int depth) {
         if (depth == 0) {
             return 1;
-        }
+        } 
 
         movegen.generateMoves(board);
-        std::vector<Move> moves = movegen.moves;
         int pos = 0;
 
-        for (Move move : moves) {
+        for (Move move : movegen.moves) {
             moveBreakdown(move, board);
-
-            if (Move::SameMove(move,Move(f4,f3))) {
-                std::cout << "check for pinned pawn" << std::endl;
-            }
-
+        
             board.MakeMove(move); 
-            board.print_board();
-
+           
             checks += board.is_in_check ? 1 : 0;
             checkmates += (arbiter.GetGameState(board) == WhiteIsMated || arbiter.GetGameState(board) == BlackIsMated) ? 1 : 0;
             captures += board.currentGameState.capturedPieceType > -1 ? 1 : 0;
 
-            pos += MoveGenerationTest(depth-1);
+            pos += perft(depth-1);
 
             board.UnmakeMove(move);
+
         }
 
         return pos;
     }
+
+    int perft(int depth, std::string _fen) {
+        setBoard(_fen);
+        int p = perft(depth);
+        return p;
+    }
+
+
+    void perftDivide(int depth, std::string _fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1") {
+        setBoard(_fen);
+        movegen.generateMoves(board);
+        int total = 0;
+        int count;
+    
+        for (Move move :  movegen.moves) {
+            moveBreakdown(move, board);
+
+            board.MakeMove(move);
+    
+            count = perft(depth - 1);
+
+            if (Move::SameMove(move, Move(b4,f4))) {std::cout << count << std::endl;}
+
+            std::cout << move.uci() << ": " << count << std::endl;
+            total += count;
+
+            board.UnmakeMove(move);
+        }
+
+        std::cout << "Nodes searched: " << total << std::endl;
+    }
+
+
+    void completePerftTest() {
+        const char* testCases[][6] = {
+            // name       FEN                                                            d1     d2      d3      d4
+            {"Initial",   "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",      "20",  "400",  "8902", "197281"},
+            {"Kiwipete",  "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq -", "48",  "2039", "97862", "4085603"},
+            {"En Passant Chaos", "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - -",                         "14",  "191",  "2812", nullptr},
+            {"Complex Middle",   "r4rk1/1pp1qppp/p1np1n2/8/2P5/2N1PN2/PP2QPPP/2KR1B1R w - -",     "46",  "2079", "89890", nullptr}
+        };
+
+        const int numTests = sizeof(testCases) / sizeof(testCases[0]);
+        const int maxDepth = 3;
+
+        for (int t = 0; t < numTests; ++t) {
+            const char* name = testCases[t][0];
+            const char* fen  = testCases[t][1];
+
+            std::cout << "Running: " << name << "\n";
+            std::cout << "FEN: " << fen << "\n";
+
+            for (int depth = 1; depth <= maxDepth && testCases[t][depth + 1]; ++depth) {
+                board.setFromFEN(fen);
+
+                auto start = std::chrono::high_resolution_clock::now();
+                int nodes = perft(depth);
+                auto end = std::chrono::high_resolution_clock::now();
+
+                int expected = std::atoi(testCases[t][depth + 1]);
+                bool correct = (nodes == expected);
+                double elapsed = std::chrono::duration<double>(end - start).count();
+
+                std::cout << "  Depth " << depth << ": "
+                        << (correct ? "[PASS]" : "[FAIL]") << "  "
+                        << "Expected: " << expected
+                        << ", Got: " << nodes
+                        << ", Time: " << std::fixed << std::setprecision(3) << elapsed << "s\n";
+            }
+
+            std::cout << std::string(40, '-') << "\n";
+        }
+    }
+    
+    
 
     void moveBreakdown(Move move, Board &board) {
         total++;
