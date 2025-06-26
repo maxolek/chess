@@ -25,7 +25,7 @@ public:
     bool in_double_check;
 
     // board
-    Board board;
+    const Board* board;
     U64 own, opp, pawns, knights, bishops, rooks, queens, kings;
     int side;
     int move_idx;
@@ -53,7 +53,7 @@ public:
 
 
     MoveGenerator();
-    MoveGenerator(Board& _board);
+    MoveGenerator(const Board* _board);
 
     // look up kings last 
     //      have to generate opponenent attack map
@@ -64,7 +64,7 @@ public:
     // easier code might be to generate it on iteration and not in this bool stuff
 
     void generateMoves();
-    void generateMoves(Board& _board);
+    void generateMoves(const Board* _board);
 
 
     // obstruction difference for sliding moves
@@ -100,7 +100,7 @@ public:
     //      rather than narrowing down legality from all blank board moves as we currently do
 
     // if going to be used in the same instance the bitboards need to be reupdated with the call commands
-    void updateBitboards(Board board);
+    void updateBitboards(const Board* board);
 
     // tests
     // returns all legal moves after each ply (complete) 

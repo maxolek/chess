@@ -15,16 +15,17 @@ bool Arbiter::isBlackWinResult(Result result) {
     return result == WhiteIsMated || result == WhiteTimeout || result == WhiteIllegalMove;
 }
 
-Result Arbiter::GetGameState(Board& board) {
+Result Arbiter::GetGameState(const Board* board) {
     MoveGenerator movegen = MoveGenerator(board);
     movegen.generateMoves();
 
+    //if (board.currentGameState.FiftyMoveCounter() > 100) {return FiftyMoveRule;}
+    if (board->currentGameState.fiftyMoveCounter > 100) {return FiftyMoveRule;}
     // checkmate and stalemate
     if (movegen.moves.size() == 0) {
-        if (board.is_in_check) return (board.is_white_move) ? WhiteIsMated : BlackIsMated;
+        if (board->is_in_check) return (board->is_white_move) ? WhiteIsMated : BlackIsMated;
         else return Stalemate;
     }
-    else if (board.currentGameState.FiftyMoveCounter() > 100) return FiftyMoveRule;
     // repetition
     //else if (countPosDuplicates(board.repetitionPosHistory))
     //else if (InsufficientMaterial(board)) return InsufficientMaterial;

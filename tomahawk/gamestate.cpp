@@ -26,17 +26,17 @@ GameState::GameState(int capture_piece, int en_passant_file, int castling_rights
     fiftyMoveCounter = fifty_move_count;
 }
 
-bool GameState::HasKingsideCastleRight(bool white) {
+bool GameState::HasKingsideCastleRight(bool white) const {
     int mask = white ? 1 : 4;
     return (castlingRights & mask) != 0;
 }
 
-bool GameState::HasQueensideCastleRight(bool white) {
+bool GameState::HasQueensideCastleRight(bool white) const {
     int mask = white ? 2 : 8;
     return (castlingRights & mask) != 0;
 }
 
-int GameState::FiftyMoveCounter() { return fiftyMoveCounter; }
+//int GameState::FiftyMoveCounter() const { return fiftyMoveCounter; }
 
 void GameState::PrintGamestate() {
     std::cout << "Captured Piece: " << capturedPieceType << std::endl;

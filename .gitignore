@@ -10,9 +10,11 @@ settings.json
 
 # Ignore log files
 *.log
+*.txt
 
 # ignore object files
 *.o
 
 # ignore executable files
 *.exe
+*.dll

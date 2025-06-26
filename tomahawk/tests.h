@@ -10,9 +10,9 @@ struct Tests
 {
 private:
 public:
-    Board board = Board();
-    MoveGenerator movegen = MoveGenerator(board);
-    Arbiter arbiter = Arbiter();
+    Board board;
+    std::unique_ptr<MoveGenerator> movegen;
+    //Arbiter arbiter = Arbiter();
     std::vector<Move> finalPlyMovesList;
     //std::vector<Move> fullMovesList;
     //std::vector<Move> whiteMoves;
@@ -34,12 +34,12 @@ public:
     void resetBoard() {
         //whiteMoves.clear();
         //blackMoves.clear();
-        resetVars();
         board = Board();
-        movegen.updateBitboards(board);
+        movegen = std::make_unique<MoveGenerator>(&board);
         // Ensure move_color and plyCount are reset to their initial states
         board.move_color = 0; // Start with white to move
         board.plyCount = 0;   // Starting ply count
+        resetVars();
     }
 
 
@@ -47,17 +47,20 @@ public:
         //whiteMoves.clear();
         //blackMoves.clear();
         board = Board(_fen);
+        movegen = std::make_unique<MoveGenerator>(&board);
         resetVars();
-        movegen.updateBitboards(board);
     }
 
-    void setBoard(Board _board) {
+    void setBoard(const Board& _board) {
         board = _board;
+        movegen = std::make_unique<MoveGenerator>(&board);
         resetVars();
-        movegen.updateBitboards(board);
     }
 
-    Tests() {}
+    Tests() {
+        board = Board();
+        movegen = std::make_unique<MoveGenerator>(&board);
+    }
 
     Tests(Board _board) {
         setBoard(_board);
@@ -89,9 +92,9 @@ public:
             std::cout << "--------------------------------------------\n";
             PrintMoveBreakdown();
             std::cout << "\nmovegen total moves" << std::endl;
-            std::cout << sizeof(movegen.moves) / sizeof(movegen.moves[0]) << std::endl;
+            std::cout << sizeof(movegen->moves) / sizeof(movegen->moves[0]) << std::endl;
             if (init_moves && i==2) {
-                for (Move move : movegen.moves) {
+                for (Move move : movegen->moves) {
                     move.PrintMove();
                 }
             }
@@ -108,21 +111,33 @@ public:
             return 1;
         } 
 
-        movegen.generateMoves(board);
+        //std::cout << "movegen board (post first move)" << std::endl;
+        //movegen->board.print_board();
+        movegen->generateMoves(&board);
+        std::vector<Move> moves = movegen->moves;
+        //std::cout << "movegen board (post first move) - post movegeneration" << std::endl;
+        //movegen->board.print_board();
         int pos = 0;
 
-        for (Move move : movegen.moves) {
-            moveBreakdown(move, board);
+        //std::cout << "perft, depth: " << depth << std::endl;
+        //board.print_board();
+        for (Move move : moves) {
+            //moveBreakdown(move, board);
         
             board.MakeMove(move); 
+            //std::cout << "board after move" << std::endl;
+            //board.print_board();
+
            
-            checks += board.is_in_check ? 1 : 0;
-            checkmates += (arbiter.GetGameState(board) == WhiteIsMated || arbiter.GetGameState(board) == BlackIsMated) ? 1 : 0;
-            captures += board.currentGameState.capturedPieceType > -1 ? 1 : 0;
+            //checks += board.is_in_check ? 1 : 0;
+            //checkmates += (Arbiter::GetGameState(&board) == WhiteIsMated || Arbiter::GetGameState(&board) == BlackIsMated) ? 1 : 0;
+            //captures += board.currentGameState.capturedPieceType > -1 ? 1 : 0;
 
             pos += perft(depth-1);
 
             board.UnmakeMove(move);
+            //std::cout << "board after move" << std::endl;
+            //board.print_board();
 
         }
 
@@ -138,21 +153,35 @@ public:
 
     void perftDivide(int depth, std::string _fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1") {
         setBoard(_fen);
-        movegen.generateMoves(board);
+        movegen->generateMoves(&board);
+        std::vector<Move> moves = movegen->moves;
         int total = 0;
         int count;
+
+        //std::cout << "movegen board" << std::endl;
+        //movegen->board.print_board();
     
-        for (Move move :  movegen.moves) {
-            moveBreakdown(move, board);
+        for (Move move : moves) {
+            //moveBreakdown(move, board);
+
+            //if (Move::SameMove(Move(a2,a3),move)) {continue;}
+
+            if (Move::SameMove(Move(d5,c6,Move::enPassantCaptureFlag),move)) {
+                board.print_board();
+            }
 
             board.MakeMove(move);
+
+            
+            //std::cout << "perftDivide post move" << std::endl;
+            //board.print_board();
     
             count = perft(depth - 1);
 
-            if (Move::SameMove(move, Move(b4,f4))) {std::cout << count << std::endl;}
-
             std::cout << move.uci() << ": " << count << std::endl;
             total += count;
+
+            //if (total >= 3) {std::cout << "total >= 3" << std::endl; break;}
 
             board.UnmakeMove(move);
         }
@@ -167,7 +196,8 @@ public:
             {"Initial",   "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",      "20",  "400",  "8902", "197281"},
             {"Kiwipete",  "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq -", "48",  "2039", "97862", "4085603"},
             {"En Passant Chaos", "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - -",                         "14",  "191",  "2812", nullptr},
-            {"Complex Middle",   "r4rk1/1pp1qppp/p1np1n2/8/2P5/2N1PN2/PP2QPPP/2KR1B1R w - -",     "46",  "2079", "89890", nullptr}
+            {"Complex Middle",   "r4rk1/1pp1qppp/p1np1n2/8/2P5/2N1PN2/PP2QPPP/2KR1B1R w - -",     "46",  "2079", "89890", nullptr},
+            {"Promotions & Castling", "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8  ",nullptr,"1486",nullptr,nullptr}
         };
 
         const int numTests = sizeof(testCases) / sizeof(testCases[0]);
@@ -272,105 +302,6 @@ public:
         std::cout << "--------------------------------------------\n";
     }
 
-    // printMoveBreakdown() is problematic
-    //      board is always in starting state (leading to misassigned bitboards, etc)
-    //      and doesnt account for white/black moves both being in fullMovesList
-
-/*
-    void printMoveBreakdown(int depth, bool is_white_start) {
-        // Track statistics for pieces and game state
-        int white = 0, black = 0, pawns_pushes = 0, pawns_captures = 0, knights = 0;
-        int bishops = 0, rooks = 0, queens = 0, kings = 0;
-        int castles = 0, promotions = 0, enpassants = 0, captures = 0, checks = 0;
-        int checkmates = 0, total = 0;
-
-        bool is_white_move;
-
-        // For each depth, reset the breakdown counters
-        for (int i = 0; i < fullMovesList.size(); i++) {
-            Move move = fullMovesList[i];
-            total++;
-
-            is_white_move = is_white_start ? (depth % 2 == 0) : (depth % 2 == 1);
-            if (is_white_start) {
-                white++;
-            } else {
-                black++;
-            }
-
-            // Breakdown for each type of piece
-            for (int piece = 0; piece < 6; piece++) {
-                if (board.pieceBitboards[piece] & (1ULL << move.StartSquare())) {
-                    switch (piece) {
-                        case pawn:
-                            if (move.TargetSquare() % 8 == move.StartSquare() % 8) {
-                                pawns_pushes++;
-                            } else {
-                                pawns_captures++;
-                            }
-                            break;
-                        case knight:
-                            knights++;
-                            break;
-                        case bishop:
-                            bishops++;
-                            break;
-                        case rook:
-                            rooks++;
-                            break;
-                        case queen:
-                            queens++;
-                            break;
-                        case king:
-                            kings++;
-                            break;
-                    }
-                }
-            }
-
-            // Print the board state (optional, for debugging)
-            //std::cout << "move-breakdown gamestate" << std::endl;
-            //board.print_board();
-
-            // Apply the move, and record game state changes
-            board.MakeMove(move);
-            checks += board.is_in_check ? 1 : 0;
-            checkmates += (arbiter.GetGameState(board) == WhiteIsMated || arbiter.GetGameState(board) == BlackIsMated) ? 1 : 0;
-            promotions += move.IsPromotion() ? 1 : 0;
-            enpassants += move.MoveFlag() == Move::enPassantCaptureFlag ? 1 : 0;
-            captures += board.currentGameState.capturedPieceType > -1 ? 1 : 0;
-            castles += move.MoveFlag() == Move::castleFlag ? 1 : 0;
-            board.UnmakeMove(move);
-        }
-
-        // Print the breakdown of the collected statistics
-        std::cout << "--------------------------------------------\n";
-        std::cout << "Move Breakdown: " << std::endl;
-        std::cout << "--------------------------------------------\n";
-
-        std::cout << "Total Moves: " << total << std::endl;
-        std::cout << "White Moves: " << white << std::endl;
-        std::cout << "Black Moves: " << black << std::endl;
-        std::cout << "\nPiece Breakdown:" << std::endl;
-        std::cout << "--------------------------------------------\n";
-        std::cout << "Pawns Pushes: " << pawns_pushes << std::endl;
-        std::cout << "Pawns Captures: " << pawns_captures << std::endl;
-        std::cout << "Knights: " << knights << std::endl;
-        std::cout << "Bishops: " << bishops << std::endl;
-        std::cout << "Rooks: " << rooks << std::endl;
-        std::cout << "Queens: " << queens << std::endl;
-        std::cout << "Kings: " << kings << std::endl;
-        std::cout << "\nSpecial Moves Breakdown:" << std::endl;
-        std::cout << "--------------------------------------------\n";
-        std::cout << "Castles: " << castles << std::endl;
-        std::cout << "Promotions: " << promotions << std::endl;
-        std::cout << "En Passants: " << enpassants << std::endl;
-        std::cout << "Captures: " << captures << std::endl;
-        std::cout << "Checks: " << checks << std::endl;
-        std::cout << "Checkmates: " << checkmates << std::endl;
-        std::cout << "--------------------------------------------\n";
-    }
-*/
 
 
 };

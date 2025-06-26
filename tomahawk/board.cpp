@@ -29,7 +29,7 @@ Board::Board() {
     move_color = is_white_move ? 0 : 1;
     is_in_check = false;
     plyCount = 0;
-    setBoardFEN(); 
+    //setBoardFEN(); 
 }
 
 Board::Board(std::string _fen) {
@@ -52,7 +52,7 @@ Board::Board(int side, U64 _color_bitboards[2], U64 _piece_bitboards[6], GameSta
     pieceBitboards[5] = _piece_bitboards[5];
 
     is_in_check = inCheck(true);
-    setBoardFEN();
+    //setBoardFEN();
 }
 
 // inSearch controls whether this move is recorded in the game history
@@ -67,7 +67,7 @@ void Board::MakeMove(Move move, bool in_search) {
     bool is_enpassant = (move_flag == Move::enPassantCaptureFlag);
 
     int moved_piece = getMovedPiece(start_square);
-    int captured_piece = getCapturedPiece(target_square);
+    int captured_piece = is_enpassant ? 0 : getCapturedPiece(target_square);
     int promotion_piece = move.PromotionPieceType();
 
     // update bitboards
@@ -75,7 +75,7 @@ void Board::MakeMove(Move move, bool in_search) {
     //std::cout << "moved: " << moved_piece << "\t" << start_square << "\t" << target_square << std::endl;
     if (captured_piece > -1) { CapturePiece(captured_piece, target_square, is_enpassant, moved_piece == captured_piece); }
 
-        // castling
+    // castling
     if (move_flag == Move::castleFlag) {
         if (!move_color) {
             if (target_square == g1) MovePiece(rook, h1, f1);
@@ -143,7 +143,7 @@ void Board::MakeMove(Move move, bool in_search) {
     gameStateHistory.push_back(currentGameState);
     is_white_move = !is_white_move;
     move_color = 1-move_color;
-    setBoardFEN();
+    //setBoardFEN();
 }
 
 void Board::UnmakeMove(Move move, bool in_search) {
@@ -191,7 +191,7 @@ void Board::UnmakeMove(Move move, bool in_search) {
     plyCount--;
     //updateFiftyMoveCounter(-1,false,true); // -1/false cause it doesnt matter
     allGameMoves.pop_back();
-    setBoardFEN();
+    //setBoardFEN();
 
 }
 
@@ -441,9 +441,9 @@ void Board::setBoardFEN() {
     // castling rights
     std::string castling_rights = "";
     if (currentGameState.HasKingsideCastleRight(true)) castling_rights += "K";
-    if (currentGameState.HasKingsideCastleRight(true)) castling_rights += "Q";
+    if (currentGameState.HasQueensideCastleRight(true)) castling_rights += "Q";
     if (currentGameState.HasKingsideCastleRight(false)) castling_rights += "k";
-    if (currentGameState.HasKingsideCastleRight(false)) castling_rights += "q";
+    if (currentGameState.HasQueensideCastleRight(false)) castling_rights += "q";
     if (castling_rights == "") castling_rights = "-";
     fen += ' ';
     fen += castling_rights;
@@ -513,12 +513,13 @@ void Board::print_board() {
     std::cout << "\n    a   b   c   d   e   f   g   h\n" << std::endl;
 
     // Print gamestate info
+    setBoardFEN();
     std::cout << fen << std::endl;
     std::cout << "\nMove: " << plyCount/2 << std::endl;
     std::cout << (is_white_move ? "White to move" : "Black to move") << std::endl;
     std::cout << (is_in_check ? "Check" : "") << std::endl;
     std::cout << "Castling Rights: " << currentGameState.castlingRights << std::endl;
-    std::cout << "50 Move Counter: " << currentGameState.FiftyMoveCounter() << std::endl;
+    std::cout << "50 Move Counter: " << currentGameState.fiftyMoveCounter << std::endl;
     std::cout << "En Passant: " << currentGameState.enPassantFile << "\n\n" << std::endl;
 }
 

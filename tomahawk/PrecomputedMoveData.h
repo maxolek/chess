@@ -34,6 +34,7 @@ public:
     //      useful for MoveGenerator::isPinned()
 
     // straight line mask that contains the entire line containing square a&b
+    // if squares are not connected by a straight line, empty bitboard
     void generateAlignMasks();
     // ray between 2 squares (if squares are not connected by straight line, empty bitboard)
     void generateRayMasks();

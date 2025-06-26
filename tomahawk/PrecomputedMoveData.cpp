@@ -263,7 +263,7 @@ void PrecomputedMoveData::generateAlignMasks() {
                     if ((target_file > -1 && target_file < 8) & (target_rank > -1 && target_rank < 8))
                             alignMasks[a][b] |= 1ULL << square;
                 }
-            }
+            } 
         }
     }
 }

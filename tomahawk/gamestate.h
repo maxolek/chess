@@ -24,11 +24,10 @@ public:
 
     GameState(int capture_piece, int en_passant_file, int castling_rights, int fifty_move_count);
 
-    bool HasKingsideCastleRight(bool white);
+    bool HasKingsideCastleRight(bool white) const;
+    bool HasQueensideCastleRight(bool white) const;
 
-    bool HasQueensideCastleRight(bool white);
-
-    int FiftyMoveCounter();
+    //int FiftyMoveCounter() const;
 
     void PrintGamestate();
 

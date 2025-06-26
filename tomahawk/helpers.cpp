@@ -81,9 +81,23 @@ int direction_index(int start_square, int target_square) {
 
 // rank, file direction map
 std::pair<int,int> direction_map(int start_square, int target_square) {
-    int rank_dir = (target_square/8 - start_square/8 > 0) ? 1 : (target_square/8 - start_square/8 < 0) ? -1 : 0;
-    int file_dir = (target_square%8 - start_square%8 > 0) ? 1 : (target_square%8 - start_square%8 < 0) ? -1 : 0;
-    return std::make_pair(rank_dir,file_dir);
+    int a_file = start_square % 8;
+    int b_file = target_square % 8;
+    int a_rank = start_square / 8;
+    int b_rank = target_square / 8;
+    if (abs(b_file - a_file) == abs(b_rank - a_rank) || b_file == a_file || b_rank == a_rank) {
+        int rank_dir = (target_square/8 - start_square/8 > 0) ? 1 : (target_square/8 - start_square/8 < 0) ? -1 : 0;
+        int file_dir = (target_square%8 - start_square%8 > 0) ? 1 : (target_square%8 - start_square%8 < 0) ? -1 : 0;
+        return std::make_pair(rank_dir,file_dir);
+    } else {return std::make_pair(0,0);}
+}
+
+U64 isolateLSB(U64 x) {
+    return x & -x;
+}
+
+U64 isolateMSB(U64 x) {
+    return 1ULL << (63 - lzcnt(x));
 }
 
 int countBits(U64 x) {

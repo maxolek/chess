@@ -1,999 +1,1800 @@
+movegen board
 
 
-8  [r] [.] [.] [.] [k] [.] [.] [r] 
-7  [p] [.] [p] [p] [q] [p] [b] [.] 
-6  [b] [n] [.] [.] [p] [n] [p] [.] 
-5  [.] [.] [.] [P] [N] [.] [.] [.] 
-4  [.] [p] [.] [.] [P] [.] [.] [.] 
-3  [.] [.] [N] [.] [.] [Q] [.] [p] 
-2  [P] [P] [P] [B] [B] [P] [P] [P] 
-1  [R] [.] [.] [.] [K] [.] [.] [R] 
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [.] [.] [.] [.] [.] [.] [.] [.] 
+2  [P] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
 
     a   b   c   d   e   f   g   h
 
-r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq -
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8
 
-Move: 1
+Move: 8
 White to move
 
-Castling Rights: 15
+Castling Rights: 3
+50 Move Counter: 1
+En Passant: -1
+
+
+perftDivide post move
+a2->a3
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R b KQ - 0 8
+
+Move: 8
+Black to move
+
+Castling Rights: 3
 50 Move Counter: 0
 En Passant: -1
 
 
-1
-b4->b3
-1
-2
-g6->g5
-2
-3
-c7->c5
-a2->a3
+movegen board (post first move)
 
 
-8  [r] [.] [.] [.] [k] [.] [.] [r] 
-7  [p] [.] [p] [p] [q] [p] [b] [.] 
-6  [b] [n] [.] [.] [p] [n] [p] [.] 
-5  [.] [.] [.] [P] [N] [.] [.] [.] 
-4  [.] [p] [.] [.] [P] [.] [.] [.] 
-3  [P] [.] [N] [.] [.] [Q] [.] [p] 
-2  [.] [P] [P] [B] [B] [P] [P] [P] 
-1  [R] [.] [.] [.] [K] [.] [.] [R] 
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [.] [.] [.] [.] [.] [.] [.] [.] 
+2  [P] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
 
     a   b   c   d   e   f   g   h
 
-r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/P1N2Q1p/1PPBBPPP/R3K2R b KQkq c3 0 1
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8
 
-Move: 1
+Move: 8
+White to move
+
+Castling Rights: 3
+50 Move Counter: 1
+En Passant: -1
+
+
+movegen board (post first move) - post movegeneration
+a2->a3
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R b KQ - 0 8
+
+Move: 8
 Black to move
 
-Castling Rights: 15
+Castling Rights: 3
 50 Move Counter: 0
-En Passant: 2
+En Passant: -1
 
 
-3
-4
-d7->d6
-4
-5
-h3->g2
-5
-6
-b4->a3
-6
-7
-b4->c3
-7
-8
-e6->d5
-8
-9
-b6->a4
-a2->a3
+board after move
+c6->c5
 
 
-8  [r] [.] [.] [.] [k] [.] [.] [r] 
-7  [p] [.] [p] [p] [q] [p] [b] [.] 
-6  [b] [n] [.] [.] [p] [n] [p] [.] 
-5  [.] [.] [.] [P] [N] [.] [.] [.] 
-4  [.] [p] [.] [.] [P] [.] [.] [.] 
-3  [P] [.] [N] [.] [.] [Q] [.] [p] 
-2  [.] [P] [P] [B] [B] [P] [P] [P] 
-1  [R] [.] [.] [.] [K] [.] [.] [R] 
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [.] [.] [.] [.] [.] [.] 
+5  [.] [.] [p] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
 
     a   b   c   d   e   f   g   h
 
-r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/P1N2Q1p/1PPBBPPP/R3K2R b KQkq - 1 1
+rnbq1k1r/pp1Pbppp/8/2p5/2B5/P7/1PP1NnPP/RNBQK2R w KQ - 0 9
 
-Move: 1
+Move: 9
+White to move
+
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: -1
+
+
+board after move
+a2->a3
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R b KQ - 0 8
+
+Move: 8
 Black to move
 
-Castling Rights: 15
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: -1
+
+
+board after move
+a7->a5
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [.] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [p] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/1p1Pbppp/2p5/p7/2B5/P7/1PP1NnPP/RNBQK2R w KQ a6 0 9
+
+Move: 9
+White to move
+
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: 0
+
+
+board after move
+a2->a3
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R b KQ - 0 8
+
+Move: 8
+Black to move
+
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: -1
+
+
+board after move
+a7->a6
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [.] [p] [.] [P] [b] [p] [p] [p] 
+6  [p] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/1p1Pbppp/p1p5/8/2B5/P7/1PP1NnPP/RNBQK2R w KQ - 0 9
+
+Move: 9
+White to move
+
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: -1
+
+
+board after move
+a2->a3
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R b KQ - 0 8
+
+Move: 8
+Black to move
+
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: -1
+
+
+board after move
+b7->b5
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [.] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [p] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/p2Pbppp/2p5/1p6/2B5/P7/1PP1NnPP/RNBQK2R w KQ b6 0 9
+
+Move: 9
+White to move
+
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: 1
+
+
+board after move
+a2->a3
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R b KQ - 0 8
+
+Move: 8
+Black to move
+
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: -1
+
+
+board after move
+b7->b6
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [.] [.] [P] [b] [p] [p] [p] 
+6  [.] [p] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/p2Pbppp/1pp5/8/2B5/P7/1PP1NnPP/RNBQK2R w KQ - 0 9
+
+Move: 9
+White to move
+
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: -1
+
+
+board after move
+a2->a3
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R b KQ - 0 8
+
+Move: 8
+Black to move
+
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: -1
+
+
+board after move
+f7->f5
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [.] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [p] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/pp1Pb1pp/2p5/5p2/2B5/P7/1PP1NnPP/RNBQK2R w KQ f6 0 9
+
+Move: 9
+White to move
+
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: 5
+
+
+board after move
+a2->a3
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R b KQ - 0 8
+
+Move: 8
+Black to move
+
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: -1
+
+
+board after move
+f7->f6
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [.] [p] [p] 
+6  [.] [.] [p] [.] [.] [p] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/pp1Pb1pp/2p2p2/8/2B5/P7/1PP1NnPP/RNBQK2R w KQ - 0 9
+
+Move: 9
+White to move
+
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: -1
+
+
+board after move
+a2->a3
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R b KQ - 0 8
+
+Move: 8
+Black to move
+
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: -1
+
+
+board after move
+g7->g5
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [.] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [p] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/pp1Pbp1p/2p5/6p1/2B5/P7/1PP1NnPP/RNBQK2R w KQ g6 0 9
+
+Move: 9
+White to move
+
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: 6
+
+
+board after move
+a2->a3
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R b KQ - 0 8
+
+Move: 8
+Black to move
+
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: -1
+
+
+board after move
+g7->g6
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [.] [p] 
+6  [.] [.] [p] [.] [.] [.] [p] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/pp1Pbp1p/2p3p1/8/2B5/P7/1PP1NnPP/RNBQK2R w KQ - 0 9
+
+Move: 9
+White to move
+
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: -1
+
+
+board after move
+a2->a3
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R b KQ - 0 8
+
+Move: 8
+Black to move
+
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: -1
+
+
+board after move
+h7->h5
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [.] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [p] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/pp1Pbpp1/2p5/7p/2B5/P7/1PP1NnPP/RNBQK2R w KQ h6 0 9
+
+Move: 9
+White to move
+
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: 7
+
+
+board after move
+a2->a3
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R b KQ - 0 8
+
+Move: 8
+Black to move
+
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: -1
+
+
+board after move
+h7->h6
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [.] 
+6  [.] [.] [p] [.] [.] [.] [.] [p] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/pp1Pbpp1/2p4p/8/2B5/P7/1PP1NnPP/RNBQK2R w KQ - 0 9
+
+Move: 9
+White to move
+
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: -1
+
+
+board after move
+a2->a3
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R b KQ - 0 8
+
+Move: 8
+Black to move
+
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: -1
+
+
+board after move
+f2->d1
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [.] [P] [P] 
+1  [R] [N] [B] [n] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1N1PP/RNBnK2R w KQ - 0 9
+
+Move: 9
+White to move
+
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: -1
+
+
+board after move
+a2->a3
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R b KQ - 0 8
+
+Move: 8
+Black to move
+
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: -1
+
+
+board after move
+f2->h1
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [.] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [n] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1N1PP/RNBQK2n w Q - 0 9
+
+Move: 9
+White to move
+
+Castling Rights: 2
+50 Move Counter: 0
+En Passant: -1
+
+
+board after move
+a2->a3
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R b KQ - 0 8
+
+Move: 8
+Black to move
+
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: -1
+
+
+board after move
+f2->d3
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [n] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [.] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P2n4/1PP1N1PP/RNBQK2R w KQ - 1 9
+
+Move: 9
+White to move
+Check
+Castling Rights: 3
 50 Move Counter: 1
 En Passant: -1
 
 
+board after move
 a2->a3
 
 
-8  [r] [.] [.] [.] [k] [.] [.] [r] 
-7  [p] [.] [p] [p] [q] [p] [b] [.] 
-6  [b] [n] [.] [.] [p] [n] [p] [.] 
-5  [.] [.] [.] [P] [N] [.] [.] [.] 
-4  [.] [p] [.] [.] [P] [.] [.] [.] 
-3  [P] [.] [N] [.] [.] [Q] [.] [p] 
-2  [.] [P] [P] [B] [B] [P] [P] [P] 
-1  [R] [.] [.] [.] [K] [.] [.] [R] 
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
 
     a   b   c   d   e   f   g   h
 
-r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/P1N2Q1p/1PPBBPPP/R3K2R b KQkq - 2 1
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R b KQ - 0 8
 
-Move: 1
-Black to move
-
-Castling Rights: 15
-50 Move Counter: 2
-En Passant: -1
-
-
-9
-10
-b6->c8
-a2->a3
-
-
-8  [r] [.] [.] [.] [k] [.] [.] [r] 
-7  [p] [.] [p] [p] [q] [p] [b] [.] 
-6  [b] [n] [.] [.] [p] [n] [p] [.] 
-5  [.] [.] [.] [P] [N] [.] [.] [.] 
-4  [.] [p] [.] [.] [P] [.] [.] [.] 
-3  [P] [.] [N] [.] [.] [Q] [.] [p] 
-2  [.] [P] [P] [B] [B] [P] [P] [P] 
-1  [R] [.] [.] [.] [K] [.] [.] [R] 
-
-    a   b   c   d   e   f   g   h
-
-r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/P1N2Q1p/1PPBBPPP/R3K2R b KQkq - 1 1
-
-Move: 1
-Black to move
-
-Castling Rights: 15
-50 Move Counter: 1
-En Passant: -1
-
-
-10
-11
-f6->g4
-a2->a3
-
-
-8  [r] [.] [.] [.] [k] [.] [.] [r] 
-7  [p] [.] [p] [p] [q] [p] [b] [.] 
-6  [b] [n] [.] [.] [p] [n] [p] [.] 
-5  [.] [.] [.] [P] [N] [.] [.] [.] 
-4  [.] [p] [.] [.] [P] [.] [.] [.] 
-3  [P] [.] [N] [.] [.] [Q] [.] [p] 
-2  [.] [P] [P] [B] [B] [P] [P] [P] 
-1  [R] [.] [.] [.] [K] [.] [.] [R] 
-
-    a   b   c   d   e   f   g   h
-
-r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/P1N2Q1p/1PPBBPPP/R3K2R b KQkq - 1 1
-
-Move: 1
-Black to move
-
-Castling Rights: 15
-50 Move Counter: 1
-En Passant: -1
-
-
-11
-12
-f6->h5
-a2->a3
-
-
-8  [r] [.] [.] [.] [k] [.] [.] [r] 
-7  [p] [.] [p] [p] [q] [p] [b] [.] 
-6  [b] [n] [.] [.] [p] [n] [p] [.] 
-5  [.] [.] [.] [P] [N] [.] [.] [.] 
-4  [.] [p] [.] [.] [P] [.] [.] [.] 
-3  [P] [.] [N] [.] [.] [Q] [.] [p] 
-2  [.] [P] [P] [B] [B] [P] [P] [P] 
-1  [R] [.] [.] [.] [K] [.] [.] [R] 
-
-    a   b   c   d   e   f   g   h
-
-r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/P1N2Q1p/1PPBBPPP/R3K2R b KQkq - 1 1
-
-Move: 1
-Black to move
-
-Castling Rights: 15
-50 Move Counter: 1
-En Passant: -1
-
-
-a2->a3
-
-
-8  [r] [.] [.] [.] [k] [.] [.] [r] 
-7  [p] [.] [p] [p] [q] [p] [b] [.] 
-6  [b] [n] [.] [.] [p] [n] [p] [.] 
-5  [.] [.] [.] [P] [N] [.] [.] [.] 
-4  [.] [p] [.] [.] [P] [.] [.] [.] 
-3  [P] [.] [N] [.] [.] [Q] [.] [p] 
-2  [.] [P] [P] [B] [B] [P] [P] [P] 
-1  [R] [.] [.] [.] [K] [.] [.] [R] 
-
-    a   b   c   d   e   f   g   h
-
-r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/P1N2Q1p/1PPBBPPP/R3K2R b KQkq - 2 1
-
-Move: 1
-Black to move
-
-Castling Rights: 15
-50 Move Counter: 2
-En Passant: -1
-
-
-a2->a3
-
-
-8  [r] [.] [.] [.] [k] [.] [.] [r] 
-7  [p] [.] [p] [p] [q] [p] [b] [.] 
-6  [b] [n] [.] [.] [p] [n] [p] [.] 
-5  [.] [.] [.] [P] [N] [.] [.] [.] 
-4  [.] [p] [.] [.] [P] [.] [.] [.] 
-3  [P] [.] [N] [.] [.] [Q] [.] [p] 
-2  [.] [P] [P] [B] [B] [P] [P] [P] 
-1  [R] [.] [.] [.] [K] [.] [.] [R] 
-
-    a   b   c   d   e   f   g   h
-
-r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/P1N2Q1p/1PPBBPPP/R3K2R b KQkq - 3 1
-
-Move: 1
-Black to move
-
-Castling Rights: 15
-50 Move Counter: 3
-En Passant: -1
-
-
-a2->a3
-
-
-8  [r] [.] [.] [.] [k] [.] [.] [r] 
-7  [p] [.] [p] [p] [q] [p] [b] [.] 
-6  [b] [n] [.] [.] [p] [n] [p] [.] 
-5  [.] [.] [.] [P] [N] [.] [.] [.] 
-4  [.] [p] [.] [.] [P] [.] [.] [.] 
-3  [P] [.] [N] [.] [.] [Q] [.] [p] 
-2  [.] [P] [P] [B] [B] [P] [P] [P] 
-1  [R] [.] [.] [.] [K] [.] [.] [R] 
-
-    a   b   c   d   e   f   g   h
-
-r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/P1N2Q1p/1PPBBPPP/R3K2R b KQkq - 4 1
-
-Move: 1
+Move: 8
 Black to move
 
 Castling Rights: 3
-50 Move Counter: 4
+50 Move Counter: 0
 En Passant: -1
 
 
-a2->a3
+board after move
+f2->h3
 
 
-8  [r] [.] [.] [.] [k] [.] [.] [r] 
-7  [p] [.] [p] [p] [q] [p] [b] [.] 
-6  [b] [n] [.] [.] [p] [n] [p] [.] 
-5  [.] [.] [.] [P] [N] [.] [.] [.] 
-4  [.] [p] [.] [.] [P] [.] [.] [.] 
-3  [P] [.] [N] [.] [.] [Q] [.] [p] 
-2  [.] [P] [P] [B] [B] [P] [P] [P] 
-1  [R] [.] [.] [.] [K] [.] [.] [R] 
-
-    a   b   c   d   e   f   g   h
-
-r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/P1N2Q1p/1PPBBPPP/R3K2R b KQkq - 5 1
-
-Move: 1
-Black to move
-
-Castling Rights: 3
-50 Move Counter: 5
-En Passant: -1
-
-
-a2->a3
-
-
-8  [r] [.] [.] [.] [k] [.] [.] [r] 
-7  [p] [.] [p] [p] [q] [p] [b] [.] 
-6  [b] [n] [.] [.] [p] [n] [p] [.] 
-5  [.] [.] [.] [P] [N] [.] [.] [.] 
-4  [.] [p] [.] [.] [P] [.] [.] [.] 
-3  [P] [.] [N] [.] [.] [Q] [.] [p] 
-2  [.] [P] [P] [B] [B] [P] [P] [P] 
-1  [R] [.] [.] [.] [K] [.] [.] [R] 
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [n] 
+2  [.] [P] [P] [.] [N] [.] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
 
     a   b   c   d   e   f   g   h
 
-r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/P1N2Q1p/1PPBBPPP/R3K2R b KQkq - 6 1
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P6n/1PP1N1PP/RNBQK2R w KQ - 1 9
 
-Move: 1
-Black to move
-
-Castling Rights: 3
-50 Move Counter: 6
-En Passant: -1
-
-
-a2->a3
-
-
-8  [r] [.] [.] [.] [k] [.] [.] [r] 
-7  [p] [.] [p] [p] [q] [p] [b] [.] 
-6  [b] [n] [.] [.] [p] [n] [p] [.] 
-5  [.] [.] [.] [P] [N] [.] [.] [.] 
-4  [.] [p] [.] [.] [P] [.] [.] [.] 
-3  [P] [.] [N] [.] [.] [Q] [.] [p] 
-2  [.] [P] [P] [B] [B] [P] [P] [P] 
-1  [R] [.] [.] [.] [K] [.] [.] [R] 
-
-    a   b   c   d   e   f   g   h
-
-r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/P1N2Q1p/1PPBBPPP/R3K2R b KQkq - 7 1
-
-Move: 1
-Black to move
-
-Castling Rights: 3
-50 Move Counter: 7
-En Passant: -1
-
-
-a2->a3
-
-
-8  [r] [.] [.] [.] [k] [.] [.] [r] 
-7  [p] [.] [p] [p] [q] [p] [b] [.] 
-6  [b] [n] [.] [.] [p] [n] [p] [.] 
-5  [.] [.] [.] [P] [N] [.] [.] [.] 
-4  [.] [p] [.] [.] [P] [.] [.] [.] 
-3  [P] [.] [N] [.] [.] [Q] [.] [p] 
-2  [.] [P] [P] [B] [B] [P] [P] [P] 
-1  [R] [.] [.] [.] [K] [.] [.] [R] 
-
-    a   b   c   d   e   f   g   h
-
-r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/P1N2Q1p/1PPBBPPP/R3K2R b KQkq - 8 1
-
-Move: 1
-Black to move
-
-Castling Rights: 3
-50 Move Counter: 8
-En Passant: -1
-
-
-a2->a3
-
-
-8  [r] [.] [.] [.] [k] [.] [.] [r] 
-7  [p] [.] [p] [p] [q] [p] [b] [.] 
-6  [b] [n] [.] [.] [p] [n] [p] [.] 
-5  [.] [.] [.] [P] [N] [.] [.] [.] 
-4  [.] [p] [.] [.] [P] [.] [.] [.] 
-3  [P] [.] [N] [.] [.] [Q] [.] [p] 
-2  [.] [P] [P] [B] [B] [P] [P] [P] 
-1  [R] [.] [.] [.] [K] [.] [.] [R] 
-
-    a   b   c   d   e   f   g   h
-
-r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/P1N2Q1p/1PPBBPPP/R3K2R b KQkq - 9 1
-
-Move: 1
-Black to move
-
-Castling Rights: 3
-50 Move Counter: 9
-En Passant: -1
-
-
-a2->a3
-
-
-8  [r] [.] [.] [.] [k] [.] [.] [r] 
-7  [p] [.] [p] [p] [q] [p] [b] [.] 
-6  [b] [n] [.] [.] [p] [n] [p] [.] 
-5  [.] [.] [.] [P] [N] [.] [.] [.] 
-4  [.] [p] [.] [.] [P] [.] [.] [.] 
-3  [P] [.] [N] [.] [.] [Q] [.] [p] 
-2  [.] [P] [P] [B] [B] [P] [P] [P] 
-1  [R] [.] [.] [.] [K] [.] [.] [R] 
-
-    a   b   c   d   e   f   g   h
-
-r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/P1N2Q1p/1PPBBPPP/R3K2R b KQkq - 10 1
-
-Move: 1
-Black to move
-
-Castling Rights: 3
-50 Move Counter: 10
-En Passant: -1
-
-
-a2->a3
-
-
-8  [r] [.] [.] [.] [k] [.] [.] [r] 
-7  [p] [.] [p] [p] [q] [p] [b] [.] 
-6  [b] [n] [.] [.] [p] [n] [p] [.] 
-5  [.] [.] [.] [P] [N] [.] [.] [.] 
-4  [.] [p] [.] [.] [P] [.] [.] [.] 
-3  [P] [.] [N] [.] [.] [Q] [.] [p] 
-2  [.] [P] [P] [B] [B] [P] [P] [P] 
-1  [R] [.] [.] [.] [K] [.] [.] [R] 
-
-    a   b   c   d   e   f   g   h
-
-r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/P1N2Q1p/1PPBBPPP/R3K2R b KQkq - 11 1
-
-Move: 1
-Black to move
-
-Castling Rights: 3
-50 Move Counter: 11
-En Passant: -1
-
-
-a2->a3
-
-
-8  [r] [.] [.] [.] [k] [.] [.] [r] 
-7  [p] [.] [p] [p] [q] [p] [b] [.] 
-6  [b] [n] [.] [.] [p] [n] [p] [.] 
-5  [.] [.] [.] [P] [N] [.] [.] [.] 
-4  [.] [p] [.] [.] [P] [.] [.] [.] 
-3  [P] [.] [N] [.] [.] [Q] [.] [p] 
-2  [.] [P] [P] [B] [B] [P] [P] [P] 
-1  [R] [.] [.] [.] [K] [.] [.] [R] 
-
-    a   b   c   d   e   f   g   h
-
-r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/P1N2Q1p/1PPBBPPP/R3K2R b KQkq - 12 1
-
-Move: 1
-Black to move
-
-Castling Rights: 3
-50 Move Counter: 12
-En Passant: -1
-
-
-a2->a3
-
-
-8  [r] [.] [.] [.] [k] [.] [.] [r] 
-7  [p] [.] [p] [p] [q] [p] [b] [.] 
-6  [b] [n] [.] [.] [p] [n] [p] [.] 
-5  [.] [.] [.] [P] [N] [.] [.] [.] 
-4  [.] [p] [.] [.] [P] [.] [.] [.] 
-3  [P] [.] [N] [.] [.] [Q] [.] [p] 
-2  [.] [P] [P] [B] [B] [P] [P] [P] 
-1  [R] [.] [.] [.] [K] [.] [.] [R] 
-
-    a   b   c   d   e   f   g   h
-
-r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/P1N2Q1p/1PPBBPPP/R3K2R b KQkq - 13 1
-
-Move: 1
-Black to move
-
-Castling Rights: 3
-50 Move Counter: 13
-En Passant: -1
-
-
-a2->a3
-
-
-8  [r] [.] [.] [.] [k] [.] [.] [r] 
-7  [p] [.] [p] [p] [q] [p] [b] [.] 
-6  [b] [n] [.] [.] [p] [n] [p] [.] 
-5  [.] [.] [.] [P] [N] [.] [.] [.] 
-4  [.] [p] [.] [.] [P] [.] [.] [.] 
-3  [P] [.] [N] [.] [.] [Q] [.] [p] 
-2  [.] [P] [P] [B] [B] [P] [P] [P] 
-1  [R] [.] [.] [.] [K] [.] [.] [R] 
-
-    a   b   c   d   e   f   g   h
-
-r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/P1N2Q1p/1PPBBPPP/R3K2R b KQkq - 14 1
-
-Move: 1
-Black to move
-
-Castling Rights: 3
-50 Move Counter: 14
-En Passant: -1
-
-
-12
-13
-a6->d3
-a2->a3
-
-
-8  [r] [.] [.] [.] [k] [.] [.] [r] 
-7  [p] [.] [p] [p] [q] [p] [b] [.] 
-6  [b] [n] [.] [.] [p] [n] [p] [.] 
-5  [.] [.] [.] [P] [N] [.] [.] [.] 
-4  [.] [p] [.] [.] [P] [.] [.] [.] 
-3  [P] [.] [N] [.] [.] [Q] [.] [p] 
-2  [.] [P] [P] [B] [B] [P] [P] [P] 
-1  [R] [.] [.] [.] [K] [.] [.] [R] 
-
-    a   b   c   d   e   f   g   h
-
-r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/P1N2Q1p/1PPBBPPP/R3K2R b KQkq - 1 1
-
-Move: 1
-Black to move
+Move: 9
+White to move
 
 Castling Rights: 3
 50 Move Counter: 1
 En Passant: -1
 
 
+board after move
 a2->a3
 
 
-8  [r] [.] [.] [.] [k] [.] [.] [r] 
-7  [p] [.] [p] [p] [q] [p] [b] [.] 
-6  [b] [n] [.] [.] [p] [n] [p] [.] 
-5  [.] [.] [.] [P] [N] [.] [.] [.] 
-4  [.] [p] [.] [.] [P] [.] [.] [.] 
-3  [P] [.] [N] [.] [.] [Q] [.] [p] 
-2  [.] [P] [P] [B] [B] [P] [P] [P] 
-1  [R] [.] [.] [.] [K] [.] [.] [R] 
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
 
     a   b   c   d   e   f   g   h
 
-r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/P1N2Q1p/1PPBBPPP/R3K2R b KQkq - 2 1
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R b KQ - 0 8
 
-Move: 1
+Move: 8
 Black to move
 
 Castling Rights: 3
-50 Move Counter: 2
+50 Move Counter: 0
 En Passant: -1
 
 
-a2->a3
+board after move
+f2->e4
 
 
-8  [r] [.] [.] [.] [k] [.] [.] [r] 
-7  [p] [.] [p] [p] [q] [p] [b] [.] 
-6  [b] [n] [.] [.] [p] [n] [p] [.] 
-5  [.] [.] [.] [P] [N] [.] [.] [.] 
-4  [.] [p] [.] [.] [P] [.] [.] [.] 
-3  [P] [.] [N] [.] [.] [Q] [.] [p] 
-2  [.] [P] [P] [B] [B] [P] [P] [P] 
-1  [R] [.] [.] [.] [K] [.] [.] [R] 
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [n] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [.] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
 
     a   b   c   d   e   f   g   h
 
-r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/P1N2Q1p/1PPBBPPP/R3K2R b KQkq - 3 1
+rnbq1k1r/pp1Pbppp/2p5/8/2B1n3/P7/1PP1N1PP/RNBQK2R w KQ - 1 9
 
-Move: 1
-Black to move
+Move: 9
+White to move
 
 Castling Rights: 3
-50 Move Counter: 3
+50 Move Counter: 1
 En Passant: -1
 
 
+board after move
 a2->a3
 
 
-8  [r] [.] [.] [.] [k] [.] [.] [r] 
-7  [p] [.] [p] [p] [q] [p] [b] [.] 
-6  [b] [n] [.] [.] [p] [n] [p] [.] 
-5  [.] [.] [.] [P] [N] [.] [.] [.] 
-4  [.] [p] [.] [.] [P] [.] [.] [.] 
-3  [P] [.] [N] [.] [.] [Q] [.] [p] 
-2  [.] [P] [P] [B] [B] [P] [P] [P] 
-1  [R] [.] [.] [.] [K] [.] [.] [R] 
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
 
     a   b   c   d   e   f   g   h
 
-r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/P1N2Q1p/1PPBBPPP/R3K2R b KQkq - 4 1
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R b KQ - 0 8
 
-Move: 1
+Move: 8
 Black to move
 
 Castling Rights: 3
-50 Move Counter: 4
+50 Move Counter: 0
 En Passant: -1
 
 
-a2->a3
+board after move
+f2->g4
 
 
-8  [r] [.] [.] [.] [k] [.] [.] [r] 
-7  [p] [.] [p] [p] [q] [p] [b] [.] 
-6  [b] [n] [.] [.] [p] [n] [p] [.] 
-5  [.] [.] [.] [P] [N] [.] [.] [.] 
-4  [.] [p] [.] [.] [P] [.] [.] [.] 
-3  [P] [.] [N] [.] [.] [Q] [.] [p] 
-2  [.] [P] [P] [B] [B] [P] [P] [P] 
-1  [R] [.] [.] [.] [K] [.] [.] [R] 
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [n] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [.] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
 
     a   b   c   d   e   f   g   h
 
-r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/P1N2Q1p/1PPBBPPP/R3K2R b KQkq - 5 1
+rnbq1k1r/pp1Pbppp/2p5/8/2B3n1/P7/1PP1N1PP/RNBQK2R w KQ - 1 9
 
-Move: 1
-Black to move
+Move: 9
+White to move
 
 Castling Rights: 3
-50 Move Counter: 5
+50 Move Counter: 1
 En Passant: -1
 
 
+board after move
 a2->a3
 
 
-8  [r] [.] [.] [.] [k] [.] [.] [r] 
-7  [p] [.] [p] [p] [q] [p] [b] [.] 
-6  [b] [n] [.] [.] [p] [n] [p] [.] 
-5  [.] [.] [.] [P] [N] [.] [.] [.] 
-4  [.] [p] [.] [.] [P] [.] [.] [.] 
-3  [P] [.] [N] [.] [.] [Q] [.] [p] 
-2  [.] [P] [P] [B] [B] [P] [P] [P] 
-1  [R] [.] [.] [.] [K] [.] [.] [R] 
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
 
     a   b   c   d   e   f   g   h
 
-r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/P1N2Q1p/1PPBBPPP/R3K2R b KQkq - 6 1
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R b KQ - 0 8
 
-Move: 1
+Move: 8
 Black to move
 
 Castling Rights: 3
-50 Move Counter: 6
+50 Move Counter: 0
 En Passant: -1
 
 
-a2->a3
+board after move
+b8->a6
 
 
-8  [r] [.] [.] [.] [k] [.] [.] [r] 
-7  [p] [.] [p] [p] [q] [p] [b] [.] 
-6  [b] [n] [.] [.] [p] [n] [p] [.] 
-5  [.] [.] [.] [P] [N] [.] [.] [.] 
-4  [.] [p] [.] [.] [P] [.] [.] [.] 
-3  [P] [.] [N] [.] [.] [Q] [.] [p] 
-2  [.] [P] [P] [B] [B] [P] [P] [P] 
-1  [R] [.] [.] [.] [K] [.] [.] [R] 
+8  [r] [.] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [n] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
 
     a   b   c   d   e   f   g   h
 
-r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/P1N2Q1p/1PPBBPPP/R3K2R b KQkq - 7 1
+r1bq1k1r/pp1Pbppp/n1p5/8/2B5/P7/1PP1NnPP/RNBQK2R w KQ - 1 9
 
-Move: 1
-Black to move
+Move: 9
+White to move
 
 Castling Rights: 3
-50 Move Counter: 7
+50 Move Counter: 1
 En Passant: -1
 
 
+board after move
 a2->a3
 
 
-8  [r] [.] [.] [.] [k] [.] [.] [r] 
-7  [p] [.] [p] [p] [q] [p] [b] [.] 
-6  [b] [n] [.] [.] [p] [n] [p] [.] 
-5  [.] [.] [.] [P] [N] [.] [.] [.] 
-4  [.] [p] [.] [.] [P] [.] [.] [.] 
-3  [P] [.] [N] [.] [.] [Q] [.] [p] 
-2  [.] [P] [P] [B] [B] [P] [P] [P] 
-1  [R] [.] [.] [.] [K] [.] [.] [R] 
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
 
     a   b   c   d   e   f   g   h
 
-r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/P1N2Q1p/1PPBBPPP/R3K2R b KQkq - 8 1
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R b KQ - 0 8
 
-Move: 1
+Move: 8
 Black to move
 
 Castling Rights: 3
-50 Move Counter: 8
+50 Move Counter: 0
 En Passant: -1
 
 
-a2->a3
+board after move
+b8->d7
 
 
-8  [r] [.] [.] [.] [k] [.] [.] [r] 
-7  [p] [.] [p] [p] [q] [p] [b] [.] 
-6  [b] [n] [.] [.] [p] [n] [p] [.] 
-5  [.] [.] [.] [P] [N] [.] [.] [.] 
-4  [.] [p] [.] [.] [P] [.] [.] [.] 
-3  [P] [.] [N] [.] [.] [Q] [.] [p] 
-2  [.] [P] [P] [B] [B] [P] [P] [P] 
-1  [R] [.] [.] [.] [K] [.] [.] [R] 
+8  [r] [.] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [n] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
 
     a   b   c   d   e   f   g   h
 
-r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/P1N2Q1p/1PPBBPPP/R3K2R b KQkq - 9 1
+r1bq1k1r/pp1nbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R w KQ - 0 9
 
-Move: 1
-Black to move
+Move: 9
+White to move
 
 Castling Rights: 3
-50 Move Counter: 9
+50 Move Counter: 0
 En Passant: -1
 
 
+board after move
 a2->a3
 
 
-8  [r] [.] [.] [.] [k] [.] [.] [r] 
-7  [p] [.] [p] [p] [q] [p] [b] [.] 
-6  [b] [n] [.] [.] [p] [n] [p] [.] 
-5  [.] [.] [.] [P] [N] [.] [.] [.] 
-4  [.] [p] [.] [.] [P] [.] [.] [.] 
-3  [P] [.] [N] [.] [.] [Q] [.] [p] 
-2  [.] [P] [P] [B] [B] [P] [P] [P] 
-1  [R] [.] [.] [.] [K] [.] [.] [R] 
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
 
     a   b   c   d   e   f   g   h
 
-r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/P1N2Q1p/1PPBBPPP/R3K2R b KQkq - 10 1
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R b KQ - 0 8
 
-Move: 1
+Move: 8
 Black to move
 
 Castling Rights: 3
-50 Move Counter: 10
+50 Move Counter: 0
 En Passant: -1
 
 
-a2->a3
+board after move
+h8->g8
 
 
-8  [r] [.] [.] [.] [k] [.] [.] [r] 
-7  [p] [.] [p] [p] [q] [p] [b] [.] 
-6  [b] [n] [.] [.] [p] [n] [p] [.] 
-5  [.] [.] [.] [P] [N] [.] [.] [.] 
-4  [.] [p] [.] [.] [P] [.] [.] [.] 
-3  [P] [.] [N] [.] [.] [Q] [.] [p] 
-2  [.] [P] [P] [B] [B] [P] [P] [P] 
-1  [R] [.] [.] [.] [K] [.] [.] [R] 
+8  [r] [n] [b] [q] [.] [k] [r] [.] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
 
     a   b   c   d   e   f   g   h
 
-r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/P1N2Q1p/1PPBBPPP/R3K2R b KQkq - 11 1
+rnbq1kr1/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R w KQ - 1 9
 
-Move: 1
-Black to move
+Move: 9
+White to move
 
 Castling Rights: 3
-50 Move Counter: 11
+50 Move Counter: 1
 En Passant: -1
 
 
+board after move
 a2->a3
 
 
-8  [r] [.] [.] [.] [k] [.] [.] [r] 
-7  [p] [.] [p] [p] [q] [p] [b] [.] 
-6  [b] [n] [.] [.] [p] [n] [p] [.] 
-5  [.] [.] [.] [P] [N] [.] [.] [.] 
-4  [.] [p] [.] [.] [P] [.] [.] [.] 
-3  [P] [.] [N] [.] [.] [Q] [.] [p] 
-2  [.] [P] [P] [B] [B] [P] [P] [P] 
-1  [R] [.] [.] [.] [K] [.] [.] [R] 
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
 
     a   b   c   d   e   f   g   h
 
-r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/P1N2Q1p/1PPBBPPP/R3K2R b KQkq - 12 1
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R b KQ - 0 8
 
-Move: 1
+Move: 8
 Black to move
 
 Castling Rights: 3
-50 Move Counter: 12
+50 Move Counter: 0
 En Passant: -1
 
 
-a2->a3
+board after move
+e7->a3
 
 
-8  [r] [.] [.] [.] [k] [.] [.] [r] 
-7  [p] [.] [p] [p] [q] [p] [b] [.] 
-6  [b] [n] [.] [.] [p] [n] [p] [.] 
-5  [.] [.] [.] [P] [N] [.] [.] [.] 
-4  [.] [p] [.] [.] [P] [.] [.] [.] 
-3  [P] [.] [N] [.] [.] [Q] [.] [p] 
-2  [.] [P] [P] [B] [B] [P] [P] [P] 
-1  [R] [.] [.] [.] [K] [.] [.] [R] 
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [.] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [b] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
 
     a   b   c   d   e   f   g   h
 
-r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/P1N2Q1p/1PPBBPPP/R3K2R b KQkq - 13 1
+rnbq1k1r/pp1P1ppp/2p5/8/2B5/b7/1PP1NnPP/RNBQK2R w KQ - 0 9
 
-Move: 1
-Black to move
+Move: 9
+White to move
 
 Castling Rights: 3
-50 Move Counter: 13
+50 Move Counter: 0
 En Passant: -1
 
 
+board after move
 a2->a3
-44
 
-a2->a4
-44
 
-b2->b3
-42
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
 
-g2->g3
-42
+    a   b   c   d   e   f   g   h
 
-g2->g4
-42
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R b KQ - 0 8
 
-d5->d6
-41
+Move: 8
+Black to move
 
-g2->h3
-43
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: -1
 
-d5->e6
-46
 
-c3->b1
-42
+board after move
+e7->b4
 
-c3->d1
-42
 
-c3->a4
-42
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [.] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [b] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
 
-c3->b5
-39
+    a   b   c   d   e   f   g   h
 
-e5->d3
-43
+rnbq1k1r/pp1P1ppp/2p5/8/1bB5/P7/1PP1NnPP/RNBQK2R w KQ - 1 9
 
-e5->c4
-42
+Move: 9
+White to move
+Check
+Castling Rights: 3
+50 Move Counter: 1
+En Passant: -1
 
-e5->g4
-44
 
-e5->c6
-41
+board after move
+a2->a3
 
-e5->g6
-42
 
-e5->d7
-45
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
 
-e5->f7
-44
+    a   b   c   d   e   f   g   h
 
-a1->b1
-41
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R b KQ - 0 8
 
-a1->c1
-41
+Move: 8
+Black to move
 
-a1->d1
-41
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: -1
 
-h1->f1
-41
 
-h1->g1
-41
+board after move
+e7->c5
 
-d2->c1
-41
 
-d2->e3
-41
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [.] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [b] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
 
-d2->f4
-41
+    a   b   c   d   e   f   g   h
 
-d2->g5
-40
+rnbq1k1r/pp1P1ppp/2p5/2b5/2B5/P7/1PP1NnPP/RNBQK2R w KQ - 1 9
 
-d2->h6
-39
+Move: 9
+White to move
 
-e2->d1
-42
+Castling Rights: 3
+50 Move Counter: 1
+En Passant: -1
 
-e2->f1
-42
 
-e2->d3
-40
+board after move
+a2->a3
 
-e2->c4
-39
 
-e2->b5
-37
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
 
-e2->a6
-35
+    a   b   c   d   e   f   g   h
 
-f3->g4
-41
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R b KQ - 0 8
 
-f3->h5
-41
+Move: 8
+Black to move
 
-f3->f4
-41
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: -1
 
-f3->f5
-43
 
-f3->f6
-37
+board after move
+e7->d6
 
-f3->d3
-40
 
-f3->e3
-41
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [.] [p] [p] [p] 
+6  [.] [.] [p] [b] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
 
-f3->g3
-41
+    a   b   c   d   e   f   g   h
 
-f3->h3
-41
+rnbq1k1r/pp1P1ppp/2pb4/8/2B5/P7/1PP1NnPP/RNBQK2R w KQ - 1 9
 
-e1->d1
-41
+Move: 9
+White to move
 
-e1->f1
-41
+Castling Rights: 3
+50 Move Counter: 1
+En Passant: -1
 
-e1->g1
-41
 
-e1->c1
-41
+board after move
+a2->a3
 
---------------------------------------------
-Move Breakdown: 
---------------------------------------------
-Total Moves: 2030
-White Moves: 48
-Black Moves: 1982
 
-Piece Breakdown:
---------------------------------------------
-Pawns Pushes: 246
-Pawns Captures: 146
-Knights: 487
-Bishops: 379
-Rooks: 436
-Queens: 204
-Kings: 132
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
 
-Special Moves Breakdown:
---------------------------------------------
-Castles: 36
-Promotions: 0
-En Passants: 0
-Captures: 350
-Checks: 3
-Checkmates: 0
---------------------------------------------
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R b KQ - 0 8
+
+Move: 8
+Black to move
+
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: -1
+
+
+board after move
+e7->h4
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [.] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [b] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/pp1P1ppp/2p5/8/2B4b/P7/1PP1NnPP/RNBQK2R w KQ - 1 9
+
+Move: 9
+White to move
+
+Castling Rights: 3
+50 Move Counter: 1
+En Passant: -1
+
+
+board after move
+a2->a3
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R b KQ - 0 8
+
+Move: 8
+Black to move
+
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: -1
+
+
+board after move
+e7->g5
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [.] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [b] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/pp1P1ppp/2p5/6b1/2B5/P7/1PP1NnPP/RNBQK2R w KQ - 1 9
+
+Move: 9
+White to move
+
+Castling Rights: 3
+50 Move Counter: 1
+En Passant: -1
+
+
+board after move
+a2->a3
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R b KQ - 0 8
+
+Move: 8
+Black to move
+
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: -1
+
+
+board after move
+e7->f6
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [.] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [b] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/pp1P1ppp/2p2b2/8/2B5/P7/1PP1NnPP/RNBQK2R w KQ - 1 9
+
+Move: 9
+White to move
+
+Castling Rights: 3
+50 Move Counter: 1
+En Passant: -1
+
+
+board after move
+a2->a3
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R b KQ - 0 8
+
+Move: 8
+Black to move
+
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: -1
+
+
+board after move
+c8->d7
+
+
+8  [r] [n] [.] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [b] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rn1q1k1r/pp1bbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R w KQ - 0 9
+
+Move: 9
+White to move
+
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: -1
+
+
+board after move
+a2->a3
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R b KQ - 0 8
+
+Move: 8
+Black to move
+
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: -1
+
+
+board after move
+d8->a5
+
+
+8  [r] [n] [b] [.] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [q] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnb2k1r/pp1Pbppp/2p5/q7/2B5/P7/1PP1NnPP/RNBQK2R w KQ - 1 9
+
+Move: 9
+White to move
+Check
+Castling Rights: 3
+50 Move Counter: 1
+En Passant: -1
+
+
+board after move
+a2->a3
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R b KQ - 0 8
+
+Move: 8
+Black to move
+
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: -1
+
+
+board after move
+d8->b6
+
+
+8  [r] [n] [b] [.] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [q] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnb2k1r/pp1Pbppp/1qp5/8/2B5/P7/1PP1NnPP/RNBQK2R w KQ - 1 9
+
+Move: 9
+White to move
+
+Castling Rights: 3
+50 Move Counter: 1
+En Passant: -1
+
+
+board after move
+a2->a3
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R b KQ - 0 8
+
+Move: 8
+Black to move
+
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: -1
+
+
+board after move
+d8->c7
+
+
+8  [r] [n] [b] [.] [.] [k] [.] [r] 
+7  [p] [p] [q] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnb2k1r/ppqPbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R w KQ - 1 9
+
+Move: 9
+White to move
+
+Castling Rights: 3
+50 Move Counter: 1
+En Passant: -1
+
+
+board after move
+a2->a3
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R b KQ - 0 8
+
+Move: 8
+Black to move
+
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: -1
+
+
+board after move
+d8->d7
+
+
+8  [r] [n] [b] [.] [.] [k] [.] [r] 
+7  [p] [p] [.] [q] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnb2k1r/pp1qbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R w KQ - 0 9
+
+Move: 9
+White to move
+
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: -1
+
+
+board after move
+a2->a3
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R b KQ - 0 8
+
+Move: 8
+Black to move
+
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: -1
+
+
+board after move
+d8->e8
+
+
+8  [r] [n] [b] [.] [q] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnb1qk1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R w KQ - 1 9
+
+Move: 9
+White to move
+
+Castling Rights: 3
+50 Move Counter: 1
+En Passant: -1
+
+
+board after move
+a2->a3
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R b KQ - 0 8
+
+Move: 8
+Black to move
+
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: -1
+
+
+board after move
+f8->g8
+
+
+8  [r] [n] [b] [q] [.] [.] [k] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq2kr/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R w KQ - 1 9
+
+Move: 9
+White to move
+
+Castling Rights: 3
+50 Move Counter: 1
+En Passant: -1
+
+
+board after move
+a2->a3
+
+
+8  [r] [n] [b] [q] [.] [k] [.] [r] 
+7  [p] [p] [.] [P] [b] [p] [p] [p] 
+6  [.] [.] [p] [.] [.] [.] [.] [.] 
+5  [.] [.] [.] [.] [.] [.] [.] [.] 
+4  [.] [.] [B] [.] [.] [.] [.] [.] 
+3  [P] [.] [.] [.] [.] [.] [.] [.] 
+2  [.] [P] [P] [.] [N] [n] [P] [P] 
+1  [R] [N] [B] [Q] [K] [.] [.] [R] 
+
+    a   b   c   d   e   f   g   h
+
+rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R b KQ - 0 8
+
+Move: 8
+Black to move
+
+Castling Rights: 3
+50 Move Counter: 0
+En Passant: -1
+
+
+a2a3: 34
+Nodes searched: 34

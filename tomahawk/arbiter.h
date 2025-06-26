@@ -6,6 +6,7 @@
 #include "moveGenerator.h"
 
 
+
 class Arbiter {
 private:
 public:
@@ -16,7 +17,7 @@ public:
     static bool isWinResult(Result result);
     static bool isWhiteWinResult(Result result);
     static bool isBlackWinResult(Result result);
-    static Result GetGameState(Board& board);
+    static Result GetGameState(const Board* board);
 
 /*
     static bool InsufficientMaterial(Board &board) {

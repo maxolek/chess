@@ -4,10 +4,6 @@
 #include "tests.h"
 #include <iostream>
 
-// first set of moves is looking good
-// now, test for 1. check 2. pins 3. castling 4. enpassant 
-// then run movegencount test
-
 
 int main(int argc, char* argv[]) {
     Tests tests = Tests();

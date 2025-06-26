@@ -86,6 +86,9 @@ struct SMasks {
 //      clockwise from N indexing
 std::pair<int,int> direction_map(int start_square, int target_square);
 int direction_index(int start_square, int target_square);
+// get relevant bits
+U64 isolateLSB(U64 x);
+U64 isolateMSB(U64 x);
 // function to count the number of set bits
 int countBits(U64 x);
 // function to get leading zero count
