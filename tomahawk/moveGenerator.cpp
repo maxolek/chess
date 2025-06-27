@@ -111,7 +111,6 @@ bool MoveGenerator::isPinned(int square) {
     U64 bitboard = 0ULL;
     U64 bb_opp = 0ULL; // all squares (incl) above/below king & opp pinning pieces
                         // pin_rays already excludes king
-    int piece_cnt = 0;
     int target_square;
     bool ortho; // true if orthogonal pin, false if diagonal pin
 
