@@ -182,7 +182,7 @@ bool MoveGenerator::isPinned(int square) {
             
     }
 
-    pin_rays &= ~bitboard;
+    //pin_rays &= ~PrecomputedMoveData::rayMasks[square][own_king_square];
     return false;
 }
 

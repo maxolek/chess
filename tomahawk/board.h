@@ -16,6 +16,23 @@ class Board {
 private:
 public:
     //PrecomputedMoveData align_masks = PrecomputedMoveData();
+    
+    
+    // zobrist hashing for board history store (repetition tables etc)
+    U64 zobrist_hash;
+    std::unordered_map<U64,int> hash_history;
+    U64 zobrist_table[12][64]; // 0-11: 6 pieces * 2 colors
+    U64 zobrist_side_to_move;
+    U64 zobrist_castling[4]; // KQkq
+    U64 zobrist_enpassant[8]; // a-h
+    U64 randomU64();
+    void initZobristKeys();
+    U64 computeZobristHash();
+    U64 updateHash( // called inside makeMove so these are all passed as args
+        U64 currentHash,  // since it isnt stored outside of that
+        int start_square, int target_square, int move_flag, bool is_promotion, int promotion_piece,
+        int moved_piece, int captured_piece, bool is_enpassant, int old_castling_rights
+    );
 
     // default bitboards
     U64 colorBitboards[2];
@@ -37,6 +54,7 @@ public:
     //      improve with hash
     //std::vector<U64[8]> repetitionPosHistory;
     // move history
+    std::unordered_map<U64,int> positionHistory;
     std::vector<Move> allGameMoves;
     std::vector<GameState> gameStateHistory;
 

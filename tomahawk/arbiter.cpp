@@ -16,11 +16,12 @@ bool Arbiter::isBlackWinResult(Result result) {
 }
 
 Result Arbiter::GetGameState(const Board* board) {
-    MoveGenerator movegen = MoveGenerator(board);
-    movegen.generateMoves();
-
     //if (board.currentGameState.FiftyMoveCounter() > 100) {return FiftyMoveRule;}
     if (board->currentGameState.fiftyMoveCounter > 100) {return FiftyMoveRule;}
+    if ()
+        
+    MoveGenerator movegen = MoveGenerator(board);
+    movegen.generateMoves();
     // checkmate and stalemate
     if (movegen.moves.size() == 0) {
         if (board->is_in_check) return (board->is_white_move) ? WhiteIsMated : BlackIsMated;

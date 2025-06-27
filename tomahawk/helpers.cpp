@@ -92,6 +92,31 @@ std::pair<int,int> direction_map(int start_square, int target_square) {
     } else {return std::make_pair(0,0);}
 }
 
+U64 randomU64() {
+    std::mt19937_64 rng(42); 
+    return rng();
+}
+
+void initZobristKeys() {
+    std::mt19937_64 rng(42);
+
+    for (int piece = 0; piece < 12; piece++) {
+        for (int square = 0; square < 64; square++) {
+            zobrist_table[piece][square] = rng();
+        }
+    }
+
+    for (int i = 0; i < 4; i++) {
+        zobrist_castling[i] = rng();
+    }
+    for (int i = 0; i < 8; i++) {
+        zobrist_enpassant[i] = rng();
+    }
+
+    zobrist_side_to_move = rng();
+}
+
+
 U64 isolateLSB(U64 x) {
     return x & -x;
 }
