@@ -7,8 +7,12 @@
 
 int main(int argc, char* argv[]) {
     Tests tests = Tests();
-    // precomp must always be initialized for movegenerator to work
+    // precomp must always be initialized for movegenerator+board to work
     PrecomputedMoveData precomp = PrecomputedMoveData();
+
+    if (argc == 2){
+        tests.zobristTest();
+    }
 
     if (argc < 9) {
         std::cerr << "Usage: ./testing [perft|divide] <fen> <depth>\n";
@@ -21,22 +25,7 @@ int main(int argc, char* argv[]) {
     for (int i = 3; i < argc - 1; ++i) {
         fen += " " + std::string(argv[i]);
     }
-
     int depth = std::stoi(argv[argc - 1]);
-    //int depth = 2;
-
-    //std::string mode = argv[1];
-    //std::string fen = argv[2];
-    //int depth = std::stoi(argv[3]);
-    //std::cout << "argc: " << argc << std::endl;
-    //std::cout << "fen: " << fen << std::endl;
-    //std::cout << i << std::endl;
-    //std::cout << "hard coded last arg: " << argv[8] << std::endl;
-    //std::cout << "last arg: " << argv[argc - 1] << std::endl;
-    //std::cout << "mode: " << mode << std::endl;
-    //std::cout << "fen: " << fen << std::endl;
-    //std::cout << "depth: " << depth << std::endl;
-    //std::cout << mode << "\t" << fen << "\t" << depth << std::endl;
 
     if (mode == "perft") {
         std::cout << tests.perft(depth, fen) << "\n";  // perft should return a node count

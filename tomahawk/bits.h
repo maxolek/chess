@@ -36,6 +36,10 @@ public:
     static constexpr U64 mask_h_file = 0x8080808080808080ULL; 
     static constexpr U64 mask_rank_2 = 0x000000000000FF00ULL;
     static constexpr U64 mask_rank_7 = 0x00FF000000000000ULL;
+
+    // colors masks
+    static constexpr U64 light_squares_mask = 0x55AA55AA55AA55AAULL;
+    static constexpr U64 dark_squares_mask  = 0xAA55AA55AA55AA55ULL;
 };
 
 #endif

@@ -66,8 +66,52 @@ public:
         setBoard(_board);
     }
 
-    // movegen is not setting the correct side
-    // depth = 1 is correct ... depth = 2 is set to black_to_move for first set of moves (should still be white)
+    // INTERNAL TESTS
+    void printHashHistory() const {
+        std::cout << "\nZobrist Hash History:\n";
+        for (const auto& [ply, hash] : board.hash_history) {
+            std::cout << "Ply " << ply << ": " << hash << "\n";
+        }
+        std::cout << "----------------------------------------\n";
+    }
+
+    // should see new hashs appear on new positions, increments/decrements on repeat hashs, and hashs disappear before first appearances
+    void zobristTest() {
+        std::string input;
+        Move move = Move(0); // init to null move 
+
+        std::cout << "Initial Board:" << std::endl;
+        board.print_board();
+
+        while (true) {
+            std::cout << "\nEnter move (or 'unmake <move>') (format: [a-z][1-8][a-z][1-8]): ";
+            std::getline(std::cin, input);
+
+            if (input == "quit") {break;}
+
+            if (input.rfind("unmake ", 0) == 0) {
+                move = Move(algebraic_to_square(input.substr(7,2)),algebraic_to_square(input.substr(9,2)));
+                if (!board.allGameMoves.empty() && Move::SameMove(board.allGameMoves.back(), move)) {
+                    board.UnmakeMove(move);
+                    board.allGameMoves.pop_back();
+                    std::cout << "Move '" << input << "' unmade.\n";
+                } else {
+                    std::cout << "Warning: Move to unmake does not match last move.\n";
+                }
+            } else {
+                move = Move(algebraic_to_square(input.substr(0,2)),algebraic_to_square(input.substr(2,2)));
+                board.MakeMove(move);
+                board.allGameMoves.push_back(move);
+                std::cout << "Move '" << input << "' made.\n";
+            }
+
+            std::cout << "\nUpdated Board:\n";
+            board.print_board();
+            printHashHistory();
+        }
+    }
+
+    // MOVEGEN TESTS
 
     void runPerft(int depth, bool init_moves, std::string _fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1") {
         int res = 0;
