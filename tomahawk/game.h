@@ -9,17 +9,20 @@
 class Game {
 public:
     bool userIsWhite;
+    Board board;
+    //MoveGenerator* movegen;
     Game();
 
-    void start(); // Main loop for playing a game
+    void start(Engine* eng); // Main loop for playing a game
+    void startUCI(Engine* eng); // still main loop, limit output for UCI compatibility
     void userMove(const std::string& moveStr); // Process a move from user input
-    void engineMove(); // Let engine choose a move
+    void engineMove(Engine* eng); // Let engine choose a move
+    void engineMoveUCI(Engine* eng); // cut output for UCI compatibility
     void undoMove(); // Undo last move
     void printBoard(); // Display board
     bool isGameOver() const; // Check for checkmate, stalemate, etc.
 
 private:
-    Board board;
     PrecomputedMoveData precomp = PrecomputedMoveData();
 
     void displayResult();

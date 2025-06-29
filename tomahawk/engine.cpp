@@ -8,17 +8,17 @@
 #include <sstream>
 
 Engine::Engine() {
-    board = Board();
-    movegen = std::make_unique<MoveGenerator>(&board);
+    //board = &Board();
+    movegen = std::make_unique<MoveGenerator>(board);
     movegen->generateMoves();
     legal_moves = movegen->moves;
     clearState();
 }
 
-Engine::Engine(const Board* _board) {
-    board = *_board;
-    movegen = std::make_unique<MoveGenerator>(&board);
-    movegen->generateMoves(&board);
+Engine::Engine(Board* _board) {
+    board = _board;
+    movegen = std::make_unique<MoveGenerator>(board);
+    movegen->generateMoves(board);
     legal_moves = movegen->moves;
 }
 
@@ -33,28 +33,57 @@ void Engine::clearState() {
 }
 
 void Engine::setOption(const std::string& name, const std::string& value) {
-    // Placeholder for future engine options
-    std::cout << "info string option " << name << " set to " << value << std::endl;
+    if (name == "Move Overhead") {
+        moveOverhead = std::stoi(value);
+        std::cout << "info string set Move Overhead to " << moveOverhead << std::endl;
+    }
+    else if (name == "Hash") {
+        hashSize = std::stoi(value);
+        std::cout << "info string set Hash to " << hashSize << std::endl;
+    }
+    else if (name == "Threads") {
+        threads = std::stoi(value);
+        std::cout << "info string set Threads to " << threads << std::endl;
+    }
+    else if (name == "Ponder") {
+        ponder = (value == "true" || value == "1");
+        std::cout << "info string set Ponder to " << (ponder ? "true" : "false") << std::endl;
+    }
+    else if (name == "SyzygyPath") {
+        syzygyPath = value;
+        std::cout << "info string set SyzygyPath to " << syzygyPath << std::endl;
+    }
+    else if (name == "UCI_ShowWDL") {
+        // You can accept and ignore this option if you don't support WDL tablebases
+        uciShowWDL = (value == "true" || value == "1");
+        std::cout << "info string set UCI_ShowWDL to " << (uciShowWDL ? "true" : "false") << std::endl;
+    }
+    else {
+        // Silently ignore unknown options to avoid errors
+        std::cout << "info string ignoring unknown option: " << name << std::endl;
+    }
 }
+
+
 
 void Engine::setPosition(const std::string& fen, const std::vector<Move>& moves) {
     if (fen == "startpos") {
-        board.setFromFEN(STARTPOS_FEN);
+        board->setFromFEN(STARTPOS_FEN);
     } else {
-        board.setFromFEN(fen);
+        board->setFromFEN(fen);
     }
     playMoves(moves);
 }
 
 void Engine::playMoves(const std::vector<Move>& moves) {
     for (const auto& move : moves) {
-        board.MakeMove(move);
+        board->MakeMove(move);
     }
 }
 
 void Engine::playMovesStrings(const std::vector<std::string>& moves) {
     for (const auto& move : moves) {
-        board.MakeMove(Move(move));
+        board->MakeMove(Move(move));
     }
 }
 
@@ -68,7 +97,7 @@ void Engine::startSearch(SearchSettings settings) {
     pondering = settings.infinite;
 
     // Set remaining time for this side
-    int side = board.is_white_move ? 0 : 1;
+    int side = board->is_white_move ? 0 : 1;
     int myTime = time_left[side];
     int myInc = increment[side];
 
@@ -129,7 +158,7 @@ void Engine::ponderHit() {
 
 void Engine::iterativeDeepening() {
     // Dummy search just picks the first legal move
-    movegen->generateMoves(&board);
+    movegen->generateMoves(board);
     std::vector<Move> moves = movegen->moves;
     if (!moves.empty()) {
         bestMove = moves[0];
@@ -159,7 +188,7 @@ void Engine::uciLoop() {
             std::cout << "readyok\n";
         } else if (line == "ucinewgame") {
             clearState();
-            board.setFromFEN(STARTPOS_FEN);
+            board->setFromFEN(STARTPOS_FEN);
         } else if (line.rfind("position", 0) == 0) {
             std::istringstream iss(line.substr(9));
             std::string token, fen;
@@ -200,30 +229,42 @@ void Engine::uciLoop() {
             break;
         }
     }
+    exit(0);
 }
 
+// move object
+Move Engine::getBestMove(const Board& board) {
+    movegen->generateMoves(&board);
+    legal_moves = movegen->moves;
+    return Searcher::bestMove(legal_moves);
+}
+// uci
+std::string Engine::getBestMoveUCI(const Board& board) {
+    movegen->generateMoves(&board);
+    legal_moves = movegen->moves;
+    Move best_move = Searcher::bestMove(legal_moves);
+    return best_move.uci();
+}
 
 // for use with GAME.CPP
 // AN INTERFACE TO PLAY WITH USER
-
 void Engine::processPlayerMove(Move move) {
-    board.MakeMove(move);
-    movegen->generateMoves(&board);
-    legal_moves = movegen->moves;
+    //board->MakeMove(move);
+    //movegen->generateMoves(board);
+    //legal_moves = movegen->moves;
 }
 
 std::string Engine::processEngineMoveString() {
     Move best_move = Searcher::bestMove(legal_moves);
-    board.MakeMove(best_move);
-    return square_to_algebraic(best_move.StartSquare()) + square_to_algebraic(best_move.TargetSquare());
+    //board->MakeMove(best_move);
+    return best_move.uci();
 }
 
 Move Engine::processEngineMove() {
     Move best_move = Searcher::bestMove(legal_moves);
-    board.MakeMove(best_move);
+    //board->MakeMove(best_move);
     return best_move;
 }
-
 
 
 // JAVA INTERFACE SUPPORT

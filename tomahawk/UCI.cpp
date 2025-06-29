@@ -18,6 +18,7 @@ void UCI::loop() {
 
         if (line == "quit") {
             isRunning = false;
+            exit(0);
         }
     }
 }
@@ -28,10 +29,15 @@ void UCI::handleCommand(const std::string& line) {
     iss >> token;
 
     if (token == "uci") {
-        std::cout << "Tomahawk v0\n";
-        std::cout << "Max Oleksa\n";
-        // Add option descriptions here if needed
-        std::cout << "uciok\n";
+            std::cout << "id name tomahawk\n";
+            std::cout << "id author maxolek\n";
+            std::cout << "option name Move Overhead type spin default 30 min 0 max 1000\n";
+            std::cout << "option name Hash type spin default 16 min 1 max 1024\n";
+            std::cout << "option name Threads type spin default 1 min 1 max 128\n";
+            std::cout << "option name Ponder type check default false\n";
+            // Required for lichess
+            std::cout << "option name UCI_ShowWDL type check default false" << std::endl;
+            std::cout << "uciok\n";
     }
     else if (token == "isready") {
         std::cout << "readyok\n";
@@ -40,8 +46,8 @@ void UCI::handleCommand(const std::string& line) {
         handleSetOption(iss);
     }
     else if (token == "ucinewgame") {
-        //engine->newGame();
-        game->start();
+        engine->clearState();
+        //game->startUCI(engine);
     }
     else if (token == "position") {
         handlePosition(iss);
@@ -54,36 +60,54 @@ void UCI::handleCommand(const std::string& line) {
         std::string best = engine->bestMove.uci();
         std::cout << "bestmove " << best << "\n";
     }
-    else if (token == "ponderhit") {
-        engine->ponderHit();
-    }
+    //else if (token == "ponderhit") {
+    //    engine->ponderHit();
+    //}
     else if (token == "quit") {
         engine->stopSearch();
+        exit(0);
     }
     // else ignore unknown commands or add more handlers
 }
 
 void UCI::handleSetOption(std::istringstream& iss) {
-    std::string word;
-    std::string name, value;
+    std::string token;
+    std::string name;
+    std::string value;
 
-    iss >> word; // expect "name"
-    if (word == "name") {
-        std::string part;
-        while (iss >> part && part != "value") {
-            if (!name.empty()) name += " ";
-            name += part;
-        }
-        // read rest as value
-        std::getline(iss, value);
-        if (!value.empty()) {
-            size_t first = value.find_first_not_of(" \t");
-            if (first != std::string::npos)
-                value = value.substr(first);
-        }
-        engine->setOption(name, value);
+    // Read tokens until "value" or end
+    // First token should be "name"
+    iss >> token;
+    if (token != "name") {
+        // Invalid command format, ignore or handle error
+        return;
     }
+
+    // Read option name until "value" or end of stream
+    while (iss >> token) {
+        if (token == "value") {
+            // Now read the rest as value
+            std::getline(iss, value);
+            // Trim leading spaces from value
+            size_t first = value.find_first_not_of(" \t");
+            if (first != std::string::npos) {
+                value = value.substr(first);
+            } else {
+                value.clear(); // no value after "value"
+            }
+            break;
+        } else {
+            if (!name.empty()) name += " ";
+            name += token;
+        }
+    }
+
+    // If no "value" token, value remains empty string
+
+    // Now pass to your engine's option setter
+    engine->setOption(name, value);
 }
+
 
 void UCI::handlePosition(std::istringstream& iss) {
     std::string posType;

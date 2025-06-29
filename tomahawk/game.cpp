@@ -1,13 +1,13 @@
 #include "game.h"
 
 // Constructor initializes board and user color (white by default)
-Game::Game() : userIsWhite(true) {
-    // Initialize board to starting position if needed
-    // board.reset(); // uncomment if you have such a method
+Game::Game() {
+    userIsWhite = true;
+    board = Board();
 }
 
 // Main loop could be implemented outside or here; here is a simple placeholder
-void Game::start() {
+void Game::start(Engine* eng) {
     printBoard();
 
     while (!isGameOver()) {
@@ -18,12 +18,26 @@ void Game::start() {
             std::getline(std::cin, userInput);
             userMove(userInput);
         } else {
-            engineMove();
+            engineMove(eng);
         }
         printBoard();
     }
 
     displayResult();
+}
+
+void Game::startUCI(Engine* eng) {
+    /*while (!isGameOver()) {
+        if ((board.move_color == white && userIsWhite) ||
+            (board.move_color == black && !userIsWhite)) {
+            std::string userInput;
+            //std::cout << "Your move: ";
+            std::getline(std::cin, userInput);
+            userMove(userInput);
+        } else {
+            engineMoveUCI(eng);
+        }
+    }*/
 }
 
 // Process a user move given as a string
@@ -39,10 +53,15 @@ void Game::userMove(const std::string& moveStr) {
 }
 
 // Let the engine choose and make a move
-void Game::engineMove() {
-    Engine engine(&board);  // Assuming Engine can be constructed from Board or passed a Board ref
-    Move bestMove = engine.processEngineMove();
+void Game::engineMove(Engine* eng) {
+    Move bestMove = eng->getBestMove(board);
     std::cout << "Engine plays: " << bestMove.uci() << "\n";
+    board.MakeMove(bestMove);
+}
+
+// UCI handles output so dont need any here, just making move
+void Game::engineMoveUCI(Engine* eng) {
+    Move bestMove = eng->getBestMove(board);
     board.MakeMove(bestMove);
 }
 

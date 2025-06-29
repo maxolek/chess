@@ -1,5 +1,7 @@
 # Ignore VS Code settings
 .vscode/
+# and lichess-bot repo
+lichess-bot/
 
 # Ignore JSON configuration files
 launch.json

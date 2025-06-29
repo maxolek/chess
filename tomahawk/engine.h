@@ -18,16 +18,29 @@ private:
 
     // internal helpers
     void iterativeDeepening();
-    void clearState();
+
 public:
-    Board board;
+    Board* board;
     Move bestMove;
     std::vector<Move> legal_moves;
     bool pondering = false; bool stop = false;
 
+    // UCI options
+    std::string syzygyPath = "";
+    int hashSize = 16;       // default example
+    int threads = 1;
+    bool ponder = false;
+    int moveOverhead = 30;
+    int multiPV = 1;
+    int skillLevel = 20;
+    int contempt = 0;
+    bool uciShowWDL = false;
+
     Engine();
-    Engine(const Board* _board);
+    Engine(Board* _board);
     //~Engine();
+
+    void clearState();
 
     // uci
     void setOption(const std::string& name, const std::string& value);
@@ -43,6 +56,9 @@ public:
     void sendBestMove(Move bestMove, Move ponderMove = Move::NullMove());
     void uciLoop();
 
+    // best moves
+    Move getBestMove(const Board& board); // move obj
+    std::string getBestMoveUCI(const Board& board); // uci
     void processPlayerMove(Move move);
     std::string processEngineMoveString();
     Move processEngineMove();

@@ -3,8 +3,8 @@
 #include "game.h"
 
 int main() {
-    Engine engine;
-    Game game;
+    Game game = Game();
+    Engine engine = Engine(&game.board);
     UCI uci(engine, game);
 
     uci.loop();
