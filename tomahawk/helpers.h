@@ -18,11 +18,13 @@
 #include <sstream>
 #include <chrono>
 #include <iomanip>
+#include <limits>
 
 typedef uint64_t U64;
 typedef unsigned short ushort;
 
 extern std::string STARTPOS_FEN;
+const float INF = std::numeric_limits<float>::infinity();
 
 // board squares
 enum {

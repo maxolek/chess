@@ -20,9 +20,9 @@ enum Result
 };
 */
 
-//static bool isDrawResult(Result result) {
-//    return result == Stalemate || result == Repetition || result == FiftyMoveRule || result == InsufficientMaterial || result == DrawByArbiter;
-//}
+bool Arbiter::isDrawResult(Result result) {
+    return result == Stalemate || result == Repetition || result == FiftyMoveRule || result == InsufficientMaterial || result == DrawByArbiter;
+}
 bool Arbiter::isWinResult(Result result) {
     return isWhiteWinResult(result) || isBlackWinResult(result);
 }

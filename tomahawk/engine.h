@@ -20,7 +20,8 @@ private:
     void iterativeDeepening();
 
 public:
-    Board* board;
+    Board* game_board;
+    Board search_board; // want to modify search board
     Move bestMove;
     std::vector<Move> legal_moves;
     bool pondering = false; bool stop = false;
@@ -57,8 +58,10 @@ public:
     void uciLoop();
 
     // best moves
-    Move getBestMove(const Board& board); // move obj
-    std::string getBestMoveUCI(const Board& board); // uci
+    Move getBestMove( Board& board); // move obj
+    std::string getBestMoveUCI( Board& board); // uci
+    // above are not const args as engine will reference game.cpp
+    // and searcher will move on game.board to get best moves
     void processPlayerMove(Move move);
     std::string processEngineMoveString();
     Move processEngineMove();

@@ -1,7 +1,5 @@
 // Engine.cpp
 #include "engine.h"
-
-#include "engine.h"
 #include <iostream>
 #include <thread>
 #include <chrono>
@@ -9,16 +7,17 @@
 
 Engine::Engine() {
     //board = &Board();
-    movegen = std::make_unique<MoveGenerator>(board);
-    movegen->generateMoves();
+    movegen = std::make_unique<MoveGenerator>(&search_board);
+    movegen->generateMoves(game_board);
     legal_moves = movegen->moves;
     clearState();
 }
 
 Engine::Engine(Board* _board) {
-    board = _board;
-    movegen = std::make_unique<MoveGenerator>(board);
-    movegen->generateMoves(board);
+    game_board = _board;
+    search_board = *_board;
+    movegen = std::make_unique<MoveGenerator>(&search_board);
+    movegen->generateMoves(game_board);
     legal_moves = movegen->moves;
 }
 
@@ -68,26 +67,27 @@ void Engine::setOption(const std::string& name, const std::string& value) {
 
 void Engine::setPosition(const std::string& fen, const std::vector<Move>& moves) {
     if (fen == "startpos") {
-        board->setFromFEN(STARTPOS_FEN);
+        game_board->setFromFEN(STARTPOS_FEN);
     } else {
-        board->setFromFEN(fen);
+        game_board->setFromFEN(fen);
     }
     playMoves(moves);
 }
 
 void Engine::playMoves(const std::vector<Move>& moves) {
     for (const auto& move : moves) {
-        board->MakeMove(move);
+        game_board->MakeMove(move);
     }
 }
 
 void Engine::playMovesStrings(const std::vector<std::string>& moves) {
     for (const auto& move : moves) {
-        board->MakeMove(Move(move));
+        game_board->MakeMove(Move(move));
     }
 }
 
 void Engine::startSearch(SearchSettings settings) {
+    search_board = *game_board;
     search_depth = settings.depth;
     time_left[0] = settings.wtime;
     time_left[1] = settings.btime;
@@ -97,7 +97,7 @@ void Engine::startSearch(SearchSettings settings) {
     pondering = settings.infinite;
 
     // Set remaining time for this side
-    int side = board->is_white_move ? 0 : 1;
+    int side = game_board->is_white_move ? 0 : 1;
     int myTime = time_left[side];
     int myInc = increment[side];
 
@@ -129,6 +129,7 @@ void Engine::startSearch(SearchSettings settings) {
 
 
 void Engine::startSearch(int depth, int movetime, int wtime, int btime, int winc, int binc) {
+    search_board = *game_board;
     search_depth = depth;
     time_left[0] = wtime;
     time_left[1] = btime;
@@ -158,10 +159,10 @@ void Engine::ponderHit() {
 
 void Engine::iterativeDeepening() {
     // Dummy search just picks the first legal move
-    movegen->generateMoves(board);
+    movegen->generateMoves(&search_board);
     std::vector<Move> moves = movegen->moves;
     if (!moves.empty()) {
-        bestMove = moves[0];
+        bestMove = Searcher::bestMove(search_board, moves);
     } else {
         bestMove = Move::NullMove();
     }
@@ -188,7 +189,7 @@ void Engine::uciLoop() {
             std::cout << "readyok\n";
         } else if (line == "ucinewgame") {
             clearState();
-            board->setFromFEN(STARTPOS_FEN);
+            game_board->setFromFEN(STARTPOS_FEN);
         } else if (line.rfind("position", 0) == 0) {
             std::istringstream iss(line.substr(9));
             std::string token, fen;
@@ -232,17 +233,20 @@ void Engine::uciLoop() {
     exit(0);
 }
 
+// OBSOLETE
+
+
 // move object
-Move Engine::getBestMove(const Board& board) {
+Move Engine::getBestMove(Board& board) {
     movegen->generateMoves(&board);
     legal_moves = movegen->moves;
-    return Searcher::bestMove(legal_moves);
+    return Searcher::bestMove(board, legal_moves);
 }
 // uci
-std::string Engine::getBestMoveUCI(const Board& board) {
+std::string Engine::getBestMoveUCI(Board& board) {
     movegen->generateMoves(&board);
     legal_moves = movegen->moves;
-    Move best_move = Searcher::bestMove(legal_moves);
+    Move best_move = Searcher::bestMove(board, legal_moves);
     return best_move.uci();
 }
 
@@ -255,13 +259,13 @@ void Engine::processPlayerMove(Move move) {
 }
 
 std::string Engine::processEngineMoveString() {
-    Move best_move = Searcher::bestMove(legal_moves);
+    Move best_move = Searcher::bestMove(search_board, legal_moves);
     //board->MakeMove(best_move);
     return best_move.uci();
 }
 
 Move Engine::processEngineMove() {
-    Move best_move = Searcher::bestMove(legal_moves);
+    Move best_move = Searcher::bestMove(search_board, legal_moves);
     //board->MakeMove(best_move);
     return best_move;
 }

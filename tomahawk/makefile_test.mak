@@ -8,13 +8,13 @@ ifeq ($(DEBUG),1)
     TARGET = debug.exe
 else
     CXXFLAGS += -O2
-    TARGET = main.exe
+    TARGET = testing.exe
 endif
 
 # Source files
 SRCS = arbiter.cpp board.cpp gamestate.cpp helpers.cpp moveGenerator.cpp \
        PrecomputedMoveData.cpp game.cpp UCI.cpp \
-       searcher.cpp evaluator.cpp engine.cpp main.cpp
+       searcher.cpp evaluator.cpp engine.cpp testing.cpp
 
 OBJS = $(SRCS:.cpp=.o)
 

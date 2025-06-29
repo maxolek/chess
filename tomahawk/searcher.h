@@ -1,13 +1,14 @@
 #ifndef SEARCHER_H
 #define SEARCHER_H
 
-#include "moveGenerator.h"
+#include "evaluator.h"
 
 class Searcher {
 private:
-    std::vector<Move> potential_moves;
+    //Board* board;
+    //std::vector<Move>* potential_moves;
 public:
-    static Move bestMove(std::vector<Move> potential_moves);
+    static Move bestMove(Board& board, std::vector<Move>& potential_moves);
 };
 
 #endif

@@ -11,9 +11,7 @@ class Arbiter {
 private:
 public:
 
-    //static bool isDrawResult(Result result) {
-    //    return result == Stalemate || result == Repetition || result == FiftyMoveRule || result == InsufficientMaterial || result == DrawByArbiter;
-    //}
+    static bool isDrawResult(Result result);
     static bool isInsufficientMaterial(const Board&board);
     static bool isWinResult(Result result);
     static bool isWhiteWinResult(Result result);

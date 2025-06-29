@@ -14,9 +14,10 @@ int main() {
     // Create game and set player color
     Game game;
     game.userIsWhite = (choice == 'w');
+    Engine engine = Engine(&game.board);
 
     std::cin.ignore(); // Clear leftover newline from input buffer
-    game.start();      // Start the game loop
+    game.start(&engine);      // Start the game loop
 
     return 0;
 }
