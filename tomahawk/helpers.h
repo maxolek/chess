@@ -22,6 +22,8 @@
 typedef uint64_t U64;
 typedef unsigned short ushort;
 
+extern std::string STARTPOS_FEN;
+
 // board squares
 enum {
     a1, b1, c1, d1, e1, f1, g1, h1,
@@ -58,6 +60,7 @@ enum Result
 };
 
 extern std::string file_char;
+extern std::string results_string[];
 
 // set/get/pop macros
 inline void set_bit(U64 &bitboard, int square) {
@@ -81,6 +84,20 @@ struct SMasks {
     U64 upper; // from piece -> upper idx square
     U64 lineEx; // lower | upper
 };
+
+// for UCI game settings
+struct SearchSettings {
+    int wtime = 0;
+    int btime = 0;
+    int winc = 0;
+    int binc = 0;
+    int movestogo = 0;
+    int depth = -1;
+    int nodes = -1;
+    int movetime = -1;
+    bool infinite = false;
+};
+
 
 // function to get the cardinal direction from start_square -> target_square
 //      clockwise from N indexing

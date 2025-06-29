@@ -14,7 +14,7 @@ public:
     //static bool isDrawResult(Result result) {
     //    return result == Stalemate || result == Repetition || result == FiftyMoveRule || result == InsufficientMaterial || result == DrawByArbiter;
     //}
-    static bool InsufficientMaterial(const Board&board);
+    static bool isInsufficientMaterial(const Board&board);
     static bool isWinResult(Result result);
     static bool isWhiteWinResult(Result result);
     static bool isBlackWinResult(Result result);

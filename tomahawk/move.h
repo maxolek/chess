@@ -34,6 +34,8 @@ public:
     static constexpr ushort flagMask = 0b1111000000000000;
 
     // constructors
+    Move () {moveValue = 0;}
+
     Move (ushort _moveValue) {
         moveValue = _moveValue;
     }
@@ -44,6 +46,29 @@ public:
 
     Move (int _startSquare, int _targetSquare, int _flag) {
         moveValue = (ushort)(_startSquare | _targetSquare << 6 | _flag << 12);
+    }
+
+    Move (std::string uci) {
+        std::string _start, _target;
+        char _flag;
+        int start, target, flag;
+
+        _start = uci.substr(0,2); _target = uci.substr(2,2);
+        start = algebraic_to_square(_start); target = algebraic_to_square(_target);
+
+        if (uci == "e1g1" || uci == "e1c1" || uci == "e8g8" || uci == "e8c8") {
+            // castling
+            moveValue = (ushort)(start | target << 6 | castleFlag << 12);
+        } else if (uci.length() == 5 ) { // promotions
+            _flag = uci[4];
+            switch (_flag) {
+                    case 'q': moveValue = (ushort)(start | target << 6 | promoteToQueenFlag << 12); break;
+                    case 'r': moveValue = (ushort)(start | target << 6 | promoteToRookFlag<< 12); break;
+                    case 'b': moveValue = (ushort)(start | target << 6 | promoteToBishopFlag<< 12); break;
+                    case 'n': moveValue = (ushort)(start | target << 6 | promoteToKnightFlag<< 12); break;
+                }
+        } else {moveValue = (ushort)(start | target << 6);} // rest
+        
     }
 
     // getters

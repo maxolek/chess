@@ -2,7 +2,7 @@
 #ifndef ENGINE_H
 #define ENGINE_H
 
-#include <jni.h>
+//#include <jni.h>
 #include "board.h"
 #include "moveGenerator.h"
 #include "arbiter.h"
@@ -10,24 +10,47 @@
 
 class Engine {
 private:
-    Board board;
-    bool isWhiteTurn;
-    MoveGenerator movegen;
-    std::vector<Move> legal_moves;
+    PrecomputedMoveData precomp = PrecomputedMoveData();
+    std::unique_ptr<MoveGenerator> movegen;
+    Move ponderMove;
+    int search_depth;
+    int time_left[2], increment[2]; //white,black
+
+    // internal helpers
+    void iterativeDeepening();
+    void clearState();
 public:
+    Board board;
+    Move bestMove;
+    std::vector<Move> legal_moves;
+    bool pondering = false; bool stop = false;
+
     Engine();
-    Engine(Board _board);
+    Engine(const Board* _board);
     //~Engine();
 
-    void initializeGame();
+    // uci
+    void setOption(const std::string& name, const std::string& value);
+    void setPosition(const std::string& fen, const std::vector<Move>& moves);
+    void playMoves(const std::vector<Move>& moves);
+    void playMovesStrings(const std::vector<std::string>& moves);
+    void startSearch(SearchSettings settings);
+    void startSearch(int depth = -1, int movetime = -1, int wtime = -1, int btime = -1, int winc = 0, int binc = 0);
+    void stopSearch();
+    void ponderHit();
+
+    // Communication
+    void sendBestMove(Move bestMove, Move ponderMove = Move::NullMove());
+    void uciLoop();
 
     void processPlayerMove(Move move);
-    std::string processEngineMove();
+    std::string processEngineMoveString();
+    Move processEngineMove();
     std::string getBoardState();
     bool isGameOver() const;
 };
 
-
+/*
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -37,5 +60,6 @@ __declspec(dllexport) const jstring getBoardState();
 #ifdef __cplusplus
 }
 #endif
+*/
 
 #endif // ENGINE_H

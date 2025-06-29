@@ -69,11 +69,12 @@ public:
     // INTERNAL TESTS
     void printHashHistory() const {
         std::cout << "\nZobrist Hash History:\n";
-        for (const auto& [ply, hash] : board.hash_history) {
-            std::cout << "Ply " << ply << ": " << hash << "\n";
+        for (const auto& pair : board.hash_history) {
+            std::cout << "Hash " << pair.first << ": " << pair.second << " occurrence(s)\n";
         }
         std::cout << "----------------------------------------\n";
     }
+
 
     // should see new hashs appear on new positions, increments/decrements on repeat hashs, and hashs disappear before first appearances
     void zobristTest() {

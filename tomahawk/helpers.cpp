@@ -1,6 +1,22 @@
 #include "helpers.h"
 
+std::string STARTPOS_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 std::string file_char = "abcdefgh";
+std::string results_string[] = {
+    "NotStarted",
+    "InProgress",
+    "WhiteIsMated",
+    "BlackIsMated",
+    "Stalemate",
+    "Repetition",
+    "FiftyMoveRule",
+    "InsufficientMaterial",
+    "DrawByArbiter",
+    "WhiteTimeout",
+    "BlackTimeout",
+    "WhiteIllegalMove",
+    "BlackIllegalMove"
+};
 
 // print bitboard
 void print_bitboard(U64 bitboard) {

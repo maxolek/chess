@@ -1,39 +1,234 @@
 // Engine.cpp
 #include "engine.h"
 
+#include "engine.h"
+#include <iostream>
+#include <thread>
+#include <chrono>
+#include <sstream>
+
 Engine::Engine() {
-    isWhiteTurn = true;
     board = Board();
-    MoveGenerator movegen = MoveGenerator(board);
-    movegen.generateMoves();
-    legal_moves = movegen.moves;
+    movegen = std::make_unique<MoveGenerator>(&board);
+    movegen->generateMoves();
+    legal_moves = movegen->moves;
+    clearState();
 }
 
-Engine::Engine(Board _board) {
-    board = _board;
-    MoveGenerator movegen = MoveGenerator(board);
-    movegen.generateMoves(board);
-    legal_moves = movegen.moves;
+Engine::Engine(const Board* _board) {
+    board = *_board;
+    movegen = std::make_unique<MoveGenerator>(&board);
+    movegen->generateMoves(&board);
+    legal_moves = movegen->moves;
 }
 
-std::string Engine::getBoardState() {
-    board.setBoardFEN();
-    return board.getBoardFEN();
+void Engine::clearState() {
+    stop = false;
+    pondering = false;
+    bestMove = Move::NullMove();
+    ponderMove = Move::NullMove();
+    search_depth = -1;
+    time_left[0] = time_left[1] = 0;
+    increment[0] = increment[1] = 0;
 }
+
+void Engine::setOption(const std::string& name, const std::string& value) {
+    // Placeholder for future engine options
+    std::cout << "info string option " << name << " set to " << value << std::endl;
+}
+
+void Engine::setPosition(const std::string& fen, const std::vector<Move>& moves) {
+    if (fen == "startpos") {
+        board.setFromFEN(STARTPOS_FEN);
+    } else {
+        board.setFromFEN(fen);
+    }
+    playMoves(moves);
+}
+
+void Engine::playMoves(const std::vector<Move>& moves) {
+    for (const auto& move : moves) {
+        board.MakeMove(move);
+    }
+}
+
+void Engine::playMovesStrings(const std::vector<std::string>& moves) {
+    for (const auto& move : moves) {
+        board.MakeMove(Move(move));
+    }
+}
+
+void Engine::startSearch(SearchSettings settings) {
+    search_depth = settings.depth;
+    time_left[0] = settings.wtime;
+    time_left[1] = settings.btime;
+    increment[0] = settings.winc;
+    increment[1] = settings.binc;
+    stop = false;
+    pondering = settings.infinite;
+
+    // Set remaining time for this side
+    int side = board.is_white_move ? 0 : 1;
+    int myTime = time_left[side];
+    int myInc = increment[side];
+
+    // Time control handling (naive)
+    int timeBudget = settings.movetime;
+    if (timeBudget == -1 && myTime > 0) {
+        int movesToGo = settings.movestogo > 0 ? settings.movestogo : 30;
+        timeBudget = myTime / movesToGo + myInc;
+    }
+
+    // Begin search
+    auto start = std::chrono::steady_clock::now();
+
+    iterativeDeepening();
+
+    // Dummy search — just return the first legal move after sleeping
+    //if (timeBudget > 0) {
+    //    std::this_thread::sleep_for(std::chrono::milliseconds(std::min(timeBudget, 1000)));
+    //}
+
+    //ponderMove = moves.size() > 1 ? moves[1] : Move::NullMove(); // fake pondering target
+
+    auto end = std::chrono::steady_clock::now();
+    int elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    //std::cerr << "info string search completed in " << elapsedMs << " ms\n";
+
+    sendBestMove(bestMove, ponderMove);
+}
+
+
+void Engine::startSearch(int depth, int movetime, int wtime, int btime, int winc, int binc) {
+    search_depth = depth;
+    time_left[0] = wtime;
+    time_left[1] = btime;
+    increment[0] = winc;
+    increment[1] = binc;
+
+    stop = false;
+    pondering = false;
+
+    // Fake search logic for now
+    // Start search on a separate thread to keep UCI responsive
+    //search_thread = std::thread(&Engine::iterativeDeepening, this, movetime);
+    iterativeDeepening();
+    sendBestMove(bestMove, ponderMove);
+}
+
+void Engine::stopSearch() {
+    stop = true;
+    //if (search_thread.joinable()) {
+    //    search_thread.join();
+    //}
+}
+
+void Engine::ponderHit() {
+    pondering = false;
+}
+
+void Engine::iterativeDeepening() {
+    // Dummy search just picks the first legal move
+    movegen->generateMoves(&board);
+    std::vector<Move> moves = movegen->moves;
+    if (!moves.empty()) {
+        bestMove = moves[0];
+    } else {
+        bestMove = Move::NullMove();
+    }
+    // Simulate time-consuming search
+    //std::this_thread::sleep_for(std::chrono::milliseconds(100));
+}
+
+void Engine::sendBestMove(Move best, Move ponder) {
+    std::cout << "bestmove " << best.uci();
+    if (!ponder.IsNull()) {
+        std::cout << " ponder " << ponder.uci();
+    }
+    std::cout << std::endl;
+}
+
+void Engine::uciLoop() {
+    std::string line;
+    while (std::getline(std::cin, line)) {
+        if (line == "uci") {
+            std::cout << "id name MyEngine 1.0\n";
+            std::cout << "id author You\n";
+            std::cout << "uciok\n";
+        } else if (line == "isready") {
+            std::cout << "readyok\n";
+        } else if (line == "ucinewgame") {
+            clearState();
+            board.setFromFEN(STARTPOS_FEN);
+        } else if (line.rfind("position", 0) == 0) {
+            std::istringstream iss(line.substr(9));
+            std::string token, fen;
+            std::vector<Move> moves;
+
+            if (line.find("startpos") != std::string::npos) {
+                fen = "startpos";
+                while (iss >> token && token != "moves");
+            } else {
+                while (iss >> token && token != "moves") {
+                    fen += token + " ";
+                }
+            }
+
+            while (iss >> token) {
+                moves.push_back(Move(token));
+            }
+            setPosition(fen, moves);
+        } else if (line.rfind("go", 0) == 0) {
+            std::istringstream iss(line.substr(3));
+            std::string token;
+            int wtime = -1, btime = -1, winc = 0, binc = 0, depth = -1, movetime = -1;
+
+            while (iss >> token) {
+                if (token == "wtime") iss >> wtime;
+                else if (token == "btime") iss >> btime;
+                else if (token == "winc") iss >> winc;
+                else if (token == "binc") iss >> binc;
+                else if (token == "movetime") iss >> movetime;
+                else if (token == "depth") iss >> depth;
+            }
+            startSearch(depth, movetime, wtime, btime, winc, binc);
+        } else if (line == "stop") {
+            stopSearch();
+        } else if (line == "ponderhit") {
+            ponderHit();
+        } else if (line == "quit") {
+            break;
+        }
+    }
+}
+
+
+// for use with GAME.CPP
+// AN INTERFACE TO PLAY WITH USER
 
 void Engine::processPlayerMove(Move move) {
     board.MakeMove(move);
-    isWhiteTurn = !isWhiteTurn;
-    movegen.generateMoves(board);
-    legal_moves = movegen.moves;
+    movegen->generateMoves(&board);
+    legal_moves = movegen->moves;
 }
 
-std::string Engine::processEngineMove() {
+std::string Engine::processEngineMoveString() {
     Move best_move = Searcher::bestMove(legal_moves);
     board.MakeMove(best_move);
     return square_to_algebraic(best_move.StartSquare()) + square_to_algebraic(best_move.TargetSquare());
 }
 
+Move Engine::processEngineMove() {
+    Move best_move = Searcher::bestMove(legal_moves);
+    board.MakeMove(best_move);
+    return best_move;
+}
+
+
+
+// JAVA INTERFACE SUPPORT
+
+/*
 extern "C" JNIEXPORT jlong JNICALL Java_engine_Engine_initNativeEngine(JNIEnv* env, jobject obj) {
     Engine* engine = new Engine();
     return reinterpret_cast<jlong>(engine);
@@ -67,3 +262,4 @@ extern "C" JNIEXPORT jstring JNICALL Java_engine_Engine_getBoardState(JNIEnv* en
     
     return env->NewStringUTF(fen.c_str());
 }
+    */

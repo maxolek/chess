@@ -24,7 +24,7 @@ enum Result
 //    return result == Stalemate || result == Repetition || result == FiftyMoveRule || result == InsufficientMaterial || result == DrawByArbiter;
 //}
 bool Arbiter::isWinResult(Result result) {
-    return result == isWhiteWinResult(result) || result == isBlackWinResult(result);
+    return isWhiteWinResult(result) || isBlackWinResult(result);
 }
 bool Arbiter::isWhiteWinResult(Result result) {
     return result == BlackIsMated || result == BlackTimeout || result == BlackIllegalMove;
@@ -37,14 +37,15 @@ Result Arbiter::GetGameState(const Board* board) {
     //if (board.currentGameState.FiftyMoveCounter() > 100) {return FiftyMoveRule;}
     if (board->currentGameState.fiftyMoveCounter > 100) {return FiftyMoveRule;}
     if (board->hash_history.find(board->zobrist_hash)->second >= 3) {return Repetition;}
-        
+    if (isInsufficientMaterial(*board)) {return InsufficientMaterial;}    
+
     MoveGenerator movegen = MoveGenerator(board);
     movegen.generateMoves();
-    if (InsufficientMaterial(*board))
+
     // checkmate and stalemate
     if (movegen.moves.size() == 0) {
         if (board->is_in_check) return (board->is_white_move) ? WhiteIsMated : BlackIsMated;
-        else return Stalemate;
+        else if (board->plyCount >= 20) {return Stalemate;}
     }
     // repetition
     //else if (countPosDuplicates(board.repetitionPosHistory))
@@ -53,7 +54,7 @@ Result Arbiter::GetGameState(const Board* board) {
     return InProgress;
 }
 
-bool Arbiter::InsufficientMaterial(const Board& board) {
+bool Arbiter::isInsufficientMaterial(const Board& board) {
     // If any side has pawns, rooks, or queens → not insufficient
     if (board.pieceBitboards[pawn] | board.pieceBitboards[rook] | board.pieceBitboards[queen])
         return false;
