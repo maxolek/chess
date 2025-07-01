@@ -30,6 +30,7 @@ Board::Board() {
     is_in_check = false;
     plyCount = 0;
     currentGameState = GameState();
+    allGameMoves.clear();
     gameStateHistory.push_back(currentGameState);
     //setBoardFEN(); 
     
@@ -58,6 +59,7 @@ Board::Board(int side, U64 _color_bitboards[2], U64 _piece_bitboards[6], GameSta
     pieceBitboards[5] = _piece_bitboards[5];
 
     is_in_check = inCheck(true);
+    allGameMoves.clear();
     //setBoardFEN();
     initZobristKeys();
     zobrist_hash = computeZobristHash();
@@ -125,6 +127,66 @@ U64 Board::computeZobristHash() {
 
     return hash;
 }
+
+U64 Board::zobristCastlingHash(int castling_rights) {
+    U64 hash = 0;
+    // KQKq --> 0,2,4,8
+    if (castling_rights & 1)
+        hash ^= zobrist_castling[0]; // K
+    if (castling_rights & 2)
+        hash ^= zobrist_castling[1]; // Q
+    if (castling_rights & 4)
+        hash ^= zobrist_castling[2]; // k
+    if (castling_rights & 8)
+        hash ^= zobrist_castling[3]; // q
+
+    return hash;
+}
+
+void Board::debugZobristDifference(uint64_t old_hash, uint64_t new_hash) {
+    uint64_t diff = old_hash ^ new_hash;
+    if (diff == 0) {
+        std::cout << "Zobrist hashes are identical.\n";
+        return;
+    }
+
+    std::cout << "\n\nZobrist mismatch detected!\n";
+
+    // Side to move
+    if (diff & zobrist_side_to_move) {
+        std::cout << "- Side to move bit changed\n";
+    }
+
+    // Castling rights
+    for (int i = 0; i < 4; ++i) {
+        if (diff & zobrist_castling[i]) {
+            std::cout << "- Castling rights changed (mask " << i << ")\n";
+        }
+    }
+
+    // En passant file
+    for (int file = 0; file < 8; ++file) {
+        if (diff & zobrist_enpassant[file]) {
+            std::cout << "- En passant file toggled: file " << file << "\n";
+        }
+    }
+
+    // Piece positions
+    for (int color = 0; color < 2; ++color) {
+        for (int piece = 0; piece < 6; ++piece) {
+            int piece_index = color * 6 + piece;
+            for (int square = 0; square < 64; ++square) {
+                if (diff & zobrist_table[piece_index][square]) {
+                    std::cout << "- " << (color == 0 ? "White" : "Black") 
+                              << " " << piece_label(piece)
+                              << " toggled on square " << square << "\n";
+                }
+            }
+        }
+    }
+}
+
+
 /*
 U64 Board::updateHash(
     U64 currentHash,
@@ -289,8 +351,8 @@ void Board::MakeMove(Move move, bool in_search) {
         }
     }
     // zobrist castling
-    zobrist_hash ^= zobrist_castling[old_castling];
-    zobrist_hash ^= zobrist_castling[currentGameState.castlingRights];
+    zobrist_hash ^= zobristCastlingHash(old_castling);
+    zobrist_hash ^= zobristCastlingHash(currentGameState.castlingRights);
 
     is_in_check = inCheck(false);
     plyCount++;
@@ -365,8 +427,8 @@ void Board::UnmakeMove(Move move, bool in_search) {
     gameStateHistory.pop_back();
     currentGameState = gameStateHistory.back();
     // zobrist
-    zobrist_hash ^= zobrist_castling[new_castling];
-    zobrist_hash ^= zobrist_castling[currentGameState.castlingRights];
+    zobrist_hash ^= zobristCastlingHash(new_castling);
+    zobrist_hash ^= zobristCastlingHash(currentGameState.castlingRights);
     // re-implement EP hash if needed
     if (currentGameState.enPassantFile != -1) 
         zobrist_hash ^= zobrist_enpassant[currentGameState.enPassantFile];
@@ -386,7 +448,7 @@ void Board::MovePiece(int piece, int start_square, int target_square) {
     pop_bit(colorBitboards[move_color],start_square);
 
     zobrist_hash ^= zobrist_table[move_color * 6 + piece][start_square];
-    zobrist_hash ^= zobrist_table[move_color*6 + piece][target_square];
+    zobrist_hash ^= zobrist_table[move_color * 6 + piece][target_square];
 }
 
 void Board::CapturePiece(int piece, int target_square, bool is_enpassant, bool captured_is_moved_piece) {
@@ -552,6 +614,7 @@ void Board::setFromFEN(std::string _fen) {
 
     // reset state
     currentGameState = GameState();
+    allGameMoves.clear();
     for (int _ = 0; _ < 6; _++) {pieceBitboards[_] = 0ULL;}
     for (int _ = 0; _ < 2; _++) {colorBitboards[_] = 0ULL;}
 
@@ -652,7 +715,7 @@ void Board::setBoardFEN() {
     fen += " ";
     fen += std::to_string(currentGameState.fiftyMoveCounter);
     fen += " ";
-    fen += std::to_string(plyCount/2);
+    fen += std::to_string(plyCount/2+1);
 }
 
 void Board::print_board() {

@@ -109,12 +109,11 @@ public:
         std::cout << " (xor: " << board.zobrist_castling[board.currentGameState.castlingRights] << ")\n";
     }
 
-
-
     // should see new hashs appear on new positions, increments/decrements on repeat hashs, and hashs disappear before first appearances
     void zobristTest() {
+        U64 computed_zobrist;
         std::string input;
-        std::string start_str, target_str;
+        std::string start_str, target_str; int start, target; int ep;
         Move move = Move(0); // init to null move 
 
         std::cout << "Initial Board:" << std::endl;
@@ -128,41 +127,45 @@ public:
 
             if (input.rfind("unmake ", 0) == 0) {
                 start_str = input.substr(7,2); target_str = input.substr(9,2);
+                start = algebraic_to_square(start_str); target = algebraic_to_square(target_str);
+                ep = !board.is_white_move ? board.gameStateHistory[board.gameStateHistory.size()-2].enPassantFile + 8*5 : board.gameStateHistory[board.gameStateHistory.size()-2].enPassantFile + 8*2;
 
                 // castling
                 if ((start_str == "e1" || start_str == "e8") && (target_str == "g1" || target_str == "g8" || target_str == "c1" || target_str == "c8")) {
-                    move = Move(algebraic_to_square(start_str), algebraic_to_square(target_str), Move::castleFlag);
+                    move = Move(start, target, Move::castleFlag);
                 } // ep
-                else if (algebraic_to_square(start_str) == (board.gameStateHistory[board.gameStateHistory.size()-2].enPassantFile * board.is_white_move ? 5 : 2)) {
-                    move = Move(algebraic_to_square(start_str), algebraic_to_square(target_str), Move::enPassantCaptureFlag);
+                else if (target == ep) {
+                    move = Move(start, target, Move::enPassantCaptureFlag);
                 } // pawn up 2
-                else if (algebraic_to_square(start_str) % 8 == algebraic_to_square(target_str) % 8 && std::abs(algebraic_to_square(start_str)/8 - algebraic_to_square(target_str)/8)==2) {
-                    move = Move(algebraic_to_square(start_str), algebraic_to_square(target_str), Move::pawnTwoUpFlag);
-                } else {move = Move(algebraic_to_square(start_str),algebraic_to_square(target_str));}
+                else if (start % 8 == target % 8 && std::abs(start/8 - target/8)==2) {
+                    move = Move(start, target, Move::pawnTwoUpFlag);
+                } else {move = Move(start,target);}
 
                 if (!board.allGameMoves.empty() && Move::SameMove(board.allGameMoves.back(), move)) {
                     board.UnmakeMove(move);
-                    board.allGameMoves.pop_back();
+                    //board.allGameMoves.pop_back();
                     std::cout << "Move '" << input << "' unmade.\n";
                 } else {
                     std::cout << "Warning: Move to unmake does not match last move.\n";
                 }
             } else {
                 start_str = input.substr(0,2); target_str = input.substr(2,2);
+                start = algebraic_to_square(start_str); target = algebraic_to_square(target_str);
+                ep = board.is_white_move ? board.currentGameState.enPassantFile + 8*5 : board.currentGameState.enPassantFile + 8*2;
 
                 // castling
                 if ((start_str == "e1" || start_str == "e8") && (target_str == "g1" || target_str == "g8" || target_str == "c1" || target_str == "c8")) {
-                    move = Move(algebraic_to_square(start_str), algebraic_to_square(target_str), Move::castleFlag);
+                    move = Move(start, target, Move::castleFlag);
                 } // ep
-                else if (algebraic_to_square(start_str) == (board.gameStateHistory[board.gameStateHistory.size()-2].enPassantFile * board.is_white_move ? 5 : 2)) {
-                    move = Move(algebraic_to_square(start_str), algebraic_to_square(target_str), Move::enPassantCaptureFlag);
+                else if (target == ep) {
+                    move = Move(start, target, Move::enPassantCaptureFlag);
                 } // pawn up 2
-                else if (algebraic_to_square(start_str) % 8 == algebraic_to_square(target_str) % 8 && std::abs(algebraic_to_square(start_str)/8 - algebraic_to_square(target_str)/8)==2) {
-                    move = Move(algebraic_to_square(start_str), algebraic_to_square(target_str), Move::pawnTwoUpFlag);
-                } else {move = Move(algebraic_to_square(start_str),algebraic_to_square(target_str));}
+                else if (start % 8 == target % 8 && std::abs(start/8 - target/8)==2) {
+                    move = Move(start, target, Move::pawnTwoUpFlag);
+                } else {move = Move(start,target);}
 
                 board.MakeMove(move);
-                board.allGameMoves.push_back(move);
+                //board.allGameMoves.push_back(move);
                 std::cout << "Move '" << input << "' made.\n";
             }
 
@@ -170,6 +173,13 @@ public:
             board.print_board();
             printHashHistory();
             printZobristComponents(board);
+
+            if (board.zobrist_hash != board.computeZobristHash()) {
+                computed_zobrist = board.computeZobristHash();
+                std::cout << "board | computed" << std::endl;
+                std::cout << board.zobrist_hash << " || " << computed_zobrist << std::endl;
+                board.debugZobristDifference(board.zobrist_hash, computed_zobrist);
+            }
         }
     }
 
