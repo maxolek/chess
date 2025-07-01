@@ -29,7 +29,10 @@ Board::Board() {
     move_color = is_white_move ? 0 : 1;
     is_in_check = false;
     plyCount = 0;
+    currentGameState = GameState();
+    gameStateHistory.push_back(currentGameState);
     //setBoardFEN(); 
+    
     initZobristKeys();
     zobrist_hash = computeZobristHash();
     hash_history[zobrist_hash] = 1;
@@ -198,6 +201,9 @@ U64 Board::updateHash(
 // inSearch controls whether this move is recorded in the game history
 // (for three-fold repetition)
 void Board::MakeMove(Move move, bool in_search) {
+    // for zobrist hashing
+    int old_castling = currentGameState.castlingRights;
+
     // get info about move
     int start_square = move.StartSquare();
     int target_square = move.TargetSquare();
@@ -232,16 +238,14 @@ void Board::MakeMove(Move move, bool in_search) {
     // update game state
     currentGameState.capturedPieceType = captured_piece;
     // zobrist enpassant (remove old)
-    //if (currentGameState.enPassantFile != -1) 
-    //    zobrist_hash ^= zobrist_enpassant[currentGameState.enPassantFile];
+    if (currentGameState.enPassantFile != -1) 
+        zobrist_hash ^= zobrist_enpassant[currentGameState.enPassantFile];
     currentGameState.enPassantFile = (move_flag == Move::pawnTwoUpFlag) ? start_square % 8 : -1;
     updateFiftyMoveCounter(moved_piece, captured_piece > -1, false);
     // zobrist ep (add new)
-    //if (currentGameState.enPassantFile != -1) 
-    //    zobrist_hash ^= zobrist_enpassant[currentGameState.enPassantFile];
+    if (currentGameState.enPassantFile != -1) 
+        zobrist_hash ^= zobrist_enpassant[currentGameState.enPassantFile];
 
-    // zobrist
-    //zobrist_hash ^= zobrist_castling[currentGameState.castlingRights];
     if (currentGameState.castlingRights != 0) {
         if (moved_piece == king) {
             if (is_white_move) {
@@ -285,7 +289,8 @@ void Board::MakeMove(Move move, bool in_search) {
         }
     }
     // zobrist castling
-    //zobrist_hash ^= zobrist_castling[currentGameState.castlingRights];
+    zobrist_hash ^= zobrist_castling[old_castling];
+    zobrist_hash ^= zobrist_castling[currentGameState.castlingRights];
 
     is_in_check = inCheck(false);
     plyCount++;
@@ -293,19 +298,23 @@ void Board::MakeMove(Move move, bool in_search) {
     gameStateHistory.push_back(currentGameState);
     is_white_move = !is_white_move;
     move_color = 1-move_color;
-    //zobrist_hash ^= zobrist_side_to_move;
+    zobrist_hash ^= zobrist_side_to_move;
     //setBoardFEN();
-    zobrist_hash = computeZobristHash();
+    //zobrist_hash = computeZobristHash();
     hash_history[zobrist_hash]++;
 }
 
 void Board::UnmakeMove(Move move, bool in_search) {
+    // for zobrist
+    int new_castling = currentGameState.castlingRights;
+
     hash_history[zobrist_hash]--;
     if (hash_history[zobrist_hash] == 0)
         hash_history.erase(zobrist_hash); // save memory
+    zobrist_hash ^= zobrist_side_to_move;
+
     is_white_move = !is_white_move;
     move_color = 1-move_color;
-    //zobrist_hash ^= zobrist_side_to_move;
         
     // get move info
     int moved_from = move.StartSquare();
@@ -314,20 +323,21 @@ void Board::UnmakeMove(Move move, bool in_search) {
 
     int moved_piece = (move.IsPromotion() || move_flag==Move::enPassantCaptureFlag || move_flag==Move::pawnTwoUpFlag) ? pawn : getMovedPiece(moved_to);
     int captured_piece = currentGameState.capturedPieceType;
-    //if (move_flag == Move::pawnTwoUpFlag) currentGameState.enPassantFile = -1;
+    //if (move_flag == Move::pawnTwoUpFlag) zobrist_hash ^= zobrist_enpassant;
     int promotion_piece = move.PromotionPieceType();
-
-    // zobrist
-    //zobrist_hash ^= zobrist_castling[currentGameState.castlingRights];
 
     // update bitboards
     MovePiece(moved_piece, moved_to, moved_from);
     //std::cout << "unmoved: " << moved_piece << "\t" << moved_to << "\t" << moved_from << std::endl;
 
+    // undo zobrist EP if undoing 2x pawn push
+    if (currentGameState.enPassantFile != -1) 
+        zobrist_hash ^= zobrist_enpassant[currentGameState.enPassantFile];
+
     // undo promotion 
     if (move.IsPromotion()) {
         pop_bit(pieceBitboards[promotion_piece], moved_to);
-        //zobrist_hash ^= zobrist_table[move_color * 6 + promotion_piece][moved_to]; // already removed in bitboard
+        zobrist_hash ^= zobrist_table[(1-move_color) * 6 + promotion_piece][moved_to]; // already removed in bitboard
     }
 
     // undo captures
@@ -335,12 +345,13 @@ void Board::UnmakeMove(Move move, bool in_search) {
         int ep_square = moved_to + ((move_color == 0) ? -8 : 8);
         set_bit(pieceBitboards[pawn], ep_square);
         set_bit(colorBitboards[1 - move_color], ep_square);
-        //zobrist_hash ^= zobrist_table[(1 - move_color) * 6 + pawn][ep_square];
+        zobrist_hash ^= zobrist_table[(1 - move_color) * 6 + pawn][ep_square];
     } else if (captured_piece > -1) {
         set_bit(pieceBitboards[captured_piece], moved_to);
         set_bit(colorBitboards[1 - move_color], moved_to);
-        //zobrist_hash ^= zobrist_table[(1 - move_color) * 6 + captured_piece][moved_to];
+        zobrist_hash ^= zobrist_table[(1 - move_color) * 6 + captured_piece][moved_to];
     }
+
     // undo castling
     if (move_flag == Move::castleFlag) {
         if (moved_to == g1) MovePiece(rook, f1, h1);
@@ -354,8 +365,12 @@ void Board::UnmakeMove(Move move, bool in_search) {
     gameStateHistory.pop_back();
     currentGameState = gameStateHistory.back();
     // zobrist
-    //zobrist_hash ^= zobrist_castling[currentGameState.castlingRights];
-    zobrist_hash = computeZobristHash();
+    zobrist_hash ^= zobrist_castling[new_castling];
+    zobrist_hash ^= zobrist_castling[currentGameState.castlingRights];
+    // re-implement EP hash if needed
+    if (currentGameState.enPassantFile != -1) 
+        zobrist_hash ^= zobrist_enpassant[currentGameState.enPassantFile];
+    //zobrist_hash = computeZobristHash();
     plyCount--;
     //updateFiftyMoveCounter(-1,false,true); // -1/false cause it doesnt matter
     allGameMoves.pop_back();
@@ -370,22 +385,22 @@ void Board::MovePiece(int piece, int start_square, int target_square) {
     set_bit(colorBitboards[move_color],target_square);
     pop_bit(colorBitboards[move_color],start_square);
 
-    //zobrist_hash ^= zobrist_table[move_color * 6 + piece][start_square];
-    //zobrist_hash ^= zobrist_table[move_color*6 + piece][target_square];
+    zobrist_hash ^= zobrist_table[move_color * 6 + piece][start_square];
+    zobrist_hash ^= zobrist_table[move_color*6 + piece][target_square];
 }
 
 void Board::CapturePiece(int piece, int target_square, bool is_enpassant, bool captured_is_moved_piece) {
     if (is_enpassant) {
         pop_bit(pieceBitboards[piece], target_square + std::pow(-1,1-move_color) * 8); // shift capture square by 1 rank
         pop_bit(colorBitboards[1-move_color], target_square + std::pow(-1,1-move_color) * 8);
-        //zobrist_hash ^= zobrist_table[(1-move_color)*6 + piece][int(target_square + std::pow(-1,1-move_color)*8)];
+        zobrist_hash ^= zobrist_table[(1-move_color)*6 + piece][int(target_square + std::pow(-1,1-move_color)*8)];
     } else if (captured_is_moved_piece) {
         pop_bit(colorBitboards[1-move_color], target_square);
-        //zobrist_hash ^= zobrist_table[(1-move_color)*6 + piece][target_square];
+        zobrist_hash ^= zobrist_table[(1-move_color)*6 + piece][target_square];
     } else {
         pop_bit(pieceBitboards[piece], target_square);
         pop_bit(colorBitboards[1-move_color], target_square);
-        //zobrist_hash ^= zobrist_table[(1-move_color)*6 + piece][target_square];
+        zobrist_hash ^= zobrist_table[(1-move_color)*6 + piece][target_square];
     }
 }
 
@@ -393,7 +408,8 @@ void Board::PromoteToPiece(int piece, int target_square) {
     pop_bit(pieceBitboards[pawn], target_square);
     set_bit(pieceBitboards[piece], target_square); // side bitboards are set during movePiece, side doesnt change when changing piece type
 
-    //zobrist_hash ^= zobrist_table[move_color*6 + piece][target_square];
+    zobrist_hash ^= zobrist_table[move_color*6 + piece][target_square]; // add promotion piece
+    zobrist_hash ^= zobrist_table[move_color*6 + pawn][target_square]; // remove pawn
 }
 
 int Board::getMovedPiece(int start_square) {

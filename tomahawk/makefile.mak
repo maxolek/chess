@@ -6,6 +6,10 @@ CXXFLAGS = -std=c++17 -Wall
 ifeq ($(DEBUG),1)
     CXXFLAGS += -g -DDEBUG
     TARGET = debug.exe
+# toggle test mode: make TEST=1
+else ifeq ($(TEST),1)
+    CXXFLAGS += -O2 
+    TARGET = testing.exe
 else
     CXXFLAGS += -O2
     TARGET = tomahawk.exe
@@ -14,7 +18,7 @@ endif
 # Source files
 SRCS = arbiter.cpp board.cpp gamestate.cpp helpers.cpp moveGenerator.cpp \
        PrecomputedMoveData.cpp searcher.cpp engine.cpp game.cpp UCI.cpp \
-       tomahawk.cpp
+       testing.cpp #tomahawk.cpp
 
 OBJS = $(SRCS:.cpp=.o)
 
