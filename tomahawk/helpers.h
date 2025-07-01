@@ -23,7 +23,7 @@
 typedef uint64_t U64;
 typedef unsigned short ushort;
 
-extern std::string STARTPOS_FEN;
+constexpr const char* STARTPOS_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 const float INF = std::numeric_limits<float>::infinity();
 
 // board squares
@@ -76,6 +76,11 @@ inline void pop_bit(U64 &bitboard, int square) {
     bitboard &= ~(1ULL << square);
 }
 
+// c++ 14 or later has this in std::
+template<typename T>
+constexpr const T& clamp(const T& v, const T& lo, const T& hi) {
+    return (v < lo) ? lo : (hi < v) ? hi : v;
+}
 
 // function to print a biboard to the console
 void print_bitboard(U64 bitboard);
@@ -116,6 +121,8 @@ int lzcnt(U64 x);
 int tzcnt(U64 x);
 // get 0-63 square index of bitboard with only 1 bit set
 int sqidx(U64 bitboard);
+// Flip square for black piece evaluation
+int mirror(int square);
 
 //int countPosDuplicates(std::vector<U64> &vec);
 

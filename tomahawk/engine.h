@@ -11,15 +11,16 @@
 class Engine {
 private:
     PrecomputedMoveData precomp = PrecomputedMoveData();
-    std::unique_ptr<MoveGenerator> movegen;
+    
     Move ponderMove;
     int search_depth;
     int time_left[2], increment[2]; //white,black
 
     // internal helpers
-    void iterativeDeepening();
-
+    void iterativeDeepening(SearchSettings settings);
+    
 public:
+    std::unique_ptr<MoveGenerator> movegen;
     Board* game_board;
     Board search_board; // want to modify search board
     Move bestMove;
@@ -56,6 +57,9 @@ public:
     // Communication
     void sendBestMove(Move bestMove, Move ponderMove = Move::NullMove());
     void uciLoop();
+
+    // search-eval qualifications
+    int computeSearchTime(SearchSettings settings);
 
     // best moves
     Move getBestMove( Board& board); // move obj

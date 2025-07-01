@@ -20,6 +20,7 @@ MoveGenerator::MoveGenerator() {
 }
 */
 
+
 MoveGenerator::MoveGenerator(const Board* _board) {
     // load movegen at given state
     board = _board;
@@ -86,6 +87,36 @@ void MoveGenerator::generateMoves(const Board* _board) {
         generateSlidingMoves(true, true, false);
         generateKingMoves(true, true);
     }
+}
+
+std::vector<Move> MoveGenerator::generateMovesList(const Board* _board) {
+    moves.clear();
+    // load movegen at given state
+    board = _board;
+    updateBitboards(_board);
+
+    // gen opponent moves
+    // detect checks, pins, etc.
+    generatePawnAttacks(false, false);
+    generateKnightMoves(false, false);
+    generateSlidingMoves(false, false, false);
+    generateKingMoves(false, false);
+
+    //if (check_ray_mask) {in_check = true;}
+
+    if (in_double_check) { // cannot capture or block out of a double check
+        generateKingMoves(true, true);
+    } else {
+        // gen moves
+        // uses stored information from gen oppponent moves to determine legality
+        generatePawnPushes(true, true);
+        generatePawnAttacks(true, true);
+        generateKnightMoves(true, true);
+        generateSlidingMoves(true, true, false);
+        generateKingMoves(true, true);
+    }
+
+    return moves;
 }
 
 

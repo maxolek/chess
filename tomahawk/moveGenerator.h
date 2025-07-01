@@ -53,6 +53,7 @@ public:
 
 
     MoveGenerator();
+    //MoveGenerator(Board* board);
     MoveGenerator(const Board* _board);
 
     // look up kings last 
@@ -65,7 +66,7 @@ public:
 
     void generateMoves();
     void generateMoves(const Board* _board);
-
+    std::vector<Move> generateMovesList(const Board* _board);
 
     // obstruction difference for sliding moves
     // includes blockers

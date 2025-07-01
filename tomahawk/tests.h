@@ -5,13 +5,15 @@
 #include "helpers.h"
 #include "moveGenerator.h"
 #include "arbiter.h"
+#include "engine.h"
 
 struct Tests 
 {
 private:
 public:
     Board board;
-    std::unique_ptr<MoveGenerator> movegen;
+    std::unique_ptr<MoveGenerator> movegen = std::make_unique<MoveGenerator>(&board);
+    //Engine engine;
     //Arbiter arbiter = Arbiter();
     std::vector<Move> finalPlyMovesList;
     //std::vector<Move> fullMovesList;
@@ -276,6 +278,63 @@ public:
             std::cout << std::string(40, '-') << "\n";
         }
     }
+
+
+    // search tests
+
+    void testSearch(std::string fen = STARTPOS_FEN, int maxDepth = 5, int timeLimitMs = 60000) {
+        std::cout << "=== Iterative Deepening Search Test ===\n";
+        std::cout << "Starting FEN:\n" << fen << "\n";
+
+        for (int depth = 1; depth <= maxDepth; ++depth) {
+            setBoard(fen);
+            std::vector<Move> legalMoves = movegen->generateMovesList(&board);
+
+            Searcher::nodesSearched = 0;  // reset nodes counter before each depth
+
+            auto start = std::chrono::steady_clock::now();
+            // search eval
+            SearchResult search_result = Searcher::search(board, *movegen, legalMoves, depth, start, timeLimitMs);
+            int eval_search = search_result.eval;
+            std::unordered_map<std::string, int> component_search = search_result.component_evals;
+            auto split = std::chrono::steady_clock::now();
+            // static eval
+            int eval_static = Evaluator::Evaluate(&board);
+            std::unordered_map<std::string, int> component_static = Evaluator::componentEvals;
+            auto end = std::chrono::steady_clock::now();
+
+            auto durationMs = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+            Move best = search_result.bestMove;
+
+            std::cout << "Depth: " << depth << "\n";
+            std::cout << "Time: " << durationMs << " ms\n";
+            std::cout << "Nodes: " << Searcher::nodesSearched << "\n";
+            std::cout << "Best move: " << best.uci() << "\n";
+            std::cout << "Evaluation (static/search): " << eval_static << "\t" << eval_search << "\n";
+            std::cout << "---------- Eval Components (static/search) -----------\n";
+            for (const auto& [key, value] : component_static) {
+                std::cout << key << ": " << value << "\n";
+            }
+            std::cout << "=======================================\n";
+            for (const auto& [key, value] : component_search) {
+                std::cout << key << ": " << value << "\n";
+            }
+
+
+            if (best.IsNull()) {
+                std::cout << "Search aborted due to time limit.\n";
+                break;
+            }
+
+            std::cout << "=======================================\n";
+            std::cout << "=======================================\n";
+            std::cout << "=======================================\n";
+        }
+    }
+
+
+
+    // eval tests
     
     
 

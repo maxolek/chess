@@ -36,7 +36,8 @@ bool Arbiter::isBlackWinResult(Result result) {
 Result Arbiter::GetGameState(const Board* board) {
     //if (board.currentGameState.FiftyMoveCounter() > 100) {return FiftyMoveRule;}
     if (board->currentGameState.fiftyMoveCounter > 100) {return FiftyMoveRule;}
-    if (board->hash_history.find(board->zobrist_hash)->second >= 3) {return Repetition;}
+    auto it = board->hash_history.find(board->zobrist_hash);
+    if (it != board->hash_history.end() && it->second >= 3) {return Repetition;}
     if (isInsufficientMaterial(*board)) {return InsufficientMaterial;}    
 
     MoveGenerator movegen = MoveGenerator(board);

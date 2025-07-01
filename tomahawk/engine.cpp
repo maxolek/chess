@@ -6,7 +6,8 @@
 #include <sstream>
 
 Engine::Engine() {
-    //board = &Board();
+    //game_board = &Board();
+    //search_board = *game_board;
     movegen = std::make_unique<MoveGenerator>(&search_board);
     movegen->generateMoves(game_board);
     legal_moves = movegen->moves;
@@ -81,10 +82,93 @@ void Engine::playMoves(const std::vector<Move>& moves) {
 }
 
 void Engine::playMovesStrings(const std::vector<std::string>& moves) {
-    for (const auto& move : moves) {
-        game_board->MakeMove(Move(move));
+    for (const auto& moveStr : moves) {
+        int start = algebraic_to_square(moveStr.substr(0, 2));
+        int target = algebraic_to_square(moveStr.substr(2, 2));
+        int flag = Move::noFlag;
+        int epSquare = -1;
+
+        int movedPiece = game_board->getMovedPiece(start);
+        bool isPawn = movedPiece == pawn;
+
+        // En Passant
+        if (isPawn && game_board->currentGameState.enPassantFile != -1) {
+            int epRank = game_board->is_white_move ? 5 : 2;
+            epSquare = game_board->currentGameState.enPassantFile + epRank * 8;
+            if (target == epSquare) {
+                flag = Move::enPassantCaptureFlag;
+            }
+        }
+
+        // Pawn double push
+        if (isPawn) {
+            int startRank = start / 8;
+            int targetRank = target / 8;
+            if (std::abs(startRank - targetRank) == 2) {
+                flag = Move::pawnTwoUpFlag;
+            }
+        }
+
+        // Promotion
+        if (moveStr.length() == 5) {
+            char promo = moveStr[4];
+            switch (promo) {
+                case 'q': flag = Move::promoteToQueenFlag; break;
+                case 'r': flag = Move::promoteToRookFlag; break;
+                case 'b': flag = Move::promoteToBishopFlag; break;
+                case 'n': flag = Move::promoteToKnightFlag; break;
+            }
+        }
+
+        // Castling (optional: could be left to Move constructor if you detect it there)
+        if (moveStr == "e1g1" || moveStr == "e1c1" || moveStr == "e8g8" || moveStr == "e8c8") {
+            flag = Move::castleFlag;
+        }
+
+        game_board->MakeMove(Move(start, target, flag));
     }
 }
+
+
+int Engine::computeSearchTime(SearchSettings settings) {
+    int side = game_board->is_white_move ? 0 : 1;
+    int ply = game_board->plyCount;
+
+    if (ply < 100) {return 5000;}
+
+    int myTime = settings.wtime;
+    int myInc = settings.winc;
+    if (side == 1) {
+        myTime = settings.btime;
+        myInc = settings.binc;
+    }
+
+    int movesToGo = settings.movestogo > 0 ? settings.movestogo : 25;
+    int overhead = moveOverhead > 0 ? moveOverhead : 15;
+
+    // If fixed movetime is specified, use that directly
+    if (settings.movetime > 0) {
+        return std::max(500, settings.movetime - overhead);
+    }
+
+    // Fallback time control
+    double aggressiveness = .75;
+    int timeBudget = static_cast<int>((myTime / movesToGo + myInc) * aggressiveness);
+    timeBudget -= overhead;
+
+    // Clamp to avoid negative time or overspending
+    timeBudget = clamp(timeBudget, 10, myTime - overhead);
+
+    return timeBudget;
+}
+
+// move object
+Move Engine::getBestMove(Board& board) {
+    search_board = *game_board; SearchSettings default_settings = SearchSettings();
+    iterativeDeepening(default_settings);
+    return bestMove;
+}
+
 
 void Engine::startSearch(SearchSettings settings) {
     search_board = *game_board;
@@ -104,14 +188,14 @@ void Engine::startSearch(SearchSettings settings) {
     // Time control handling (naive)
     int timeBudget = settings.movetime;
     if (timeBudget == -1 && myTime > 0) {
-        int movesToGo = settings.movestogo > 0 ? settings.movestogo : 30;
+        int movesToGo = settings.movestogo > 0 ? settings.movestogo : 75;
         timeBudget = myTime / movesToGo + myInc;
     }
 
     // Begin search
     auto start = std::chrono::steady_clock::now();
 
-    iterativeDeepening();
+    iterativeDeepening(settings);
 
     // Dummy search — just return the first legal move after sleeping
     //if (timeBudget > 0) {
@@ -127,7 +211,7 @@ void Engine::startSearch(SearchSettings settings) {
     sendBestMove(bestMove, ponderMove);
 }
 
-
+/*
 void Engine::startSearch(int depth, int movetime, int wtime, int btime, int winc, int binc) {
     search_board = *game_board;
     search_depth = depth;
@@ -145,6 +229,7 @@ void Engine::startSearch(int depth, int movetime, int wtime, int btime, int winc
     iterativeDeepening();
     sendBestMove(bestMove, ponderMove);
 }
+    */
 
 void Engine::stopSearch() {
     stop = true;
@@ -157,17 +242,30 @@ void Engine::ponderHit() {
     pondering = false;
 }
 
-void Engine::iterativeDeepening() {
-    // Dummy search just picks the first legal move
+
+void Engine::iterativeDeepening(SearchSettings settings) {
+    // track search time
+    auto start_time = std::chrono::steady_clock::now();
+    int time_limit_ms = computeSearchTime(settings);
+    Move iteration_bestMove; // if time reached mid-depth, return best from last depth
+
+    // generate first legal moves from current board position
     movegen->generateMoves(&search_board);
     std::vector<Move> moves = movegen->moves;
-    if (!moves.empty()) {
-        bestMove = Searcher::bestMove(search_board, moves);
-    } else {
-        bestMove = Move::NullMove();
+    
+    // until time stop
+    // or depth limit (currently no limit)
+    int depth = 1;
+    while (!stop) {
+        if (!moves.empty()) {
+            iteration_bestMove = Searcher::search(search_board, *movegen, moves, depth, start_time, time_limit_ms).bestMove;
+            if (!iteration_bestMove.IsNull()) {bestMove = iteration_bestMove; stop=true;}
+            depth++; // increase depth and re-search if time permits
+        } else {
+            bestMove = Move::NullMove();
+        }
     }
-    // Simulate time-consuming search
-    //std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
 }
 
 void Engine::sendBestMove(Move best, Move ponder) {
@@ -178,6 +276,7 @@ void Engine::sendBestMove(Move best, Move ponder) {
     std::cout << std::endl;
 }
 
+/*
 void Engine::uciLoop() {
     std::string line;
     while (std::getline(std::cin, line)) {
@@ -232,21 +331,16 @@ void Engine::uciLoop() {
     }
     exit(0);
 }
+    */
 
 // OBSOLETE
 
-
-// move object
-Move Engine::getBestMove(Board& board) {
-    movegen->generateMoves(&board);
-    legal_moves = movegen->moves;
-    return Searcher::bestMove(board, legal_moves);
-}
+/*
 // uci
 std::string Engine::getBestMoveUCI(Board& board) {
     movegen->generateMoves(&board);
     legal_moves = movegen->moves;
-    Move best_move = Searcher::bestMove(board, legal_moves);
+    Move best_move = Searcher::bestMove(search_board, *movegen, moves, 4);
     return best_move.uci();
 }
 
@@ -259,17 +353,17 @@ void Engine::processPlayerMove(Move move) {
 }
 
 std::string Engine::processEngineMoveString() {
-    Move best_move = Searcher::bestMove(search_board, legal_moves);
+    Move best_move = Searcher::bestMove(search_board, *movegen, moves, 4);
     //board->MakeMove(best_move);
     return best_move.uci();
 }
 
 Move Engine::processEngineMove() {
-    Move best_move = Searcher::bestMove(search_board, legal_moves);
+    Move best_move = Searcher::bestMove(search_board, *movegen, moves, 4);
     //board->MakeMove(best_move);
     return best_move;
 }
-
+*/
 
 // JAVA INTERFACE SUPPORT
 

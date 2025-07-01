@@ -1,6 +1,6 @@
 # Compiler and flags
 CXX = g++
-CXXFLAGS = -std=c++17 -Wall
+CXXFLAGS = -std=c++17 -Wall -pthread
 
 # Toggle debug mode: make DEBUG=1
 ifeq ($(DEBUG),1)

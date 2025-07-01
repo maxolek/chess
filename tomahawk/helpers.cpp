@@ -1,6 +1,5 @@
 #include "helpers.h"
 
-std::string STARTPOS_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 std::string file_char = "abcdefgh";
 std::string results_string[] = {
     "NotStarted",
@@ -133,6 +132,11 @@ int tzcnt(U64 x) {
 int sqidx(U64 bitboard) {
     // Assuming there is only one bit set
     return __builtin_ctzll(bitboard);  // __builtin_ctzll is for GCC/Clang
+}
+
+// Flip square for black piece evaluation
+int mirror(int square) {
+    return square ^ 56;
 }
 
 /* for repetition detection

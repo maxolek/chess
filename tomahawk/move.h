@@ -48,7 +48,7 @@ public:
         moveValue = (ushort)(_startSquare | _targetSquare << 6 | _flag << 12);
     }
 
-    Move (std::string uci) {
+    Move (std::string uci) { // ep handled by board (no known info here)
         std::string _start, _target;
         char _flag;
         int start, target, flag;
