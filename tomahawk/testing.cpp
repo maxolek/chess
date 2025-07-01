@@ -10,7 +10,7 @@ int main(int argc, char* argv[]) {
     PrecomputedMoveData precomp = PrecomputedMoveData();  // must be initialized for movegen+board to work
 
     if (argc < 2) {
-        std::cerr << "Usage: ./testing [zobrist|search|perft|divide] <args>\n";
+        std::cerr << "Usage: ./testing [zobrist|search|perft|divide] <fen> <depth>\n";
         return 1;
     }
 

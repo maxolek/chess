@@ -28,6 +28,8 @@ public:
     U64 randomU64();
     void initZobristKeys();
     U64 computeZobristHash();
+    U64 zobristCastlingHash(int castling_rights); // returns the corresponding hash for the castling rights
+    void debugZobristDifference(U64 old_hash, U64 new_hash);
     U64 updateHash( // called inside makeMove so these are all passed as args
         U64 currentHash,  // since it isnt stored outside of that
         int start_square, int target_square, int move_flag, bool is_promotion, int promotion_piece,
