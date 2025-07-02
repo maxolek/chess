@@ -17,8 +17,8 @@ endif
 
 # Source files
 SRCS = arbiter.cpp board.cpp gamestate.cpp helpers.cpp moveGenerator.cpp \
-       PrecomputedMoveData.cpp searcher.cpp engine.cpp game.cpp UCI.cpp \
-       tomahawk.cpp #testing.cpp
+       PrecomputedMoveData.cpp game.cpp UCI.cpp \
+       searcher.cpp evaluator.cpp engine.cpp tomahawk.cpp 
 
 OBJS = $(SRCS:.cpp=.o)
 

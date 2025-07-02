@@ -2,6 +2,7 @@
 #include "board.h"
 #include "arbiter.h"
 #include "tests.h"
+#include "evaluator.h"
 #include <iostream>
 #include <string>
 

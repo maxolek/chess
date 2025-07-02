@@ -10,7 +10,7 @@ SearchResult Searcher::search(Board& board, MoveGenerator& movegen, std::vector<
 
     for (Move move : legal_moves) {
         board.MakeMove(move);
-        int eval = minimax(board, movegen, depth - 1, !maximizing);
+        int eval = minimax(board, movegen, depth - 1, !maximizing, start_time, time_limit_ms, false);
         board.UnmakeMove(move);
 
         if ((maximizing && eval > bestEval) ||
@@ -29,22 +29,33 @@ SearchResult Searcher::search(Board& board, MoveGenerator& movegen, std::vector<
     return {bestMove, bestEval, bestComponentEvals};
 }
 
-int Searcher::minimax(Board& board, MoveGenerator& movegen, int depth, bool maximizingPlayer) {
+int Searcher::minimax(Board& board, MoveGenerator& movegen, int depth, bool maximizing,
+                      std::chrono::steady_clock::time_point start_time, int time_limit_ms, bool out_of_time) {
+    if (out_of_time) maximizing ? -100000 : 100000;
+
     nodesSearched++;
-    
+
+    auto now = std::chrono::steady_clock::now();
+    if (std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count() >= time_limit_ms) {
+        out_of_time = true;
+        maximizing ? -100000 : 100000;
+    }
+
     if (depth == 0 || Arbiter::GetGameState(&board) != InProgress) {
         return Evaluator::Evaluate(&board);
-    } //else if (depth == 5) {Evaluator::writeEvalDebug(board, "C:/Users/maxol/code/chess/eval.txt");}
+    }
 
     std::vector<Move> moves = movegen.generateMovesList(&board);
-    int bestEval = maximizingPlayer ? -100000 : 100000;
+    int bestEval = maximizing ? -100000 : 100000;
 
     for (const Move& move : moves) {
         board.MakeMove(move);
-        int eval = minimax(board, movegen, depth - 1, !maximizingPlayer);
+        int eval = minimax(board, movegen, depth - 1, !maximizing, start_time, time_limit_ms, out_of_time);
         board.UnmakeMove(move);
 
-        if (maximizingPlayer)
+        if (out_of_time) maximizing ? -100000 : 100000;
+
+        if (maximizing)
             bestEval = std::max(bestEval, eval);
         else
             bestEval = std::min(bestEval, eval);

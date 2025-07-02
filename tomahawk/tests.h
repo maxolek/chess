@@ -115,7 +115,7 @@ public:
     void zobristTest() {
         U64 computed_zobrist;
         std::string input;
-        std::string start_str, target_str; int start, target; int ep;
+        std::string start_str, target_str; int start, target; int ep; std::string pp;
         Move move = Move(0); // init to null move 
 
         std::cout << "Initial Board:" << std::endl;
@@ -141,8 +141,13 @@ public:
                 } // pawn up 2
                 else if (start % 8 == target % 8 && std::abs(start/8 - target/8)==2) {
                     move = Move(start, target, Move::pawnTwoUpFlag);
+                } else if ((a2 <= start && start <= h2 && a1 <= target && target <= h1) || (a7 <= start && start <= h7 && a8 <= target && target <= h8)) { // promotion
+                    if (pp == "q") move = Move(start,target,Move::promoteToQueenFlag);
+                    else if (pp == "n") move = Move(start,target,Move::promoteToKnightFlag);
+                    else if (pp == "r") move = Move(start,target,Move::promoteToRookFlag);
+                    else if (pp == "b") move = Move(start,target,Move::promoteToBishopFlag);
                 } else {move = Move(start,target);}
-
+                    
                 if (!board.allGameMoves.empty() && Move::SameMove(board.allGameMoves.back(), move)) {
                     board.UnmakeMove(move);
                     //board.allGameMoves.pop_back();
@@ -164,6 +169,11 @@ public:
                 } // pawn up 2
                 else if (start % 8 == target % 8 && std::abs(start/8 - target/8)==2) {
                     move = Move(start, target, Move::pawnTwoUpFlag);
+                } else if ((a2 <= start && start <= h2 && a1 <= target && target <= h1) || (a7 <= start && start <= h7 && a8 <= target && target <= h8)) { // promotion
+                    if (pp == "q") move = Move(start,target,Move::promoteToQueenFlag);
+                    else if (pp == "n") move = Move(start,target,Move::promoteToKnightFlag);
+                    else if (pp == "r") move = Move(start,target,Move::promoteToRookFlag);
+                    else if (pp == "b") move = Move(start,target,Move::promoteToBishopFlag);
                 } else {move = Move(start,target);}
 
                 board.MakeMove(move);

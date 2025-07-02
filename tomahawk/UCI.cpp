@@ -180,5 +180,10 @@ void UCI::handleGo(std::istringstream& iss) {
     settings.movetime = movetime;
     settings.infinite = infinite;
 
+    std::ofstream file("C:/Users/maxol/code/chess/uci_interactions.txt", std::ios::app); // append mode = std::ios::app
+    file << iss.str() << std::endl;
+    file.close();
+
+
     engine->startSearch(settings);
 }

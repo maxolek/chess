@@ -36,7 +36,10 @@ public:
         Board& board, 
         MoveGenerator& movegen, 
         int depth, 
-        bool maximizingPlayer
+        bool maximizing,
+        std::chrono::steady_clock::time_point start_time, 
+        int time_limit_ms, 
+        bool out_of_time
     );
 };
 

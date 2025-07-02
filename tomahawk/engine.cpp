@@ -134,7 +134,7 @@ int Engine::computeSearchTime(SearchSettings settings) {
     int side = game_board->is_white_move ? 0 : 1;
     int ply = game_board->plyCount;
 
-    if (ply < 100) {return 5000;}
+    if (ply < 10) {return 3500;}
 
     int myTime = settings.wtime;
     int myInc = settings.winc;
@@ -158,6 +158,10 @@ int Engine::computeSearchTime(SearchSettings settings) {
 
     // Clamp to avoid negative time or overspending
     timeBudget = clamp(timeBudget, 10, myTime - overhead);
+
+    std::ofstream file("C:/Users/maxol/code/chess/uci_interactions.txt", std::ios::app); // append mode = std::ios::app
+    file << "(ply " << ply << ")TIME BUDGET DECISION ---- " << timeBudget << std::endl;
+    file.close();
 
     return timeBudget;
 }
@@ -186,11 +190,11 @@ void Engine::startSearch(SearchSettings settings) {
     int myInc = increment[side];
 
     // Time control handling (naive)
-    int timeBudget = settings.movetime;
-    if (timeBudget == -1 && myTime > 0) {
-        int movesToGo = settings.movestogo > 0 ? settings.movestogo : 75;
-        timeBudget = myTime / movesToGo + myInc;
-    }
+    //int timeBudget = settings.movetime;
+    //if (timeBudget == -1 && myTime > 0) {
+    //    int movesToGo = settings.movestogo > 0 ? settings.movestogo : 75;
+    //    timeBudget = myTime / movesToGo + myInc;
+    //}
 
     // Begin search
     auto start = std::chrono::steady_clock::now();
@@ -246,6 +250,7 @@ void Engine::ponderHit() {
 void Engine::iterativeDeepening(SearchSettings settings) {
     // track search time
     auto start_time = std::chrono::steady_clock::now();
+    int elapsed_ms;
     int time_limit_ms = computeSearchTime(settings);
     Move iteration_bestMove; // if time reached mid-depth, return best from last depth
 
@@ -259,7 +264,12 @@ void Engine::iterativeDeepening(SearchSettings settings) {
     while (!stop) {
         if (!moves.empty()) {
             iteration_bestMove = Searcher::search(search_board, *movegen, moves, depth, start_time, time_limit_ms).bestMove;
-            if (!iteration_bestMove.IsNull()) {bestMove = iteration_bestMove; stop=true;}
+            
+            auto now = std::chrono::steady_clock::now();
+            elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
+            if (elapsed_ms >= time_limit_ms) {stop = true;}
+            else if (!iteration_bestMove.IsNull()) {bestMove = iteration_bestMove;}
+            
             depth++; // increase depth and re-search if time permits
         } else {
             bestMove = Move::NullMove();
