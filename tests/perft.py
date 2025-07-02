@@ -95,8 +95,11 @@ def compare_divide(fen, depth) -> None:
     print(f"\nDepth: {depth}")
     print(f"Running divide...\n")
 
+    start = time.time()
     my_divide, my_lines = run_cpp_perft(fen, depth, divide=True)
+    mid = time.time()
     sf_divide, sf_lines = run_stockfish_perft(fen, depth, divide=True)
+    end = time.time()
 
     all_moves = sorted(set(my_divide.keys()) | set(sf_divide.keys()))
     correct = True
@@ -118,6 +121,8 @@ def compare_divide(fen, depth) -> None:
         print("\n✅ All perft divide results match.")
     else:
         print("\n❌ Discrepancy found in perft divide.")
+
+    print(f"Times ||  Your engine: {mid-start:.2f}  Stockfish: {end-mid:.2f}")
 
     
     

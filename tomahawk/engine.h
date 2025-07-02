@@ -71,6 +71,13 @@ public:
     Move processEngineMove();
     std::string getBoardState();
     bool isGameOver() const;
+
+
+    // logging
+    void logSearchDepthInfo(
+        int depth, Move bestMove, int eval, int elapsed_ms,
+        std::string file_path = "C:/Users/maxol/code/chess/search_depth_eval.txt"
+    );
 };
 
 /*

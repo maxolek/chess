@@ -185,9 +185,9 @@ void Engine::startSearch(SearchSettings settings) {
     pondering = settings.infinite;
 
     // Set remaining time for this side
-    int side = game_board->is_white_move ? 0 : 1;
-    int myTime = time_left[side];
-    int myInc = increment[side];
+   // int side = game_board->is_white_move ? 0 : 1;
+    //int myTime = time_left[side];
+    //int myInc = increment[side];
 
     // Time control handling (naive)
     //int timeBudget = settings.movetime;
@@ -253,6 +253,7 @@ void Engine::iterativeDeepening(SearchSettings settings) {
     int elapsed_ms;
     int time_limit_ms = computeSearchTime(settings);
     Move iteration_bestMove; // if time reached mid-depth, return best from last depth
+    int iteration_bestEval;
 
     // generate first legal moves from current board position
     movegen->generateMoves(&search_board);
@@ -263,12 +264,16 @@ void Engine::iterativeDeepening(SearchSettings settings) {
     int depth = 1;
     while (!stop) {
         if (!moves.empty()) {
-            iteration_bestMove = Searcher::search(search_board, *movegen, moves, depth, start_time, time_limit_ms).bestMove;
-            
+            SearchResult result = Searcher::search(search_board, *movegen, moves, depth, start_time, time_limit_ms);
+            iteration_bestMove = result.bestMove; iteration_bestEval = result.eval;
+
             auto now = std::chrono::steady_clock::now();
             elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
             if (elapsed_ms >= time_limit_ms) {stop = true;}
-            else if (!iteration_bestMove.IsNull()) {bestMove = iteration_bestMove;}
+            else if (!iteration_bestMove.IsNull()) {
+                bestMove = iteration_bestMove;
+                logSearchDepthInfo(depth, bestMove, iteration_bestEval, elapsed_ms);
+            }
             
             depth++; // increase depth and re-search if time permits
         } else {
@@ -285,6 +290,27 @@ void Engine::sendBestMove(Move best, Move ponder) {
     }
     std::cout << std::endl;
 }
+
+
+void Engine::logSearchDepthInfo(int depth, Move bestMove, int eval, int elapsed_ms, std::string file_path) {
+    std::ofstream file(file_path, std::ios::app); // append mode
+
+    file << "-----------------------------\n";
+    file << "-----------------------------\n";
+    file << "-----------------------------\n";
+    file << "FEN: " << search_board.getBoardFEN() << "\n";
+    file << "Depth: " << depth << "\n";
+    file << "Best move: " << bestMove.uci() << "\n";
+    file << "Eval: " << eval << "\n";
+    file << "Time: " << elapsed_ms << " ms\n";
+    file << "Nodes searched: " << Searcher::nodesSearched << "\n";
+    file << "-----------------------------\n";
+
+    Evaluator::writeEvalDebug(movegen.get(), search_board, file_path);
+}
+
+
+
 
 /*
 void Engine::uciLoop() {

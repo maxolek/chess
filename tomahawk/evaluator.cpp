@@ -1,6 +1,6 @@
 #include "evaluator.h"
 
-void Evaluator::writeEvalDebug(Board& board, const std::string& filename) {
+void Evaluator::writeEvalDebug(const MoveGenerator* movegen, Board& board, const std::string& filename) {
     std::ofstream file(filename, std::ios::app); // append mode = std::ios::app
     if (!file.is_open()) {
         std::cerr << "Failed to open eval debug file: " << filename << std::endl;
@@ -11,7 +11,7 @@ void Evaluator::writeEvalDebug(Board& board, const std::string& filename) {
 
     float material = materialDifferences(board);
     float pawnStruct = pawnStructureDifferences(board);
-    float mobility = mobilityDifferences(board);
+    float mobility = mobilityDifferences(movegen);
     float posDiff = positionDifferences(board);
 
     file << std::fixed << std::setprecision(2);
@@ -20,7 +20,7 @@ void Evaluator::writeEvalDebug(Board& board, const std::string& filename) {
     file << "Mobility:       " << mobility << "\n";
     file << "Piece Position: " << posDiff << "\n";
 
-    int totalEval = computeEval(board);
+    int totalEval = computeEval(movegen, board);
     file << "Total Eval:     " << totalEval << "\n";
     file << "-----------------------------------\n";
 
@@ -44,7 +44,7 @@ const std::unordered_map<std::string, int> Evaluator::evalWeights = { // eval is
         {"PiecePosition", 1} // already in 10s
     };
 
-int Evaluator::Evaluate(const Board* board) {
+int Evaluator::Evaluate(const MoveGenerator* movegen, const Board* board) {
     Result result = Arbiter::GetGameState(board);
 
     // terminal eval
@@ -61,11 +61,11 @@ int Evaluator::Evaluate(const Board* board) {
     }
     // else, normal eval
     // computes components hash in function loop
-    return computeEval(*board);
+    return computeEval(movegen, *board);
 
 }
 
-float Evaluator::evaluateComponent(const Board& board, std::string component) {
+float Evaluator::evaluateComponent(const MoveGenerator* movegen, const Board& board, std::string component) {
     if (component == "Material") {
         componentEvals[component] = materialDifferences(board);
         return componentEvals[component];
@@ -73,7 +73,7 @@ float Evaluator::evaluateComponent(const Board& board, std::string component) {
         componentEvals[component] = pawnStructureDifferences(board);
         return componentEvals[component];
     } else if (component == "Mobility") {
-        componentEvals[component] = mobilityDifferences(board);
+        componentEvals[component] = mobilityDifferences(movegen);
         return componentEvals[component];
     } else if (component == "PiecePosition") {
         componentEvals[component] = positionDifferences(board);
@@ -83,25 +83,25 @@ float Evaluator::evaluateComponent(const Board& board, std::string component) {
     }
 }
 
-int Evaluator::computeEval(const Board& board) {
+int Evaluator::computeEval(const MoveGenerator* movegen, const Board& board) {
     int eval = 0;
 
     for (const auto& pair : evalWeights) {
         const std::string& name = pair.first;
         int weight = pair.second;
-        float value = evaluateComponent(board, name);
+        float value = evaluateComponent(movegen, board, name);
         eval += int(weight * value);
     }
 
     return eval;
 }
 
-std::unordered_map<std::string, int> Evaluator::computeComponents(const Board& board) {
+std::unordered_map<std::string, int> Evaluator::computeComponents(const MoveGenerator* movegen, const Board& board) {
     std::unordered_map<std::string, int> component_hash;
     
     for (const auto& pair : evalWeights) { // used for analysis
         const std::string& name = pair.first;
-        float value = evaluateComponent(board, name);
+        float value = evaluateComponent(movegen, board, name);
         component_hash[name] = value;
     }
 
@@ -124,10 +124,19 @@ float Evaluator::materialDifferences(const Board& board) { // add up material
     return pEval;
 }
 float Evaluator::pawnStructureDifferences(const Board& position) { // double, block, iso
-    return 0;
+    int psEval = 0;
+    U64 pawns = position.pieceBitboards[0];
+    U64 white = position.colorBitboards[0]; U64 black = position.colorBitboards[1];
+
+    psEval += (countDoubledPawns(pawns&white) - countDoubledPawns(pawns&black));
+    psEval += (countIsolatedPawns(pawns&white) - countIsolatedPawns(pawns&black));
+    
+    return psEval;
 }
-float Evaluator::mobilityDifferences(const Board& position) { // # moves (psuedo possibilities)
-    return 0;
+float Evaluator::mobilityDifferences(const MoveGenerator* movegen) { // # moves (psuedo possibilities)
+    // return values computed during movegen 
+    int w_mob = movegen->white_mobility; int b_mob = movegen->black_mobility;
+    return w_mob - b_mob;
 }
 float Evaluator::positionDifferences(const Board& position) {
     int score = 0;
@@ -152,4 +161,47 @@ float Evaluator::positionDifferences(const Board& position) {
     }
 
     return static_cast<float>(score);
+}
+
+// Detect doubled pawns on a color bitboard
+int Evaluator::countDoubledPawns(U64 pawns) {
+    std::vector<int> doubledFiles;
+    for (int file = 0; file < 8; file++) {
+        U64 pawnsOnFile = pawns & Bits::file_masks[file];
+        if (countBits(pawnsOnFile) > 1) {
+            doubledFiles.push_back(file); // file with doubled pawns
+        }
+    }
+    return doubledFiles.size();
+}
+
+// Detect isolated pawns
+int Evaluator::countIsolatedPawns(U64 pawns) {
+    std::vector<int> isolatedSquares;
+
+    for (int file = 0; file < 8; file++) {
+        U64 pawnsOnFile = pawns & Bits::file_masks[file];
+        if (pawnsOnFile == 0) continue;
+
+        // Adjacent files mask
+        U64 adjacentFiles = 0;
+        if (file > 0) adjacentFiles |= Bits::file_masks[file - 1];
+        if (file < 7) adjacentFiles |= Bits::file_masks[file + 1];
+
+        U64 adjacentPawns = pawns & adjacentFiles;
+
+        // For each pawn on this file, check if adjacent pawns exist
+        while (pawnsOnFile) {
+            int sq = sqidx(pawnsOnFile); // find LS1B
+            U64 sqMask = 1ULL << sq;
+
+            // If no adjacent pawns, this pawn is isolated
+            if ((adjacentPawns & sqMask) == 0) {
+                isolatedSquares.push_back(sq);
+            }
+
+            pawnsOnFile &= pawnsOnFile - 1; // pop LS1B
+        }
+    }
+    return isolatedSquares.size();
 }

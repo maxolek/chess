@@ -4,6 +4,7 @@
 #include "board.h"
 #include "helpers.h"
 #include "arbiter.h" // term evals 
+#include "moveGenerator.h" // mobility
 #include <fstream>  // for file output
 #include <iomanip>  // for formatting
 
@@ -11,7 +12,7 @@ class Evaluator {
 private:
 public:
 
-    static void writeEvalDebug(Board& board, const std::string& filename);
+    static void writeEvalDebug(const MoveGenerator* movegen, Board& board, const std::string& filename);
 
 
     // pieces
@@ -100,17 +101,21 @@ public:
     static const std::unordered_map<std::string, int> evalWeights; 
     static std::unordered_map<std::string, int> componentEvals;
 
-    static int Evaluate(const Board* position); // run all
+    static int Evaluate(const MoveGenerator* movegen, const Board* position); // run all
     // eval is scaled to centipawn (100=1) and converted to int
-    static int computeEval(const Board& board); // add up below w/ weights
-    static std::unordered_map<std::string, int> computeComponents(const Board& board); // return dict constructed in above but on command
-    static float evaluateComponent(const Board& board, std::string component); // iterate through names and run below funcs
+    static int computeEval(const MoveGenerator* movegen, const Board& board); // add up below w/ weights
+    static std::unordered_map<std::string, int> computeComponents(const MoveGenerator* movegen, const Board& board); // return dict constructed in above but on command
+    static float evaluateComponent(const MoveGenerator* movegen, const Board& board, std::string component); // iterate through names and run below funcs
 
     // counts (weights are in above)
     static float materialDifferences(const Board& position); // add up material
     static float pawnStructureDifferences(const Board& position); // double, block, iso (more is bad)
-    static float mobilityDifferences(const Board& position); // # moves (psuedo possibilities)
+    static float mobilityDifferences(const MoveGenerator* movegen); // # moves (psuedo possibilities)
     static float positionDifferences(const Board& position); // pst differences
+
+    // helpers
+    static int countDoubledPawns(U64 pawns); // via file masks
+    static int countIsolatedPawns(U64 pawns); // via file masks
 };
 
 #endif

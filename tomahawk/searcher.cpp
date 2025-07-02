@@ -42,7 +42,7 @@ int Searcher::minimax(Board& board, MoveGenerator& movegen, int depth, bool maxi
     }
 
     if (depth == 0 || Arbiter::GetGameState(&board) != InProgress) {
-        return Evaluator::Evaluate(&board);
+        return Evaluator::Evaluate(&movegen, &board);
     }
 
     std::vector<Move> moves = movegen.generateMovesList(&board);

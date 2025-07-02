@@ -29,11 +29,18 @@ public:
     static constexpr U64 blackQueensideMaskExt = blackQueensideMask | 1ULL << b8;
 
 
-    // file-rank masks
-    static constexpr U64 mask_a_file = 0x0101010101010101ULL; 
-    static constexpr U64 mask_b_file = 0x0202020202020202ULL;
-    static constexpr U64 mask_g_file = 0x4040404040404040ULL;
-    static constexpr U64 mask_h_file = 0x8080808080808080ULL; 
+    // file masks
+    static constexpr U64 file_masks[8] = {
+    0x0101010101010101ULL,
+    0x0202020202020202ULL,
+    0x0404040404040404ULL,
+    0x0808080808080808ULL,
+    0x1010101010101010ULL,
+    0x2020202020202020ULL,
+    0x4040404040404040ULL,
+    0x8080808080808080ULL
+};
+    // rank
     static constexpr U64 mask_rank_2 = 0x000000000000FF00ULL;
     static constexpr U64 mask_rank_7 = 0x00FF000000000000ULL;
 

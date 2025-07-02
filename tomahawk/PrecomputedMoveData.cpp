@@ -65,10 +65,10 @@ void PrecomputedMoveData::generateFullPawnAttacks() {
             }
 
             // remove file warps
-            if (bitboard & Bits::mask_a_file) 
-                attacks &= ~(Bits::mask_a_file >> 1);
-            else if (bitboard & Bits::mask_h_file)
-                attacks &= ~(Bits::mask_h_file << 1);
+            if (bitboard & Bits::file_masks[0]) 
+                attacks &= ~(Bits::file_masks[0] >> 1);
+            else if (bitboard & Bits::file_masks[7])
+                attacks &= ~(Bits::file_masks[7] << 1);
 
             fullPawnAttacks[square][side] = attacks;
             bitboard = 0ULL;
@@ -88,10 +88,10 @@ void PrecomputedMoveData::generateBlankKnightAttacks() { // quadrants are counte
     int target_square;
 
     for (int square = a1; square <= h8; square++) {
-        is_on_a_file = (1ULL << square) & Bits::mask_a_file; 
-        is_on_b_file = (1ULL << square) & Bits::mask_b_file;
-        is_on_g_file = (1ULL << square) & Bits::mask_g_file;
-        is_on_h_file = (1ULL << square) & Bits::mask_h_file;
+        is_on_a_file = (1ULL << square) & Bits::file_masks[0]; 
+        is_on_b_file = (1ULL << square) & Bits::file_masks[1];
+        is_on_g_file = (1ULL << square) & Bits::file_masks[6];
+        is_on_h_file = (1ULL << square) & Bits::file_masks[7];
 
         for (int move : knight_moves) {
             target_square = square + move;
@@ -124,8 +124,8 @@ void PrecomputedMoveData::generateBlankKingAttacks() {
     bool is_on_a_file, is_on_h_file;
 
     for (int square = a1; square <= h8; square++) {
-        is_on_a_file = (1ULL << square) & Bits::mask_a_file;
-        is_on_h_file = (1ULL << square) & Bits::mask_h_file;
+        is_on_a_file = (1ULL << square) & Bits::file_masks[0];
+        is_on_h_file = (1ULL << square) & Bits::file_masks[1];
 
         for (int move : king_moves){
             target_square = square + move;

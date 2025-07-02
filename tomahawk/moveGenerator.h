@@ -33,6 +33,11 @@ public:
     // precomputes
     int own_king_square;
 
+    // eval vars
+    int white_mobility, black_mobility; // will be based on oppAttackMap
+
+
+
     // currently with my bool approach, opponentAttackMap is generated at the beginning of each ply no matter what
     //      thorough (a simple pawn move can open up a lot of changes so this captures everything) but not optimized
     // there is probably a way to store this search (e.g. after we make a move we reuse our search/move results as opponentAttackMap)
@@ -45,6 +50,7 @@ public:
     U64 check_ray_mask = 0ULL, check_ray_mask_ext = 0ULL;
     U64 pin_rays = 0ULL;
     U64 opponentAttackMap = 0ULL;
+    U64 ownAttackMap = 0ULL;
     U64 postEnpassantOpponentAttackMap = 0ULL; // used for isEnpassantCheck to see if making a move leads to check
     U64 enPassantMaskBlockers = 0ULL; // used to check if a pawn is enpassant pinned (shows all blockers after enpassant is performed)
 
@@ -91,6 +97,7 @@ public:
     void generatePawnAttacks(bool ours, bool add_to_list);
     void generatePromotions(int start_square, int target_square);
     void generateKingMoves(bool ours, bool add_to_list);
+
     
     // if seeing if _own_ is in check, opp moves need to be generated
     // and vice versa
