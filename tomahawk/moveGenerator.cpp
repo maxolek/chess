@@ -60,7 +60,7 @@ void MoveGenerator::generateMoves() {
         generateKingMoves(true, true);
     }
 
-    if (_board->is_white_move) {
+    if (board->is_white_move) {
         white_mobility = countBits(ownAttackMap);
         black_mobility = countBits(opponentAttackMap);
     } else {

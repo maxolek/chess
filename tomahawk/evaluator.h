@@ -110,6 +110,7 @@ public:
     // counts (weights are in above)
     static float materialDifferences(const Board& position); // add up material
     static float pawnStructureDifferences(const Board& position); // double, block, iso (more is bad)
+    // currently mobilityDiff lags the position to eval by 1 ply as it relies on movegen which ran on the prior position
     static float mobilityDifferences(const MoveGenerator* movegen); // # moves (psuedo possibilities)
     static float positionDifferences(const Board& position); // pst differences
 
