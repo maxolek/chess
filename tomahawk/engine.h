@@ -23,9 +23,12 @@ public:
     std::unique_ptr<MoveGenerator> movegen;
     Board* game_board;
     Board search_board; // want to modify search board
+    Move legal_moves[MoveGenerator::max_moves];
     Move bestMove;
-    std::vector<Move> legal_moves;
     bool pondering = false; bool stop = false;
+
+    // to preload PST tables
+    Evaluator evaluator;
 
     // mobility is stored in engine to avoid recomp of moves
     int whiteMobility = 0; int blackMobility = 0;

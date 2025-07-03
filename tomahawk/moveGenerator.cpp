@@ -39,7 +39,6 @@ MoveGenerator::MoveGenerator(const Board* _board) {
 // easier code might be to generate it on iteration and not in this bool stuff
 
 void MoveGenerator::generateMoves() {
-    moves.clear();
     updateBitboards(board);
     // gen opponent moves
     // detect checks, pins, etc.
@@ -63,7 +62,6 @@ void MoveGenerator::generateMoves() {
 }
 
 void MoveGenerator::generateMoves(const Board* _board) {
-    moves.clear();
     // load movegen at given state
     board = _board;
     updateBitboards(_board);
@@ -93,8 +91,7 @@ void MoveGenerator::generateMoves(const Board* _board) {
 
 }
 
-std::vector<Move> MoveGenerator::generateMovesList(const Board* _board) {
-    moves.clear();
+int MoveGenerator::generateMovesList(const Board* _board, Move moveList[]) {
     // load movegen at given state
     board = _board;
     updateBitboards(_board);
@@ -120,7 +117,12 @@ std::vector<Move> MoveGenerator::generateMovesList(const Board* _board) {
         generateKingMoves(true, true);
     }
 
-    return moves;
+    // Now copy internal moves to passed array
+    for (int i = 0; i < count; i++) {
+        moveList[i] = moves[i];
+    }
+
+    return count;
 }
 
 
@@ -319,7 +321,7 @@ void MoveGenerator::generateSlidingMoves(bool ours, bool add_to_list, bool post_
                         target_square = tzcnt(potential_moves_bitboard) - 1;
                         potential_moves_bitboard &= potential_moves_bitboard - 1;
 
-                        moves.push_back(Move(start_square, target_square));
+                        moves[count++] = Move(start_square, target_square);
                         //Move(start_square,target_square).PrintMove();
                     }
                 }
@@ -367,7 +369,7 @@ void MoveGenerator::generateSlidingMoves(bool ours, bool add_to_list, bool post_
                         target_square = tzcnt(potential_moves_bitboard) - 1;
                         potential_moves_bitboard &= potential_moves_bitboard - 1;
 
-                        moves.push_back(Move(start_square, target_square));
+                        moves[count++] = Move(start_square, target_square);
                         //Move(start_square,target_square).PrintMove();
                     }
                 }
@@ -421,7 +423,7 @@ void MoveGenerator::generateSlidingMoves(bool ours, bool add_to_list, bool post_
                         target_square = tzcnt(potential_moves_bitboard) - 1;
                         potential_moves_bitboard &= potential_moves_bitboard - 1;
 
-                        moves.push_back(Move(start_square, target_square));
+                        moves[count++] = Move(start_square, target_square);
                         //Move(start_square,target_square).PrintMove();
                     }
                 }
@@ -481,7 +483,7 @@ void MoveGenerator::generateKnightMoves(bool ours, bool add_to_list) {
                 target_square = tzcnt(potential_moves_bitboard) - 1;
                 potential_moves_bitboard &= potential_moves_bitboard - 1;
 
-                moves.push_back(Move(start_square, target_square));
+                moves[count++] = Move(start_square, target_square);
                 //Move(start_square,target_square).PrintMove();
             }
         }
@@ -530,7 +532,7 @@ void MoveGenerator::generatePawnPushes(bool ours, bool add_to_list) {
                 potential_moves &= potential_moves - 1;
 
                 if (target_square == start_square + std::pow(-1,side) * 8 * 2) {  // double push
-                    moves.push_back(Move(start_square, target_square,Move::pawnTwoUpFlag));
+                    moves[count++] = Move(start_square, target_square,Move::pawnTwoUpFlag);
                 }
                 else if ((!side) && ((1ULL << start_square) & Bits::mask_rank_7)) {  // promotions
                     generatePromotions(start_square, target_square);
@@ -538,7 +540,7 @@ void MoveGenerator::generatePawnPushes(bool ours, bool add_to_list) {
                 else if (side && ((1ULL << start_square) & Bits::mask_rank_2)) {
                     generatePromotions(start_square, target_square);
                 }
-                else {moves.push_back(Move(start_square, target_square));}// single push
+                else {moves[count++] = Move(start_square, target_square);}// single push
             }
         }
 
@@ -602,9 +604,9 @@ void MoveGenerator::generatePawnAttacks(bool ours, bool add_to_list) {
                     generatePromotions(start_square, target_square);
                 } else if ((target_square % 8) == board->currentGameState.enPassantFile &&
                         ((side == 0 && target_square / 8 == 5) || (side == 1 && target_square / 8 == 2))) {
-                    moves.push_back(Move(start_square, target_square, Move::enPassantCaptureFlag));
+                    moves[count++] = Move(start_square, target_square, Move::enPassantCaptureFlag);
                 } else {
-                    moves.push_back(Move(start_square, target_square));
+                    moves[count++] = Move(start_square, target_square);;
                 }
             }
         }
@@ -615,10 +617,10 @@ void MoveGenerator::generatePawnAttacks(bool ours, bool add_to_list) {
 }
 
 void MoveGenerator::generatePromotions(int start_square, int target_square) { 
-    moves.push_back(Move(start_square, target_square,Move::promoteToQueenFlag));
-    moves.push_back(Move(start_square, target_square,Move::promoteToKnightFlag));
-    moves.push_back(Move(start_square, target_square,Move::promoteToRookFlag));
-    moves.push_back(Move(start_square, target_square,Move::promoteToBishopFlag));
+    moves[count++] = Move(start_square, target_square,Move::promoteToQueenFlag);
+    moves[count++] = Move(start_square, target_square,Move::promoteToKnightFlag);
+    moves[count++] = Move(start_square, target_square,Move::promoteToRookFlag);
+    moves[count++] = Move(start_square, target_square,Move::promoteToBishopFlag);
 }
 
 
@@ -650,7 +652,7 @@ void MoveGenerator::generateKingMoves(bool ours, bool add_to_list) {
             target_square = tzcnt(potential_moves) - 1;
             potential_moves &= potential_moves - 1;
 
-            moves.push_back(Move(square, target_square));
+            moves[count++] = Move(square, target_square);
         }
         
         // castling
@@ -661,7 +663,7 @@ void MoveGenerator::generateKingMoves(bool ours, bool add_to_list) {
 
                 if (!(castle_mask & castle_blockers)) {
                     target_square = (side == 0) ? g1 : g8;
-                    moves.push_back(Move(square, target_square, Move::castleFlag));
+                    moves[count++] = Move(square, target_square, Move::castleFlag);
                 }
             }
 
@@ -671,7 +673,7 @@ void MoveGenerator::generateKingMoves(bool ours, bool add_to_list) {
 
                 if (!(castle_mask & castle_blockers) && !((own|opp)&castle_mask_ext)) {
                     target_square = (side == 0) ? c1 : c8;
-                    moves.push_back(Move(square, target_square, Move::castleFlag));
+                    moves[count++] = Move(square, target_square, Move::castleFlag);
                 }
             }
         }
@@ -912,5 +914,8 @@ void MoveGenerator::updateBitboards(const Board* _board) {
     opponentAttackMap = ownAttackMap = 0ULL;
     postEnpassantOpponentAttackMap = 0ULL;
     own_king_square = sqidx(own&kings);
+
+    count = 0;
+    //moves = [];
 }
 

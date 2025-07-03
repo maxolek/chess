@@ -3,22 +3,28 @@
 int Searcher::nodesSearched = 0;
 std::unordered_map<U64, TTEntry> Searcher::tt;
 
-SearchResult Searcher::search(Board& board, MoveGenerator& movegen, std::vector<Move>& legal_moves, int depth, std::chrono::steady_clock::time_point start_time, int time_limit_ms) {
+SearchResult Searcher::search(Board& board, MoveGenerator& movegen, Evaluator& evaluator, Move legal_moves[MoveGenerator::max_moves], int count, int depth, std::chrono::steady_clock::time_point start_time, int time_limit_ms) {
     bool maximizing = board.is_white_move;
     int bestEval = board.is_white_move ? -100000 : 100000;
     int alpha = -100000; int beta = 100000;
     Move bestMove = Move::NullMove();
     std::unordered_map<std::string, int> bestComponentEvals;
 
-    for (Move move : legal_moves) {
-        board.MakeMove(move);
-        int eval = minimax(board, movegen, depth - 1, !maximizing, alpha, beta, start_time, time_limit_ms, false);
-        board.UnmakeMove(move);
+    for (int i = 0; i < count; i++) {
+        Move m =  legal_moves[i];
+        board.MakeMove(m);
+        int eval = minimax(
+            board, movegen, evaluator,
+            depth - 1, !maximizing, 
+            alpha, beta, 
+            start_time, time_limit_ms, false
+        );
+        board.UnmakeMove(m);
 
         if ((maximizing && eval > bestEval) ||
             (!maximizing && eval < bestEval)) {
             bestEval = eval;
-            bestMove = move;
+            bestMove = m;
             //bestComponentEvals = Evaluator::computeComponents(board);
         }
 
@@ -31,7 +37,7 @@ SearchResult Searcher::search(Board& board, MoveGenerator& movegen, std::vector<
     return {bestMove, bestEval, bestComponentEvals};
 }
 
-int Searcher::minimax(Board& board, MoveGenerator& movegen, int depth, bool maximizing, int alpha, int beta,
+int Searcher::minimax(Board& board, MoveGenerator& movegen, Evaluator& evaluator, int depth, bool maximizing, int alpha, int beta,
                       std::chrono::steady_clock::time_point start_time, int time_limit_ms, bool out_of_time) {
     if (out_of_time) return maximizing ? -100000 : 100000;
     nodesSearched++;
@@ -46,7 +52,7 @@ int Searcher::minimax(Board& board, MoveGenerator& movegen, int depth, bool maxi
         //movegen.mobility(&board); // doubles some key perft position depth5 times, not worth eval increase
         // but there is potential for these pseudo legal moves to be a part of regular movegeneration so 
         // mobility is calculated en-route
-        return Evaluator::taperedEval(&board);
+        return evaluator.taperedEval(&board);
     }
 
     int bestEval = maximizing ? -100000 : 100000; //Move bestMove;
@@ -69,13 +75,15 @@ int Searcher::minimax(Board& board, MoveGenerator& movegen, int depth, bool maxi
             }
     }
 
-    std::vector<Move> moves = movegen.generateMovesList(&board);
+    Move next_moves[MoveGenerator::max_moves]; 
+    int count = movegen.generateMovesList(&board, next_moves);
 
-    for (const Move& move : moves) {
-        board.MakeMove(move);
-        int eval = minimax(board, movegen, depth - 1, !maximizing, alpha, beta,
+    for (int i = 0; i < count; i++) {
+        Move m = next_moves[i];
+        board.MakeMove(m);
+        int eval = minimax(board, movegen, evaluator, depth - 1, !maximizing, alpha, beta,
             start_time, time_limit_ms, out_of_time);
-        board.UnmakeMove(move);
+        board.UnmakeMove(m);
 
         if (out_of_time) return maximizing ? -100000 : 100000;
 

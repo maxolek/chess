@@ -241,15 +241,18 @@ public:
 
         //std::cout << "movegen board (post first move)" << std::endl;
         //movegen->board.print_board();
-        movegen->generateMoves(&board);
-        std::vector<Move> moves = movegen->moves;
+        Move first_moves[MoveGenerator::max_moves];
+        int move_cnt = movegen->generateMovesList(&board, first_moves);
+        Move move;
+        
         //std::cout << "movegen board (post first move) - post movegeneration" << std::endl;
         //movegen->board.print_board();
         int pos = 0;
 
         //std::cout << "perft, depth: " << depth << std::endl;
         //board.print_board();
-        for (Move move : moves) {
+        for (int i = 0; i < move_cnt; i++) {
+            move = first_moves[i];
             //moveBreakdown(move, board);
         
             board.MakeMove(move); 
@@ -281,15 +284,17 @@ public:
 
     void perftDivide(int depth, std::string _fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1") {
         setBoard(_fen);
-        movegen->generateMoves(&board);
-        std::vector<Move> moves = movegen->moves;
+        Move first_moves[MoveGenerator::max_moves];
+        int move_cnt = movegen->generateMovesList(&board, first_moves);
+        Move move;
         int total = 0;
         int count;
 
         //std::cout << "movegen board" << std::endl;
         //movegen->board.print_board();
     
-        for (Move move : moves) {
+        for (int i = 0; i < move_cnt; i++) {
+            move = first_moves[i];
             //moveBreakdown(move, board);
 
             //if (Move::SameMove(Move(a2,a3),move)) {continue;}
@@ -369,13 +374,14 @@ public:
 
         for (int depth = 1; depth <= maxDepth; ++depth) {
             setBoard(fen);
-            std::vector<Move> legalMoves = movegen->generateMovesList(&board);
+            Move legalMoves[MoveGenerator::max_moves];
+            movegen->generateMovesList(&board, legalMoves);
 
             Searcher::nodesSearched = 0;  // reset nodes counter before each depth
 
             auto start = std::chrono::steady_clock::now();
             // search eval
-            SearchResult search_result = Searcher::search(board, *movegen, legalMoves, depth, start, timeLimitMs);
+            SearchResult search_result = Searcher::search(board, *movegen, legalMoves, movegen->count, depth, start, timeLimitMs);
             int eval_search = search_result.eval;
             std::unordered_map<std::string, int> component_search = search_result.component_evals;
             auto split = std::chrono::steady_clock::now();

@@ -9,8 +9,8 @@ Engine::Engine() {
     //game_board = &Board();
     //search_board = *game_board;
     movegen = std::make_unique<MoveGenerator>(&search_board);
-    movegen->generateMoves(game_board);
-    legal_moves = movegen->moves;
+    int count = movegen->generateMovesList(game_board, legal_moves);
+    evaluator = Evaluator();
     clearState();
 }
 
@@ -18,8 +18,8 @@ Engine::Engine(Board* _board) {
     game_board = _board;
     search_board = *_board;
     movegen = std::make_unique<MoveGenerator>(&search_board);
-    movegen->generateMoves(game_board);
-    legal_moves = movegen->moves;
+    int count = movegen->generateMovesList(game_board, legal_moves);
+    evaluator = Evaluator();
 }
 
 void Engine::clearState() {
@@ -30,6 +30,7 @@ void Engine::clearState() {
     search_depth = -1;
     time_left[0] = time_left[1] = 0;
     increment[0] = increment[1] = 0;
+    evaluator = Evaluator();
 }
 
 void Engine::setOption(const std::string& name, const std::string& value) {
@@ -121,7 +122,8 @@ void Engine::playMovesStrings(const std::vector<std::string>& moves) {
         }
 
         // Castling (optional: could be left to Move constructor if you detect it there)
-        if (moveStr == "e1g1" || moveStr == "e1c1" || moveStr == "e8g8" || moveStr == "e8c8") {
+        if ((moveStr == "e1g1" || moveStr == "e1c1" || moveStr == "e8g8" || moveStr == "e8c8") 
+            && (movedPiece == king)) {
             flag = Move::castleFlag;
         }
 
@@ -252,34 +254,31 @@ void Engine::iterativeDeepening(SearchSettings settings) {
     auto start_time = std::chrono::steady_clock::now();
     int elapsed_ms;
     int time_limit_ms = computeSearchTime(settings);
-    Move iteration_bestMove; // if time reached mid-depth, return best from last depth
+    //Move iteration_bestMove; // if time reached mid-depth, return best from last depth
     int iteration_bestEval;
     int depth_limit = settings.depth ? settings.depth : 10;
 
     // generate first legal moves from current board position
-    movegen->generateMoves(&search_board);
-    std::vector<Move> moves = movegen->moves;
+    Move first_moves[MoveGenerator::max_moves];
+    int count = movegen->generateMovesList(&search_board, first_moves);
     
     // until time stop
     // or depth limit (currently no limit)
     int depth = 1;
     while (!stop) {
-        if (!moves.empty()) {
-            SearchResult result = Searcher::search(search_board, *movegen, moves, depth, start_time, time_limit_ms);
-            iteration_bestMove = result.bestMove; iteration_bestEval = result.eval;
-
-            auto now = std::chrono::steady_clock::now();
-            elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
-            if (elapsed_ms >= time_limit_ms || depth == depth_limit) {stop = true;}
-            else if (!iteration_bestMove.IsNull()) {
-                bestMove = iteration_bestMove;
-                logSearchDepthInfo(depth, bestMove, iteration_bestEval, elapsed_ms);
-            }
-            
-            depth++; // increase depth and re-search if time permits
-        } else {
-            bestMove = Move::NullMove();
+        SearchResult result = Searcher::search(search_board, *movegen, evaluator, first_moves, count, depth, start_time, time_limit_ms);
+    
+        auto now = std::chrono::steady_clock::now();
+        elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
+        
+        if (elapsed_ms >= time_limit_ms || depth == depth_limit) {stop = true;}
+        else if (!result.bestMove.IsNull()) {
+            bestMove = result.bestMove;
+            iteration_bestEval = result.eval;
+            logSearchDepthInfo(depth, bestMove, iteration_bestEval, elapsed_ms);
         }
+            
+        depth++; // increase depth and re-search if time permits
     }
 
 }
@@ -307,7 +306,7 @@ void Engine::logSearchDepthInfo(int depth, Move bestMove, int eval, int elapsed_
     file << "Nodes searched: " << Searcher::nodesSearched << "\n";
     file << "-----------------------------\n";
 
-    if (depth == 1) {Evaluator::writeEvalDebug(movegen.get(), search_board, file_path);}
+    if (depth == 1) {evaluator.writeEvalDebug(movegen.get(), search_board, file_path);}
 }
 
 

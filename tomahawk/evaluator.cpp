@@ -1,16 +1,37 @@
 #include "evaluator.h"
 
-void Evaluator::writeEvalDebug(const MoveGenerator* movegen, Board& board, const std::string& filename) {
-    int PST_opening[6][64];
-    if (!loadPST("C:/Users/maxol/code/chess/bin/pst_opening.txt", PST_opening)) {
-        std::cerr << "failed to load opening pst" << std::endl;
+bool Evaluator::end_pstLoaded = false; bool Evaluator::open_pstLoaded = false;
+int Evaluator::PST_endgame[6][64]; int Evaluator::PST_opening[6][64];
+
+Evaluator::Evaluator() {
+     if (!open_pstLoaded) {
+        if (!loadPST("C:/Users/maxol/code/chess/bin/pst_opening.txt", PST_opening)) {
+            std::cerr << "failed to load opening pst" << std::endl;
+        }
+        open_pstLoaded = true;
     }
-    int PST_endgame[6][64];
-    if (!loadPST("C:/Users/maxol/code/chess/bin/pst_endgame.txt", PST_opening)) {
-        std::cerr << "failed to load endgame pst" << std::endl;
+    if (!end_pstLoaded) {
+        if (!loadPST("C:/Users/maxol/code/chess/bin/pst_endgame.txt", PST_endgame)) {
+            std::cerr << "failed to load endgame pst" << std::endl;
+        }
+        end_pstLoaded = true;
+    }
+}
+
+void Evaluator::writeEvalDebug(const MoveGenerator* movegen, Board& board, const std::string& filename) {
+    if (!open_pstLoaded) {
+        if (!loadPST("C:/Users/maxol/code/chess/bin/pst_opening.txt", PST_opening)) {
+            std::cerr << "failed to load opening pst" << std::endl;
+        }
+        open_pstLoaded=true;
+    }
+    if (!end_pstLoaded) {
+        if (!loadPST("C:/Users/maxol/code/chess/bin/pst_endgame.txt", PST_endgame)) {
+            std::cerr << "failed to load endgame pst" << std::endl;
+        }
+        end_pstLoaded=true;
     }
 
-    
     std::ofstream file(filename, std::ios::app); // append mode = std::ios::app
     if (!file.is_open()) {
         std::cerr << "Failed to open eval debug file: " << filename << std::endl;
@@ -162,20 +183,10 @@ int Evaluator::taperedEval(const Board* board) {
 }
 
 int Evaluator::openingEval(const Board* board) {
-    int PST_opening[6][64];
-    if (!loadPST("C:/Users/maxol/code/chess/bin/pst_opening.txt", PST_opening)) {
-        std::cerr << "failed to load opening pst" << std::endl;
-    }
-
     return Evaluate(board, PST_opening);
 }
 
 int Evaluator::endgameEval(const Board* board) {
-    int PST_endgame[6][64];
-    if (!loadPST("C:/Users/maxol/code/chess/bin/pst_endgame.txt", PST_endgame)) {
-        std::cerr << "failed to load endgame pst" << std::endl;
-    }
-
     return Evaluate(board, PST_endgame);
 }
 

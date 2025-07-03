@@ -10,7 +10,10 @@
 
 class Evaluator {
 private:
+    static bool open_pstLoaded; static bool end_pstLoaded;
 public:
+
+    Evaluator ();
 
     static void writeEvalDebug(const MoveGenerator* movegen, Board& board, const std::string& filename);
 
@@ -22,6 +25,7 @@ public:
 
     // Load PST from file: 6 pieces, 64 squares each
     static bool loadPST(const std::string& filename, int pst[6][64]);
+    static int PST_opening[6][64]; static int PST_endgame[6][64];
 
     // pawn structure
     static constexpr int doubled_pawns = 1; 

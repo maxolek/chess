@@ -184,6 +184,6 @@ void UCI::handleGo(std::istringstream& iss) {
     settings.movetime = movetime;
     settings.infinite = infinite;
 
-
     engine->startSearch(settings);
+
 }

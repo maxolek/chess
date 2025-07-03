@@ -13,8 +13,10 @@
 class MoveGenerator {
 private:
 public:
-    const int max_moves = 218;
-    std::vector<Move> moves;
+    // preallocated array instead of dynamically allocated vector
+    static const int max_moves = 256; 
+    Move moves[max_moves];
+    int count; // for iteration
 
     // once building a more robust engine put this in the engine class not in movegen (to save time)
     //      based on the idea that MoveGenerator will be made new every turn
@@ -69,7 +71,7 @@ public:
 
     void generateMoves();
     void generateMoves(const Board* _board);
-    std::vector<Move> generateMovesList(const Board* _board);
+    int generateMovesList(const Board* _board, Move movesList[]);
 
     // psuedo-legal moves: moves that are valid (position) but not rules (check)
     int white_mobility, black_mobility;

@@ -43,8 +43,12 @@ Result Arbiter::GetGameState(const Board* board) {
     MoveGenerator movegen = MoveGenerator(board);
     movegen.generateMoves();
 
+    Move next_moves[MoveGenerator::max_moves]; 
+    movegen.generateMovesList(board, next_moves);
+    int count = movegen.count;
+
     // checkmate and stalemate
-    if (movegen.moves.size() == 0) {
+    if (count == 0) {
         if (board->is_in_check) return (board->is_white_move) ? WhiteIsMated : BlackIsMated;
         else if (board->plyCount >= 20) {return Stalemate;}
     }
