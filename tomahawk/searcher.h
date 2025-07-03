@@ -3,6 +3,16 @@
 
 #include "evaluator.h"
 
+// transposition table
+enum BoundType { EXACT, LOWERBOUND, UPPERBOUND };
+
+struct TTEntry {
+    int eval;
+    int depth;
+    Move bestMove;
+    BoundType flag;
+};
+
 struct SearchResult {
     Move bestMove;
     int eval;
@@ -15,6 +25,7 @@ private:
     //std::vector<Move>* potential_moves;
 public:
     static int nodesSearched;
+    static std::unordered_map<U64, TTEntry> tt;
 
     static SearchResult search(
         Board& board,
@@ -41,6 +52,9 @@ public:
         std::chrono::steady_clock::time_point start_time, 
         int time_limit_ms, bool out_of_time
     );
+
+    static int moveScore(const Move& move, const Board& board);
+    static void orderedMoves(std::vector<Move>& moves, const Board& board); // order in place
 };
 
 #endif

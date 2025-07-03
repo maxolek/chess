@@ -9,6 +9,8 @@ from datetime import datetime
 ENGINES = {
     "it_deep": r"C:\Users\maxol\code/chess\version_history\v1.1_iterative_deepening.exe",
     "tap_ev": r"C:\Users\maxol\code/chess\version_history\v1.2_tapered_eval.exe",
+    "alphabeta": r"C:\Users\maxol\code/chess\version_history\v1.3_alphabeta.exe",
+    "transpoition_table": r"C:\Users\maxol\code/chess\version_history\v1.4_transposition_table.exe"
     # Add more as needed
     #"stockfish": "engines/stockfish.exe"
 }
