@@ -5,12 +5,13 @@ int Searcher::nodesSearched = 0;
 SearchResult Searcher::search(Board& board, MoveGenerator& movegen, std::vector<Move>& legal_moves, int depth, std::chrono::steady_clock::time_point start_time, int time_limit_ms) {
     bool maximizing = board.is_white_move;
     int bestEval = board.is_white_move ? -100000 : 100000;
+    int alpha = -100000; int beta = 100000;
     Move bestMove = Move::NullMove();
     std::unordered_map<std::string, int> bestComponentEvals;
 
     for (Move move : legal_moves) {
         board.MakeMove(move);
-        int eval = minimax(board, movegen, depth - 1, !maximizing, start_time, time_limit_ms, false);
+        int eval = minimax(board, movegen, depth - 1, !maximizing, alpha, beta, start_time, time_limit_ms, false);
         board.UnmakeMove(move);
 
         if ((maximizing && eval > bestEval) ||
@@ -29,10 +30,9 @@ SearchResult Searcher::search(Board& board, MoveGenerator& movegen, std::vector<
     return {bestMove, bestEval, bestComponentEvals};
 }
 
-int Searcher::minimax(Board& board, MoveGenerator& movegen, int depth, bool maximizing,
+int Searcher::minimax(Board& board, MoveGenerator& movegen, int depth, bool maximizing, int alpha, int beta,
                       std::chrono::steady_clock::time_point start_time, int time_limit_ms, bool out_of_time) {
     if (out_of_time) return maximizing ? -100000 : 100000;
-
     nodesSearched++;
 
     auto now = std::chrono::steady_clock::now();
@@ -53,15 +53,21 @@ int Searcher::minimax(Board& board, MoveGenerator& movegen, int depth, bool maxi
 
     for (const Move& move : moves) {
         board.MakeMove(move);
-        int eval = minimax(board, movegen, depth - 1, !maximizing, start_time, time_limit_ms, out_of_time);
+        int eval = minimax(board, movegen, depth - 1, !maximizing, alpha, beta,
+            start_time, time_limit_ms, out_of_time);
         board.UnmakeMove(move);
 
         if (out_of_time) maximizing ? -100000 : 100000;
 
-        if (maximizing)
+        if (maximizing) {
             bestEval = std::max(bestEval, eval);
-        else
+            alpha = std::max(alpha, eval);
+        } else {
             bestEval = std::min(bestEval, eval);
+            beta = std::min(beta, eval);
+        }
+
+        if (beta <= alpha) {break;} // alpha-beta cutoff
     }
 
     return bestEval;

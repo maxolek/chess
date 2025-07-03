@@ -254,6 +254,7 @@ void Engine::iterativeDeepening(SearchSettings settings) {
     int time_limit_ms = computeSearchTime(settings);
     Move iteration_bestMove; // if time reached mid-depth, return best from last depth
     int iteration_bestEval;
+    int depth_limit = settings.depth ? settings.depth : 10;
 
     // generate first legal moves from current board position
     movegen->generateMoves(&search_board);
@@ -269,7 +270,7 @@ void Engine::iterativeDeepening(SearchSettings settings) {
 
             auto now = std::chrono::steady_clock::now();
             elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
-            if (elapsed_ms >= time_limit_ms) {stop = true;}
+            if (elapsed_ms >= time_limit_ms || depth == depth_limit) {stop = true;}
             else if (!iteration_bestMove.IsNull()) {
                 bestMove = iteration_bestMove;
                 logSearchDepthInfo(depth, bestMove, iteration_bestEval, elapsed_ms);
@@ -306,7 +307,7 @@ void Engine::logSearchDepthInfo(int depth, Move bestMove, int eval, int elapsed_
     file << "Nodes searched: " << Searcher::nodesSearched << "\n";
     file << "-----------------------------\n";
 
-    Evaluator::writeEvalDebug(movegen.get(), search_board, file_path);
+    if (depth == 1) {Evaluator::writeEvalDebug(movegen.get(), search_board, file_path);}
 }
 
 

@@ -37,9 +37,9 @@ public:
         MoveGenerator& movegen, 
         int depth, 
         bool maximizing,
+        int alpha, int beta, // alpha beta pruning
         std::chrono::steady_clock::time_point start_time, 
-        int time_limit_ms, 
-        bool out_of_time
+        int time_limit_ms, bool out_of_time
     );
 };
 

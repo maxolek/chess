@@ -28,6 +28,10 @@ void UCI::handleCommand(const std::string& line) {
     std::string token;
     iss >> token;
 
+    std::ofstream file("C:/Users/maxol/code/chess/uci_interactions.txt", std::ios::app); // append mode = std::ios::app
+    file << iss.str() << std::endl;
+    file.close();
+
     if (token == "uci") {
             std::cout << "id name tomahawk\n";
             std::cout << "id author maxolek\n";
@@ -179,10 +183,6 @@ void UCI::handleGo(std::istringstream& iss) {
     settings.nodes = nodes;
     settings.movetime = movetime;
     settings.infinite = infinite;
-
-    std::ofstream file("C:/Users/maxol/code/chess/uci_interactions.txt", std::ios::app); // append mode = std::ios::app
-    file << iss.str() << std::endl;
-    file.close();
 
 
     engine->startSearch(settings);

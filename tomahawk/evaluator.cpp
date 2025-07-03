@@ -46,40 +46,50 @@ bool Evaluator::loadPST(const std::string& filename, int pst[6][64]) {
         return false;
     }
 
-    const std::string pieceNames[6] = {"Pawn", "Knight", "Bishop", "Rook", "Queen", "King"};
+    const std::unordered_map<std::string, int> pieceMap = {
+        {"Pawn", 0}, {"Knight", 1}, {"Bishop", 2},
+        {"Rook", 3}, {"Queen", 4}, {"King", 5}
+    };
+
     std::string line;
+    while (std::getline(file, line)) {
+        if (line.empty()) continue;
 
-    for (int piece = 0; piece < 6; ++piece) {
-        // Read piece - phase header line, e.g. "Pawn - opening"
-        if (!std::getline(file, line)) {
-            std::cerr << "Unexpected end of file while reading piece header" << std::endl;
+        // Parse the header, like "Knight - endgame"
+        std::istringstream headerStream(line);
+        std::string pieceName, dash, phaseName;
+        headerStream >> pieceName >> dash >> phaseName;
+
+        auto it = pieceMap.find(pieceName);
+        if (it == pieceMap.end()) {
+            std::cerr << "Unexpected header line: " << line << std::endl;
             return false;
         }
-        // Validate piece name at start of line
-        if (line.find(pieceNames[piece]) != 0) {
-            std::cerr << "Expected piece " << pieceNames[piece] << " but got: " << line << std::endl;
-            return false;
-        }
+        int piece = it->second;
 
-        // Read 8 lines of 8 numbers each
+        // Read the 8 lines that follow
         for (int rank = 0; rank < 8; ++rank) {
             if (!std::getline(file, line)) {
-                std::cerr << "Unexpected end of file reading PST rank" << std::endl;
+                std::cerr << "Unexpected EOF while reading PST data for " << pieceName << std::endl;
                 return false;
             }
+
             std::istringstream iss(line);
             for (int fileIdx = 0; fileIdx < 8; ++fileIdx) {
                 int val;
                 if (!(iss >> val)) {
-                    std::cerr << "Failed to parse PST value at piece " << piece << ", rank " << rank << ", file " << fileIdx << std::endl;
+                    std::cerr << "Failed to parse PST value at " << pieceName
+                              << ", rank " << rank << ", file " << fileIdx << std::endl;
                     return false;
                 }
                 pst[piece][rank * 8 + fileIdx] = val;
             }
         }
     }
+
     return true;
 }
+
 
 
 
@@ -120,7 +130,7 @@ int Evaluator::gamePhase(const Board* position) {
     int bq = countBits(position->colorBitboards[1] & position->pieceBitboards[4]); // black queens
     
     phase -= (wp+bp)*pawn_phase; phase -= (wn+bn)*knight_phase;
-    phase -= (wb+bb)*bishop_phase; phase -= (wr+br)*knight_phase;
+    phase -= (wb+bb)*bishop_phase; phase -= (wr+br)*rook_phase;
     phase -= (wq+bq)*queen_phase; 
 
     phase = (phase * 256 + (total_phase / 2)) / total_phase;
