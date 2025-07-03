@@ -74,8 +74,8 @@ public:
     // getters
     ushort Value() { return moveValue; }
     bool IsNull() { return moveValue == 0; }
-    int StartSquare() { return moveValue & startSquareMask; }
-    int TargetSquare() { return ( moveValue & targetSquareMask) >> 6; }
+    int StartSquare() const { return moveValue & startSquareMask; }
+    int TargetSquare() const { return ( moveValue & targetSquareMask) >> 6; }
     bool IsPromotion() { return MoveFlag() >= promoteToQueenFlag; }
     int MoveFlag() { return moveValue >> 12; }
     void PrintMove() { 

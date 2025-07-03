@@ -6,13 +6,13 @@ int Evaluator::PST_endgame[6][64]; int Evaluator::PST_opening[6][64];
 Evaluator::Evaluator() {
      if (!open_pstLoaded) {
         if (!loadPST("C:/Users/maxol/code/chess/bin/pst_opening.txt", PST_opening)) {
-            std::cerr << "failed to load opening pst" << std::endl;
+            //std::cerr << "failed to load opening pst" << std::endl;
         }
         open_pstLoaded = true;
     }
     if (!end_pstLoaded) {
         if (!loadPST("C:/Users/maxol/code/chess/bin/pst_endgame.txt", PST_endgame)) {
-            std::cerr << "failed to load endgame pst" << std::endl;
+            //std::cerr << "failed to load endgame pst" << std::endl;
         }
         end_pstLoaded = true;
     }
@@ -62,6 +62,7 @@ void Evaluator::writeEvalDebug(const MoveGenerator* movegen, Board& board, const
 // Load PST from file: 6 pieces, 64 squares each
 bool Evaluator::loadPST(const std::string& filename, int pst[6][64]) {
     std::ifstream file(filename);
+
     if (!file.is_open()) {
         std::cerr << "Failed to open PST file: " << filename << std::endl;
         return false;
@@ -83,7 +84,7 @@ bool Evaluator::loadPST(const std::string& filename, int pst[6][64]) {
 
         auto it = pieceMap.find(pieceName);
         if (it == pieceMap.end()) {
-            std::cerr << "Unexpected header line: " << line << std::endl;
+           // std::cerr << "Unexpected header line: " << line << std::endl;
             return false;
         }
         int piece = it->second;
@@ -91,7 +92,7 @@ bool Evaluator::loadPST(const std::string& filename, int pst[6][64]) {
         // Read the 8 lines that follow
         for (int rank = 0; rank < 8; ++rank) {
             if (!std::getline(file, line)) {
-                std::cerr << "Unexpected EOF while reading PST data for " << pieceName << std::endl;
+                //std::cerr << "Unexpected EOF while reading PST data for " << pieceName << std::endl;
                 return false;
             }
 
@@ -99,8 +100,8 @@ bool Evaluator::loadPST(const std::string& filename, int pst[6][64]) {
             for (int fileIdx = 0; fileIdx < 8; ++fileIdx) {
                 int val;
                 if (!(iss >> val)) {
-                    std::cerr << "Failed to parse PST value at " << pieceName
-                              << ", rank " << rank << ", file " << fileIdx << std::endl;
+                   // std::cerr << "Failed to parse PST value at " << pieceName
+                    //          << ", rank " << rank << ", file " << fileIdx << std::endl;
                     return false;
                 }
                 pst[piece][rank * 8 + fileIdx] = val;

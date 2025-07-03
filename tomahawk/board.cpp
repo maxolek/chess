@@ -474,7 +474,7 @@ void Board::PromoteToPiece(int piece, int target_square) {
     zobrist_hash ^= zobrist_table[move_color*6 + pawn][target_square]; // remove pawn
 }
 
-int Board::getMovedPiece(int start_square) {
+int Board::getMovedPiece(int start_square) const {
     for (int piece = 0; piece < 6; piece++) {
         if (get_bit(pieceBitboards[piece],start_square))
             return piece;
@@ -482,7 +482,7 @@ int Board::getMovedPiece(int start_square) {
     return -1;
 }
 
-int Board::getCapturedPiece(int target_square) {
+int Board::getCapturedPiece(int target_square) const {
     for (int piece = 0; piece < 6; piece++) {
         if (get_bit(pieceBitboards[piece],target_square))
             return piece;
@@ -490,7 +490,7 @@ int Board::getCapturedPiece(int target_square) {
     return -1;
 }
 
-int Board::getSideAt(int square) {
+int Board::getSideAt(int square) const {
     for (int side = 0; side < 2; side++) {
         if (colorBitboards[side] & (1ULL << square))
             return side;
@@ -498,7 +498,7 @@ int Board::getSideAt(int square) {
     return -1;
 }
 
-int Board::getPieceAt(int square, int side) {
+int Board::getPieceAt(int square, int side) const {
     for (int piece = 0; piece < 6; piece++) {
         if (get_bit(pieceBitboards[piece],square))
             return piece + side*10; 

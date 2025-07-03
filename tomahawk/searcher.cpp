@@ -63,20 +63,21 @@ int Searcher::minimax(Board& board, MoveGenerator& movegen, Evaluator& evaluator
     if (tt_it != tt.end()) {
         const TTEntry& entry = tt_it->second;
         if (entry.depth >= depth) {
-                if (entry.flag == EXACT) {
-                    return entry.eval;
-                }
-                if (entry.flag == LOWERBOUND && entry.eval > bestEval) {
-                    bestEval = entry.eval;
-                }
-                if (entry.flag == UPPERBOUND && entry.eval < bestEval) {
-                    bestEval = entry.eval;
-                }
+            if (entry.flag == EXACT) {
+
+                return entry.eval;
             }
+            if (entry.flag == LOWERBOUND && entry.eval > bestEval) {
+                bestEval = entry.eval;
+            }
+            if (entry.flag == UPPERBOUND && entry.eval < bestEval) {
+                bestEval = entry.eval;
+            }
+        }
     }
 
-    Move next_moves[MoveGenerator::max_moves]; 
-    int count = movegen.generateMovesList(&board, next_moves);
+    Move next_moves[MoveGenerator::max_moves]; Move tt_move = Move(0);
+    int count = generateAndOrderMoves(board, movegen, next_moves, depth);
 
     for (int i = 0; i < count; i++) {
         Move m = next_moves[i];
@@ -87,21 +88,38 @@ int Searcher::minimax(Board& board, MoveGenerator& movegen, Evaluator& evaluator
 
         if (out_of_time) return maximizing ? -100000 : 100000;
 
+        bool isBetter;
         if (maximizing) {
-            bestEval = std::max(bestEval, eval);
-            alpha = std::max(alpha, eval);
+            isBetter = (eval > bestEval);
         } else {
-            bestEval = std::min(bestEval, eval);
-            beta = std::min(beta, eval);
+            isBetter = (eval < bestEval);
+        }
+        if (isBetter) {
+            bestEval = eval;
+            tt_move = m;
+            if (maximizing) alpha = std::max(alpha, eval);
+            else beta = std::min(beta, eval);
         }
 
-        if (beta <= alpha) {break;} // alpha-beta cutoff
+        if (beta <= alpha) {
+            if (board.getCapturedPiece(m.TargetSquare()) == -1) {  // quiet move
+                if (!Move::SameMove(killerMoves[depth][0], m)) {
+                    killerMoves[depth][1] = killerMoves[depth][0];
+                    killerMoves[depth][0] = m;
+                }
+
+                int piece = board.getMovedPiece(m.StartSquare());
+                historyHeuristic[piece][m.TargetSquare()] += depth * depth;
+            }
+            break;
+        }
+
     }
 
     // Store result in TT
     TTEntry newEntry;
     newEntry.eval = bestEval;
-    //newEntry.bestMove = bestMove;
+    newEntry.bestMove = tt_move;
     newEntry.depth = depth;
     // Set flag based on alpha-beta bounds logic (EXACT, LOWERBOUND, UPPERBOUND)
     if (bestEval <= alphaOrig) newEntry.flag = UPPERBOUND;
@@ -111,4 +129,57 @@ int Searcher::minimax(Board& board, MoveGenerator& movegen, Evaluator& evaluator
     tt[hash] = newEntry;
 
     return bestEval;
+}
+
+// call before makeMove()
+int Searcher::moveScore(const Move& move, const Board& board, int depth, const Move& ttMove) {
+    // TT move
+    if ((Move::SameMove(ttMove, move))) return 1000000;
+
+    // Captures — MVV-LVA
+    if (board.getCapturedPiece(move.TargetSquare()) != -1) {
+        int attacker = board.getMovedPiece(move.StartSquare());
+        int victim = board.getMovedPiece(move.TargetSquare());
+        return 100000 + 10 * victim - attacker;
+    }
+
+    // Killer moves
+    if (Move::SameMove(killerMoves[depth][0], move)) return 90000;
+    if (Move::SameMove(killerMoves[depth][1], move)) return 80000;
+
+    // History heuristic
+    int piece = board.getMovedPiece(move.StartSquare());
+    return historyHeuristic[piece][move.TargetSquare()];
+}
+
+
+void Searcher::orderedMoves(Move moves[MoveGenerator::max_moves], int count, const Board& board, int depth) {
+    U64 hash = board.zobrist_hash;
+    Move ttMove = Move::NullMove();
+
+    auto it = tt.find(hash);
+    if (it != tt.end()) {
+        ttMove = it->second.bestMove;
+    }
+
+    std::vector<std::pair<int, Move>> scored;
+
+    for (int i = 0; i < count; ++i) {
+        int score = moveScore(moves[i], board, depth, ttMove);
+        scored.emplace_back(score, moves[i]);
+    }
+
+    std::sort(scored.begin(), scored.end(), [](const auto& a, const auto& b) {
+        return a.first > b.first;
+    });
+
+    for (int i = 0; i < count; ++i) {
+        moves[i] = scored[i].second;
+    }
+}
+
+int Searcher::generateAndOrderMoves(Board& board, MoveGenerator& movegen, Move moves[], int depth) {
+    int count = movegen.generateMovesList(&board, moves);
+    orderedMoves(moves, count, board, depth);
+    return count;
 }

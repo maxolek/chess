@@ -260,12 +260,12 @@ void Engine::iterativeDeepening(SearchSettings settings) {
 
     // generate first legal moves from current board position
     Move first_moves[MoveGenerator::max_moves];
-    int count = movegen->generateMovesList(&search_board, first_moves);
-    
+    int count;    
     // until time stop
     // or depth limit (currently no limit)
     int depth = 1;
     while (!stop) {
+        count = Searcher::generateAndOrderMoves(search_board, *movegen, first_moves, 0);
         SearchResult result = Searcher::search(search_board, *movegen, evaluator, first_moves, count, depth, start_time, time_limit_ms);
     
         auto now = std::chrono::steady_clock::now();

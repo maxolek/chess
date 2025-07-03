@@ -78,10 +78,10 @@ public:
 
     void PromoteToPiece(int piece, int target_square);
 
-    int getMovedPiece(int start_square);
-    int getCapturedPiece(int target_square);
-    int getSideAt(int square);
-    int getPieceAt(int square, int side);
+    int getMovedPiece(int start_square) const;
+    int getCapturedPiece(int target_square) const;
+    int getSideAt(int square) const;
+    int getPieceAt(int square, int side) const; 
 
     void updateFiftyMoveCounter(int moved_piece, bool isCapture, bool unmake);
 

@@ -10,17 +10,16 @@ import threading
 
 ENGINES = {
     "it_deep": r"C:\Users\maxol\code\chess\version_history\v1.1_iterative_deepening.exe",
-    "tap_ev": r"C:\Users\maxol\code\chess\version_history\v1.2_tapered_eval.exe",
-    "alphabeta": r"C:\Users\maxol\code\chess\version_history\v1.3_alphabeta.exe",
-    "transpoition_table": r"C:\Users\maxol\code\chess\version_history\v1.4_transposition_table.exe",
-    "move_list_array": r"C:\Users\maxole\code\chess\version_history\v1.5_moveListArray.exe",
-    "pstLoadFIX": r"C:\Users\maxole\code\chess\version_history\v1.6_pstLoadFIX.exe"
-    # Add more as needed
+    #"tap_ev": r"C:\Users\maxol\code\chess\version_history\v1.2_tapered_eval.exe",
+    #"alphabeta": r"C:\Users\maxol\code\chess\version_history\v1.3_alphabeta.exe",
+    #"transpoition_table": r"C:\Users\maxol\code\chess\version_history\v1.4_transposition_table.exe",
+    #"move_list_array": r"C:\Users\maxol\code\chess\version_history\v1.5_moveListArray.exe",
+    "pstLoadFIX": r"C:\Users\maxol\code\chess\version_history\v1.6_pstLoadFIX.exe"
     #"stockfish": "engines/stockfish.exe"
 }
 
-GAMES_PER_PAIR = 5  # 3 as white, 2 as black
-TIME_LIMIT = 5  # seconds per move
+GAMES_PER_PAIR = 6  # 3 as white, 2 as black
+TIME_LIMIT = 3  # seconds per move
 
 LOG_DIR = "logs"
 PGN_FILE = os.path.join(LOG_DIR, f"tournament_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pgn")
@@ -80,9 +79,10 @@ def write_pgn_threadsafe(lock, pgn_file, data):
 
     game_text = "\n".join(headers) + "\n\n" + moves_str.strip() + f" {data['result']}\n\n"
 
-    with lock:
-        with open(pgn_file, "a") as f:
-            f.write(game_text)
+    #already single threaded
+    #with lock:
+    #    with open(pgn_file, "a") as f:
+    #        f.write(game_text)
 
 def run_tournament_parallel():
     players = list(ENGINES.keys())
@@ -98,30 +98,45 @@ def run_tournament_parallel():
                 all_games.append((ENGINES[white], ENGINES[black], white, black))
                 all_games.append((ENGINES[black], ENGINES[white], black, white))
 
+    print(f"\nStarting {len(all_games)} games...\n")
+    start_time = time.time()
+
     with concurrent.futures.ProcessPoolExecutor() as executor:
         futures = []
         for game_args in all_games:
             futures.append(executor.submit(play_single_game, *game_args))
 
-        for future in concurrent.futures.as_completed(futures):
+        for idx, future in enumerate(concurrent.futures.as_completed(futures), 1):
             try:
                 result = future.result()
                 write_pgn_threadsafe(lock, PGN_FILE, result)
 
-                # Update scores safely (since we are in main process, no concurrency here)
-                if result["result"] == "1-0":
-                    scores[result["white_name"]] += 1
-                elif result["result"] == "0-1":
-                    scores[result["black_name"]] += 1
-                elif result["result"] == "1/2-1/2":
-                    scores[result["white_name"]] += 0.5
-                    scores[result["black_name"]] += 0.5
-            except Exception as e:
-                print(f"Game error: {e}")
+                white = result["white_name"]
+                black = result["black_name"]
+                res = result["result"]
+                game_time = time.time() - start_time
 
-    print("\n🏁 Final Standings:")
+                # Print intergame result
+                print(f"[Game {idx:03}] {white} vs {black} -> {res}  (⏱ {game_time:.1f}s)")
+
+                # Update scores
+                if res == "1-0":
+                    scores[white] += 1
+                elif res == "0-1":
+                    scores[black] += 1
+                elif res == "1/2-1/2":
+                    scores[white] += 0.5
+                    scores[black] += 0.5
+
+            except Exception as e:
+                print(f"[Game {idx:03}] Error: {e}")
+
+    total_time = time.time() - start_time
+    print(f"\n🏁 Tournament complete in {total_time:.2f} seconds")
+    print("\n📊 Final Standings:")
     for name, score in sorted(scores.items(), key=lambda x: -x[1]):
-        print(f"{name}: {score} pts") 
+        print(f"{name:20} {score:.1f} pts")
+
 
 
 def play_game(white_path, black_path, white_name, black_name):
