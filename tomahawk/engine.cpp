@@ -267,18 +267,18 @@ void Engine::iterativeDeepening(SearchSettings settings) {
     // or depth limit (currently no limit)
     int depth = 1;
     while (!stop) {
-        count = Searcher::generateAndOrderMoves(search_board, *movegen, first_moves, 0, Move(0), prev_eval);
+        count = Searcher::generateAndOrderMoves(search_board, *movegen, first_moves, 0, bestMove, prev_evals);
         SearchResult result = Searcher::search(search_board, *movegen, evaluator, first_moves, count, depth, start_time, time_limit_ms);
     
         auto now = std::chrono::steady_clock::now();
         elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
         
         if (elapsed_ms >= time_limit_ms || depth == depth_limit) {stop = true;}
-        else if (!result.bestMove.IsNull()) {
-            bestMove = result.bestMove;
-            iteration_bestEval = result.eval;
-            logSearchDepthInfo(depth, bestMove, iteration_bestEval, elapsed_ms);
-        }
+        //else if (!result.bestMove.IsNull()) {
+        bestMove = result.bestMove;
+        iteration_bestEval = result.eval;
+        logSearchDepthInfo(depth, bestMove, iteration_bestEval, elapsed_ms);
+        //}
             
         depth++; // increase depth and re-search if time permits
     }

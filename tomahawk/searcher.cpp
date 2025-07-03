@@ -22,7 +22,7 @@ SearchResult Searcher::search(Board& board, MoveGenerator& movegen, Evaluator& e
         int eval = minimax(
             board, movegen, evaluator,
             depth - 1, !maximizing, 
-            alpha, beta, bestMove, prev_evals,
+            alpha, beta, Move(0), prev_evals,
             start_time, time_limit_ms, false
         );
         prev_evals[i] = eval;
@@ -39,7 +39,8 @@ SearchResult Searcher::search(Board& board, MoveGenerator& movegen, Evaluator& e
         // check time
         auto current_time = std::chrono::steady_clock::now();
         int elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - start_time).count();
-        if (elapsed_ms >= time_limit_ms) {bestMove = Move::NullMove(); break;}
+        // if  evaluating prev search best move first then we can still return the best move
+        if (elapsed_ms >= time_limit_ms) {break;}//{bestMove = Move::NullMove(); break;}
     }
 
     return {bestMove, bestEval, bestComponentEvals};
