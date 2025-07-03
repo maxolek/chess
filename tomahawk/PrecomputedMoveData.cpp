@@ -125,7 +125,7 @@ void PrecomputedMoveData::generateBlankKingAttacks() {
 
     for (int square = a1; square <= h8; square++) {
         is_on_a_file = (1ULL << square) & Bits::file_masks[0];
-        is_on_h_file = (1ULL << square) & Bits::file_masks[1];
+        is_on_h_file = (1ULL << square) & Bits::file_masks[7];
 
         for (int move : king_moves){
             target_square = square + move;

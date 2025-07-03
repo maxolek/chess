@@ -61,6 +61,7 @@ public:
     std::vector<GameState> gameStateHistory;
 
 
+
     Board();
     Board(std::string _fen);
     Board(int side, U64 color_bitboards[2], U64 piece_bitboards[6], GameState currentGameState);

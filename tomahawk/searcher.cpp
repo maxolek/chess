@@ -31,7 +31,7 @@ SearchResult Searcher::search(Board& board, MoveGenerator& movegen, std::vector<
 
 int Searcher::minimax(Board& board, MoveGenerator& movegen, int depth, bool maximizing,
                       std::chrono::steady_clock::time_point start_time, int time_limit_ms, bool out_of_time) {
-    if (out_of_time) maximizing ? -100000 : 100000;
+    if (out_of_time) return maximizing ? -100000 : 100000;
 
     nodesSearched++;
 
@@ -42,7 +42,10 @@ int Searcher::minimax(Board& board, MoveGenerator& movegen, int depth, bool maxi
     }
 
     if (depth == 0 || Arbiter::GetGameState(&board) != InProgress) {
-        return Evaluator::Evaluate(&movegen, &board);
+        //movegen.mobility(&board); // doubles some key perft position depth5 times, not worth eval increase
+        // but there is potential for these pseudo legal moves to be a part of regular movegeneration so 
+        // mobility is calculated en-route
+        return Evaluator::taperedEval(&board);
     }
 
     std::vector<Move> moves = movegen.generateMovesList(&board);

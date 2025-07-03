@@ -27,6 +27,9 @@ public:
     std::vector<Move> legal_moves;
     bool pondering = false; bool stop = false;
 
+    // mobility is stored in engine to avoid recomp of moves
+    int whiteMobility = 0; int blackMobility = 0;
+
     // UCI options
     std::string syzygyPath = "";
     int hashSize = 16;       // default example

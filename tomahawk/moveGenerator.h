@@ -33,9 +33,6 @@ public:
     // precomputes
     int own_king_square;
 
-    // eval vars
-    int white_mobility, black_mobility; // will be based on oppAttackMap
-
 
 
     // currently with my bool approach, opponentAttackMap is generated at the beginning of each ply no matter what
@@ -73,6 +70,17 @@ public:
     void generateMoves();
     void generateMoves(const Board* _board);
     std::vector<Move> generateMovesList(const Board* _board);
+
+    // psuedo-legal moves: moves that are valid (position) but not rules (check)
+    int white_mobility, black_mobility;
+    void mobility(const Board* _board);
+    std::vector<Move> psuedoLegalMovesList(const Board* _board, bool ours);
+    void generatePsuedoLegalMoves(const Board* _board, bool ours);
+    // individuals
+    int slidingMobility(const Board* _board, bool ours);
+    int knightMobility(const Board* _board, bool ours);
+    int pawnMobility(const Board* _board, bool ours); // push+attack
+    int kingMobility(const Board* _board, bool ours);
 
     // obstruction difference for sliding moves
     // includes blockers

@@ -6,6 +6,11 @@ import chess
 
 STOCKFISH_PATH = r"C:\Users\maxol\stockfish-windows-x86-64-avx2\stockfish\stockfish-windows-x86-64-avx2"
 ENGINE_PATH = r"C:\Users\maxol\code\chess\tomahawk\testing.exe"
+LOG_FILE_PATH = r"C:\Users\maxol\code\chess\perft_log.txt"
+
+def log(line: str):
+    with open(LOG_FILE_PATH, "a", encoding="utf-8") as f:
+        f.write(line + "\n")
 
 
 def run_stockfish_perft(fen, depth, divide=False):
@@ -95,6 +100,9 @@ def compare_divide(fen, depth) -> None:
     print(f"\nDepth: {depth}")
     print(f"Running divide...\n")
 
+    log(f"\nFEN: {fen}")
+    log(f"Depth: {depth}")
+
     start = time.time()
     my_divide, my_lines = run_cpp_perft(fen, depth, divide=True)
     mid = time.time()
@@ -109,20 +117,21 @@ def compare_divide(fen, depth) -> None:
         sf_val = sf_divide.get(move, None)
         if my_val != sf_val:
             correct = False
-            print(f"❌ {move:5}  Your engine: {my_val}  Stockfish: {sf_val}")
-            # Skip if move format is invalid
-            #if not re.match(r'^[a-h][1-8][a-h][1-8][qrbn]?$', move):
-            #    continue
-            #show_second_level_discrepancy(fen, move)
+            line = f"❌ {move:5}  Your engine: {my_val}  Stockfish: {sf_val}"
         else:
-            print(f"✅ {move:5}  {my_val}")
+            line = f"✅ {move:5}  {my_val}"
+        print(line)
+        log(line)
 
     if correct:
         print("\n✅ All perft divide results match.")
+        log("✅ All perft divide results match.\n")
     else:
         print("\n❌ Discrepancy found in perft divide.")
+        log("❌ Discrepancy found in perft divide.\n")
 
-    print(f"Times ||  Your engine: {mid-start:.2f}  Stockfish: {end-mid:.2f}")
+    log(f"Times ||  Your engine: {mid-start:.2f}s  Stockfish: {end-mid:.2f}s")
+
 
     
     
@@ -216,7 +225,7 @@ def run_test_suite(depth = 2) -> None:
         ("Kiwipete",   "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", depth),
         ("En-passant Hell",  "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1", depth),
         ("Complex Middle",   "r4rk1/1pp1qppp/p1np1n2/8/2P5/2N1PN2/PP2QPPP/2KR1B1R w - - 0 1", depth),
-        ("Promotions & Castling", "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8  ", depth)
+        ("Promotions & Castling", "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8", depth)
     ]
 
     for name, fen, depth in tests:

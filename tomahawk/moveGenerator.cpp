@@ -60,13 +60,6 @@ void MoveGenerator::generateMoves() {
         generateKingMoves(true, true);
     }
 
-    if (board->is_white_move) {
-        white_mobility = countBits(ownAttackMap);
-        black_mobility = countBits(opponentAttackMap);
-    } else {
-        black_mobility = countBits(ownAttackMap);
-        white_mobility = countBits(opponentAttackMap);
-    }
 }
 
 void MoveGenerator::generateMoves(const Board* _board) {
@@ -78,12 +71,11 @@ void MoveGenerator::generateMoves(const Board* _board) {
     // gen opponent moves
     // detect checks, pins, etc.
 
-    // switching add_to_list to true for mobility calculations
-    generatePawnPushes(false, true); // optional normally 
-    generatePawnAttacks(false, true); // false, false normally
-    generateKnightMoves(false, true);
-    generateSlidingMoves(false, true, false);
-    generateKingMoves(false, true);
+   
+    generatePawnAttacks(false, false); 
+    generateKnightMoves(false, false);
+    generateSlidingMoves(false, false, false);
+    generateKingMoves(false, false);
 
     //if (check_ray_mask) {in_check = true;}
 
@@ -99,13 +91,6 @@ void MoveGenerator::generateMoves(const Board* _board) {
         generateKingMoves(true, true);
     }
 
-    if (_board->is_white_move) {
-        white_mobility = countBits(ownAttackMap);
-        black_mobility = countBits(opponentAttackMap);
-    } else {
-        black_mobility = countBits(ownAttackMap);
-        white_mobility = countBits(opponentAttackMap);
-    }
 }
 
 std::vector<Move> MoveGenerator::generateMovesList(const Board* _board) {
@@ -116,11 +101,10 @@ std::vector<Move> MoveGenerator::generateMovesList(const Board* _board) {
 
     // gen opponent moves
     // detect checks, pins, etc.
-    generatePawnPushes(false, true); // optinal normally
-    generatePawnAttacks(false, true); // false, false normally
-    generateKnightMoves(false, true);
-    generateSlidingMoves(false, true, false);
-    generateKingMoves(false, true);
+    generatePawnAttacks(false, false); // false, false normally
+    generateKnightMoves(false, false);
+    generateSlidingMoves(false, false, false);
+    generateKingMoves(false, false);
 
     //if (check_ray_mask) {in_check = true;}
 
@@ -134,14 +118,6 @@ std::vector<Move> MoveGenerator::generateMovesList(const Board* _board) {
         generateKnightMoves(true, true);
         generateSlidingMoves(true, true, false);
         generateKingMoves(true, true);
-    }
-
-    if (_board->is_white_move) {
-        white_mobility = countBits(ownAttackMap);
-        black_mobility = countBits(opponentAttackMap);
-    } else {
-        black_mobility = countBits(ownAttackMap);
-        white_mobility = countBits(opponentAttackMap);
     }
 
     return moves;
@@ -700,8 +676,203 @@ void MoveGenerator::generateKingMoves(bool ours, bool add_to_list) {
             }
         }
     }
-
 }
+
+
+void MoveGenerator::mobility(const Board* _board) {
+    int mob = 0;
+    bool ours = true;
+
+    mob += slidingMobility(_board, ours);
+    mob += knightMobility(_board, ours);
+    mob += pawnMobility(_board, ours);
+    mob += kingMobility(_board, ours);
+
+    white_mobility = _board->is_white_move ? mob : 0;
+    black_mobility = _board->is_white_move ? 0 : mob;
+
+    mob += slidingMobility(_board, !ours);
+    mob += knightMobility(_board, !ours);
+    mob += pawnMobility(_board, !ours);
+    mob += kingMobility(_board, !ours);
+
+    white_mobility = _board->is_white_move ? 0 : mob;
+    black_mobility = _board->is_white_move ? mob : 0;
+}
+/*
+std::vector<Move> MoveGenerator::psuedoLegalMovesList(const Board* _board, bool ours) {
+    std::vector<Move> moves;
+    std::vector<Move> sliding = generatePsuedoSlidingMoves(_board, white);
+    std::vector<Move> knight = generatePsuedoKnightMoves(_board, white);
+    std::vector<Move> pawn = generatePsuedoPawnMoves(_board, white);
+    std::vector<Move> king = generatePsuedoKingMoves(_board, white);
+}
+*/
+
+//void generatePsuedoLegalMoves(const Board* _board, bool white);
+int MoveGenerator::slidingMobility(const Board* _board, bool ours) {
+    int start_square;
+    int target_square;
+    U64 o_diff;
+    U64 potential_moves_bitboard = Bits::fullSet;
+
+    int mob = 0;
+    
+    U64 valid_bishops;
+    U64 valid_rooks;
+    U64 valid_queens; 
+    if (ours) {
+        valid_rooks = rooks & own;
+        valid_bishops = bishops & own;
+        valid_queens = queens & own;
+    } else {
+        valid_rooks = rooks & opp;
+        valid_bishops = bishops & opp;
+        valid_queens = queens & opp;
+    }
+
+    // pinned pieces cannot move if king is in check
+    //if (in_check && own) {
+    //    valid_bishops &= ~pin_rays;
+    //    valid_rooks &= ~pin_rays;
+    //    valid_queens &= ~pin_rays;
+    //}
+
+    while (valid_rooks) {
+        start_square = tzcnt(valid_rooks) - 1; // get LSB
+        valid_rooks &= valid_rooks - 1; // clear LSB
+
+        for (int direction = 0; direction < 2; direction++) {
+            if (!ours) {
+                potential_moves_bitboard = odiff(own | opp, PrecomputedMoveData::blankRookAttacks[start_square][direction]) & ~opp;
+            } else {
+                potential_moves_bitboard &= (odiff(own | opp, PrecomputedMoveData::blankRookAttacks[start_square][direction]) & ~own);
+            }
+
+            mob += countBits(potential_moves_bitboard);
+            potential_moves_bitboard = Bits::fullSet; // reset for each direction
+        }
+    }
+
+    potential_moves_bitboard = Bits::fullSet;
+
+    while (valid_bishops) {
+        start_square = tzcnt(valid_bishops) - 1;
+        valid_bishops &= valid_bishops -1;
+
+        for (int direction = 0; direction < 2; direction++) {
+            if (!ours) {
+                potential_moves_bitboard = odiff(own | opp, PrecomputedMoveData::blankBishopAttacks[start_square][direction]) & ~opp;
+            } else {
+                potential_moves_bitboard &= odiff(own | opp, PrecomputedMoveData::blankBishopAttacks[start_square][direction]) & ~own;
+            }
+
+            mob += countBits(potential_moves_bitboard);
+            potential_moves_bitboard = Bits::fullSet; // reset for each direction
+        }     
+    }
+
+    potential_moves_bitboard = Bits::fullSet;
+    
+    while (valid_queens) {
+        start_square = tzcnt(valid_queens) - 1;
+        valid_queens &= valid_queens -1;   
+
+        for (int direction = 0; direction < 4; direction++) {
+            if (!ours) {
+                potential_moves_bitboard = odiff(own | opp, PrecomputedMoveData::blankQueenAttacks[start_square][direction]) & ~opp;
+            } else { 
+                potential_moves_bitboard &= odiff(own | opp, PrecomputedMoveData::blankQueenAttacks[start_square][direction]) & ~own;
+            }
+        }  
+
+        mob += countBits(potential_moves_bitboard);
+        potential_moves_bitboard = Bits::fullSet; // reset for each direction
+    }
+}
+int MoveGenerator::knightMobility(const Board* _board, bool ours) {
+    int start_square;
+    int target_square;
+    U64 potential_moves_bitboard = Bits::fullSet;
+    
+    U64 valid_knights = ours ? knights & own : knights & opp;
+    int mob = 0;
+
+    // pinned pieces cannot move if king is in check
+    //if (in_check && own) {
+    //    valid_knights &= ~pin_rays;
+    //}
+    
+    while (valid_knights) {
+        start_square = tzcnt(valid_knights) - 1;
+        valid_knights &= valid_knights -1;
+
+        potential_moves_bitboard &= PrecomputedMoveData::blankKnightAttacks[start_square];
+        //std::cout << "blank" << std::endl;
+        //print_bitboard(potential_moves_bitboard);
+
+        potential_moves_bitboard &= ours ? ~own : ~opp;
+        //std::cout << "not own" << std::endl;
+        //print_bitboard(potential_moves_bitboard);
+
+        mob += countBits(potential_moves_bitboard);
+    }
+
+    potential_moves_bitboard = Bits::fullSet;
+}
+int MoveGenerator::pawnMobility(const Board* _board, bool ours) { // push+attack
+    U64 valid_pawns = ours ? pawns & own : pawn & opp;
+    int start_square;
+    int target_square;
+    U64 potential_moves = Bits::fullSet & ~(own|opp);
+
+    int mob = 0;
+
+    // pinned pieces cannot move if king is in check
+    //if (in_check && ours) {
+    //    valid_pawns &= ~pin_rays;
+    //}
+
+    while (valid_pawns) {
+        start_square = tzcnt(valid_pawns) - 1;
+        valid_pawns &= valid_pawns - 1;
+
+        potential_moves &= PrecomputedMoveData::blankPawnMoves[start_square][ours ? side : 1-side];
+        // check if 1 move forward is possible
+        // if not, make sure 2 move forward is removed
+        potential_moves &= (get_bit(potential_moves,start_square+std::pow(-1,side)*8)) 
+                            ? Bits::fullSet // if it is, change nothing
+                            : ~(1ULL << (start_square + static_cast<int>(std::pow(-1,side))*8*2)); 
+
+        // captures
+        potential_moves |= (potential_moves |= PrecomputedMoveData::fullPawnAttacks[start_square][ours ? side : 1-side] & (ours ? opp : own));
+        
+        while (potential_moves) {
+            target_square = tzcnt(potential_moves) - 1;
+            potential_moves &= potential_moves - 1;
+
+            mob += countBits(potential_moves);
+        }
+    }
+    potential_moves = Bits::fullSet & ~(own|opp);
+}
+int MoveGenerator::kingMobility(const Board* _board, bool ours) {
+    int square = ours ? own_king_square : sqidx(kings & opp);
+    U64 potential_moves = PrecomputedMoveData::blankKingAttacks[square];
+    int target_square;
+
+    int mob = 0;
+
+    potential_moves &= ~own;
+    // dont care about checks
+
+    mob += countBits(potential_moves);
+        
+     // or castling
+
+     return mob;
+}
+
 
 // if seeing if _own_ is in check, opp moves need to be generated
 // and vice versa
@@ -735,7 +906,6 @@ void MoveGenerator::updateBitboards(const Board* _board) {
     queens = _board->pieceBitboards[queen];
     kings = _board->pieceBitboards[king];
 
-    white_mobility = black_mobility = 0;
     check_ray_mask = 0ULL;
     check_ray_mask_ext = 0ULL;
     pin_rays = 0ULL;

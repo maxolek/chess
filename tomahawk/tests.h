@@ -380,7 +380,7 @@ public:
             std::unordered_map<std::string, int> component_search = search_result.component_evals;
             auto split = std::chrono::steady_clock::now();
             // static eval
-            int eval_static = Evaluator::Evaluate(&board);
+            //int eval_static = Evaluator::Evaluate(&board);
             std::unordered_map<std::string, int> component_static = Evaluator::componentEvals;
             auto end = std::chrono::steady_clock::now();
 
@@ -391,7 +391,7 @@ public:
             std::cout << "Time: " << durationMs << " ms\n";
             std::cout << "Nodes: " << Searcher::nodesSearched << "\n";
             std::cout << "Best move: " << best.uci() << "\n";
-            std::cout << "Evaluation (static/search): " << eval_static << "\t" << eval_search << "\n";
+            //std::cout << "Evaluation (static/search): " << eval_static << "\t" << eval_search << "\n";
             std::cout << "---------- Eval Components (static/search) -----------\n";
             for (const auto& [key, value] : component_static) {
                 std::cout << key << ": " << value << "\n";
