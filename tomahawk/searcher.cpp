@@ -1,5 +1,8 @@
 #include "searcher.h"
 
+// Define static members
+int Searcher::historyHeuristic[12][64] = {};        // Assuming 12 piece types and 64 squares
+Move Searcher::killerMoves[64][2] = {};             // Assuming max search depth is 64
 int Searcher::nodesSearched = 0;
 std::unordered_map<U64, TTEntry> Searcher::tt;
 
@@ -109,7 +112,7 @@ int Searcher::minimax(Board& board, MoveGenerator& movegen, Evaluator& evaluator
                 }
 
                 int piece = board.getMovedPiece(m.StartSquare());
-                historyHeuristic[piece][m.TargetSquare()] += depth * depth;
+                historyHeuristic[board.is_white_move ? piece : piece+6][m.TargetSquare()] += depth * depth;
             }
             break;
         }
@@ -149,7 +152,7 @@ int Searcher::moveScore(const Move& move, const Board& board, int depth, const M
 
     // History heuristic
     int piece = board.getMovedPiece(move.StartSquare());
-    return historyHeuristic[piece][move.TargetSquare()];
+    return historyHeuristic[board.is_white_move ? piece : piece+6][move.TargetSquare()];
 }
 
 

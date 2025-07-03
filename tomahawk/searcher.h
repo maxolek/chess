@@ -45,7 +45,7 @@ public:
     // Killer moves: [depth][2] (we store up to 2 killer moves per depth)
     static Move killerMoves[MAX_DEPTH][2];
     // History heuristic: [piece][toSquare]
-    static int historyHeuristic[6][64];
+    static int historyHeuristic[12][64];
 
     static SearchResult search(
         Board& board,
@@ -89,7 +89,7 @@ public:
         int depth
     ); // order in place
 
-    static int Searcher::generateAndOrderMoves(
+    static int generateAndOrderMoves(
         Board& board, 
         MoveGenerator& movegen, 
         Move moves[MoveGenerator::max_moves], 
