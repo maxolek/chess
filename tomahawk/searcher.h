@@ -35,6 +35,7 @@ private:
 public:
     static int nodesSearched;
     static std::unordered_map<U64, TTEntry> tt;
+ 
 
     // eval enhancements (eval is based on board, not move)
     static const int castle_increase = 50; // centipawn
@@ -46,6 +47,8 @@ public:
     static Move killerMoves[MAX_DEPTH][2];
     // History heuristic: [piece][toSquare]
     static int historyHeuristic[12][64];
+
+    static Move best_line[MAX_DEPTH];
 
     static SearchResult search(
         Board& board,
@@ -72,6 +75,8 @@ public:
         int depth, 
         bool maximizing,
         int alpha, int beta, // alpha beta pruning
+        const Move& pvMove,
+        int prev_evals[MoveGenerator::max_moves],
         std::chrono::steady_clock::time_point start_time, 
         int time_limit_ms, bool out_of_time
     );
@@ -80,20 +85,26 @@ public:
         const Move& move, 
         const Board& board, 
         int depth, 
-        const Move& ttMove
+        const Move& ttMove,
+        const Move& pvMove,
+        int prev_eval
     );
     static void orderedMoves(
         Move moves[MoveGenerator::max_moves], 
         int count, 
         const Board& board, 
-        int depth
+        int depth, 
+        const Move& pvMove,
+        int prev_eval[MoveGenerator::max_moves]
     ); // order in place
 
     static int generateAndOrderMoves(
         Board& board, 
         MoveGenerator& movegen, 
         Move moves[MoveGenerator::max_moves], 
-        int depth
+        int depth,
+        const Move& pvMove,
+        int prev_eval[MoveGenerator::max_moves]
     );
 };
 
