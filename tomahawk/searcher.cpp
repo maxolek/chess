@@ -11,7 +11,7 @@ SearchResult Searcher::search(Board& board, MoveGenerator& movegen, Evaluator& e
     bool maximizing = board.is_white_move;
     int bestEval = board.is_white_move ? -100000 : 100000;
     int alpha = -100000; int beta = 100000;
-    Move bestMove = Move::NullMove();
+    Move bestMove = legal_moves[0]; //Move::NullMove();
     std::unordered_map<std::string, int> bestComponentEvals;
     int prev_evals[MoveGenerator::max_moves];
     std::fill_n(prev_evals, MoveGenerator::max_moves, bestEval);
@@ -61,7 +61,8 @@ int Searcher::minimax(Board& board, MoveGenerator& movegen, Evaluator& evaluator
         //movegen.mobility(&board); // doubles some key perft position depth5 times, not worth eval increase
         // but there is potential for these pseudo legal moves to be a part of regular movegeneration so 
         // mobility is calculated en-route
-        return evaluator.taperedEval(&board);
+        int eval = evaluator.taperedEval(&board);
+        return eval; //maximizing ? eval : -eval;
     }
 
     int bestEval = maximizing ? -100000 : 100000; //Move bestMove;
@@ -73,14 +74,13 @@ int Searcher::minimax(Board& board, MoveGenerator& movegen, Evaluator& evaluator
         const TTEntry& entry = tt_it->second;
         if (entry.depth >= depth) {
             if (entry.flag == EXACT) {
-
                 return entry.eval;
             }
-            if (entry.flag == LOWERBOUND && entry.eval > bestEval) {
-                bestEval = entry.eval;
+            if (entry.flag == LOWERBOUND && entry.eval >= beta) {
+                return  entry.eval; // cutoff- fail hard beta
             }
-            if (entry.flag == UPPERBOUND && entry.eval < bestEval) {
-                bestEval = entry.eval;
+            if (entry.flag == UPPERBOUND && entry.eval <= alpha) {
+                return entry.eval; // cutoff- fail soft alpha
             }
         }
     }
