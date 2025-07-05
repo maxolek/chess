@@ -259,16 +259,17 @@ void Engine::iterativeDeepening(SearchSettings settings) {
     int depth_limit = settings.depth ? settings.depth : 10;
 
     // generate first legal moves from current board position
-    Move first_moves[MoveGenerator::max_moves];
+    Move first_moves[MAX_MOVES];
     int count;    
-    int prev_evals[MoveGenerator::max_moves];
-    std::fill_n(prev_evals, MoveGenerator::max_moves, search_board.is_white_move ? -1000000 : 1000000);
+    int prev_evals[MAX_MOVES];
+    Move pvMove = Move::NullMove();
+    std::fill_n(prev_evals, MAX_MOVES, search_board.is_white_move ? -MATE_SCORE : MATE_SCORE);
     // until time stop
     // or depth limit (currently no limit)
     int depth = 1;
     while (!stop) {
-        count = Searcher::generateAndOrderMoves(search_board, *movegen, first_moves, 0, bestMove, prev_evals);
-        SearchResult result = Searcher::search(search_board, *movegen, evaluator, first_moves, count, depth, start_time, time_limit_ms);
+        count = Searcher::generateAndOrderMoves(search_board, *movegen, first_moves, 0, pvMove, prev_evals);
+        SearchResult result = Searcher::search(search_board, *movegen, evaluator, first_moves, count, depth, pvMove, start_time, time_limit_ms);
     
         auto now = std::chrono::steady_clock::now();
         elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
@@ -277,8 +278,11 @@ void Engine::iterativeDeepening(SearchSettings settings) {
         //else if (!result.bestMove.IsNull()) {
         bestMove = result.bestMove;
         iteration_bestEval = result.eval;
-        logSearchDepthInfo(depth, bestMove, iteration_bestEval, elapsed_ms);
+        pvMove = Searcher::best_line[0];
+        logSearchDepthInfo(depth, bestMove, Searcher::best_line, iteration_bestEval, elapsed_ms);
         //}
+        // searching at further depths for a move with proven mate is redudent
+        if (std::abs(iteration_bestEval) >= MATE_SCORE - 10) break;
             
         depth++; // increase depth and re-search if time permits
     }
@@ -294,7 +298,7 @@ void Engine::sendBestMove(Move best, Move ponder) {
 }
 
 
-void Engine::logSearchDepthInfo(int depth, Move bestMove, int eval, int elapsed_ms, std::string file_path) {
+void Engine::logSearchDepthInfo(int depth, Move bestMove,  std::vector<Move> best_line, int eval, int elapsed_ms, std::string file_path) {
     std::ofstream file(file_path, std::ios::app); // append mode
 
     file << "-----------------------------\n";
@@ -303,7 +307,8 @@ void Engine::logSearchDepthInfo(int depth, Move bestMove, int eval, int elapsed_
     file << "FEN: " << search_board.getBoardFEN() << "\n";
     file << "Depth: " << depth << "\n";
     file << "Best move: " << bestMove.uci() << "\n";
-    file << "Eval: " << eval << "\n";
+    file << "Eval: " << eval << "\nBest line: ";
+    for (int i = 0; i < best_line.size(); i++) {file << best_line[i].uci() << "  ";} file << "\n";
     file << "Time: " << elapsed_ms << " ms\n";
     file << "Nodes searched: " << Searcher::nodesSearched << "\n";
     file << "-----------------------------\n";

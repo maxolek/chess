@@ -25,6 +25,9 @@ typedef unsigned short ushort;
 
 constexpr const char* STARTPOS_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 const float INF = std::numeric_limits<float>::infinity();
+constexpr int MATE_SCORE = 100000;
+constexpr int MAX_DEPTH = 64;
+constexpr int MAX_MOVES = 256; 
 
 // board squares
 enum {

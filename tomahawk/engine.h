@@ -23,7 +23,7 @@ public:
     std::unique_ptr<MoveGenerator> movegen;
     Board* game_board;
     Board search_board; // want to modify search board
-    Move legal_moves[MoveGenerator::max_moves];
+    Move legal_moves[MAX_MOVES];
     Move bestMove;
     bool pondering = false; bool stop = false;
 
@@ -81,7 +81,7 @@ public:
 
     // logging
     void logSearchDepthInfo(
-        int depth, Move bestMove, int eval, int elapsed_ms,
+        int depth, Move bestMove, std::vector<Move> best_line, int eval, int elapsed_ms,
         std::string file_path = "C:/Users/maxol/code/chess/search_depth_eval.txt"
     );
 };

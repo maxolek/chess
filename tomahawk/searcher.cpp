@@ -5,67 +5,96 @@ int Searcher::historyHeuristic[12][64] = {};        // Assuming 12 piece types a
 Move Searcher::killerMoves[64][2] = {};             // Assuming max search depth is 64
 int Searcher::nodesSearched = 0;
 std::unordered_map<U64, TTEntry> Searcher::tt;
-Move Searcher::best_line[Searcher::MAX_DEPTH];
+std::vector<Move> Searcher::best_line;
 
-SearchResult Searcher::search(Board& board, MoveGenerator& movegen, Evaluator& evaluator, Move legal_moves[MoveGenerator::max_moves], int count, int depth, std::chrono::steady_clock::time_point start_time, int time_limit_ms) {
-    bool maximizing = board.is_white_move;
-    int bestEval = board.is_white_move ? -100000 : 100000;
-    int alpha = -100000; int beta = 100000;
+
+SearchResult Searcher::search(Board& board, MoveGenerator& movegen, Evaluator& evaluator, Move legal_moves[MAX_MOVES], int count, int depth, Move pvMove, std::chrono::steady_clock::time_point start_time, int time_limit_ms) {
+    bool out_of_time = false;
+    int bestEval = -MATE_SCORE;
+    int alpha = -MATE_SCORE; int beta = MATE_SCORE;
     Move bestMove = legal_moves[0]; //Move::NullMove();
     std::unordered_map<std::string, int> bestComponentEvals;
-    int prev_evals[MoveGenerator::max_moves];
-    std::fill_n(prev_evals, MoveGenerator::max_moves, bestEval);
+    int prev_evals[MAX_MOVES];
+    std::vector<Move> principalVariation;
+    best_line.clear();
+    nodesSearched = 0;
+    std::fill_n(prev_evals, MAX_MOVES, -MATE_SCORE);
 
     for (int i = 0; i < count; i++) {
         Move m =  legal_moves[i];
         board.MakeMove(m);
-        int eval = minimax(
+
+        out_of_time = false;
+        std::vector<Move> childPV;
+        int eval = -negamax(
             board, movegen, evaluator,
-            depth - 1, !maximizing, 
-            alpha, beta, Move(0), prev_evals,
-            start_time, time_limit_ms, false
+            depth - 1, 
+            -beta, -alpha, childPV, prev_evals,
+            start_time, time_limit_ms, out_of_time
         );
-        prev_evals[i] = eval;
+
         board.UnmakeMove(m);
 
-        if ((maximizing && eval > bestEval) ||
-            (!maximizing && eval < bestEval)) {
+        prev_evals[i] = eval;
+        if (out_of_time) {
+            if (i > 0) break; // timeout after at least one good move: keep the best one
+            //else return {bestMove, bestEval, bestComponentEvals}; // first move timed out, return last iterations result
+        }
+
+        if ((i == 0) || eval > bestEval) {
             bestEval = eval;
             bestMove = m;
+            //best_line[0] = m; // start tracking new best move
+            //for (int i = 1; i < MAX_DEPTH; i++) {if(Move::SameMove(tmp_best_line[i],Move(0))){break;} else {best_line[i] = tmp_best_line[i];}}
             //bestComponentEvals = Evaluator::computeComponents(board);
             // Set PV to current root move + line from deeper search
+            principalVariation.clear();
+            principalVariation.push_back(m);
+            principalVariation.insert(principalVariation.end(), childPV.begin(), childPV.end());
         }
+
+        // update alpha/beta as usual if you want iterative deepening with pruning here
+        alpha = std::max(alpha, eval);
 
         // check time
         auto current_time = std::chrono::steady_clock::now();
         int elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - start_time).count();
         // if  evaluating prev search best move first then we can still return the best move
-        if (elapsed_ms >= time_limit_ms) {break;}//{bestMove = Move::NullMove(); break;}
+        if (elapsed_ms >= time_limit_ms && i>0) {break;}//{bestMove = Move::NullMove(); break;}
     }
 
+    best_line = principalVariation;
     return {bestMove, bestEval, bestComponentEvals};
 }
 
-int Searcher::minimax(Board& board, MoveGenerator& movegen, Evaluator& evaluator, int depth, bool maximizing, int alpha, int beta, const Move& pvMove, int prev_eval[MoveGenerator::max_moves],
-                      std::chrono::steady_clock::time_point start_time, int time_limit_ms, bool out_of_time) {
-    if (out_of_time) return maximizing ? -100000 : 100000;
+int Searcher::negamax(Board& board, MoveGenerator& movegen, Evaluator& evaluator, int depth, int alpha, int beta, std::vector<Move>& pv, int prev_eval[MAX_MOVES],
+                      std::chrono::steady_clock::time_point start_time, int time_limit_ms, bool &out_of_time) {
+    
+                        //if (out_of_time) return bestEval;
     nodesSearched++;
+    int eval;
+    int local_prev_eval[MAX_MOVES] = {};
+    int bestEval = -MATE_SCORE;
+    bool foundMove = false;
+    //std::fill_n(tmp_best_line, MAX_DEPTH, Move(0));
+    //Result result = Arbiter::GetGameState(&board);
+
+    if (depth == 0 /*|| result != InProgress*/) {
+        //movegen.mobility(&board); // doubles some key perft position depth5 times, not worth eval increase
+        // but there is potential for these pseudo legal moves to be a part of regular movegeneration so 
+        // mobility is calculated en-route
+        eval = evaluator.taperedEval(&board);
+        return board.is_white_move ? eval : -eval; // eval is side to move agnostic but negamax
+    }                                              // returns the eval from the perspective of side to move
 
     auto now = std::chrono::steady_clock::now();
     if (std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count() >= time_limit_ms) {
         out_of_time = true;
-        return maximizing ? -100000 : 100000;
+        if (foundMove) return bestEval;
+        else return alpha; // best lower bound ("no better eval found")
+        //return bestEval;
     }
 
-    if (depth == 0 || Arbiter::GetGameState(&board) != InProgress) {
-        //movegen.mobility(&board); // doubles some key perft position depth5 times, not worth eval increase
-        // but there is potential for these pseudo legal moves to be a part of regular movegeneration so 
-        // mobility is calculated en-route
-        int eval = evaluator.taperedEval(&board);
-        return eval; //maximizing ? eval : -eval;
-    }
-
-    int bestEval = maximizing ? -100000 : 100000; //Move bestMove;
     int alphaOrig = alpha;  // Save original alpha before searching
     U64 hash = board.zobrist_hash;
     // Lookup TT entry
@@ -73,45 +102,50 @@ int Searcher::minimax(Board& board, MoveGenerator& movegen, Evaluator& evaluator
     if (tt_it != tt.end()) {
         const TTEntry& entry = tt_it->second;
         if (entry.depth >= depth) {
-            if (entry.flag == EXACT) {
-                return entry.eval;
-            }
-            if (entry.flag == LOWERBOUND && entry.eval >= beta) {
-                return  entry.eval; // cutoff- fail hard beta
-            }
-            if (entry.flag == UPPERBOUND && entry.eval <= alpha) {
-                return entry.eval; // cutoff- fail soft alpha
-            }
+            if (entry.flag == EXACT) return entry.eval;
+            if (entry.flag == LOWERBOUND && entry.eval >= beta) return  entry.eval; // cutoff- fail hard beta
+            if (entry.flag == UPPERBOUND && entry.eval <= alpha) return entry.eval; // cutoff- fail soft alpha
         }
     }
 
-    Move next_moves[MoveGenerator::max_moves]; Move tt_move = Move(0); Move it_pvMove = pvMove;
-    int count = generateAndOrderMoves(board, movegen, next_moves, depth, pvMove, prev_eval);
-
+    Move next_moves[MAX_MOVES]; 
+    Move tt_move = Move(0); Move pvMove = (!pv.empty( )) ? pv[0] : Move::NullMove();
+    int flipped_prev_eval[MAX_MOVES];
+    for (int i = 0; i < MAX_MOVES; i++) {flipped_prev_eval[i] = -prev_eval[i];}
+    int count = generateAndOrderMoves(board, movegen, next_moves, depth, pvMove, flipped_prev_eval);
+    // terminal eval check (rather than using arbiter and generating "twice")
+    if (count == 0) { 
+        if (board.is_in_check) {return -(MATE_SCORE - depth);}
+        else {return 0;}
+    }
+    
     for (int i = 0; i < count; i++) {
         Move m = next_moves[i];
         board.MakeMove(m);
-        int eval = minimax(board, movegen, evaluator, depth - 1, !maximizing, alpha, beta, it_pvMove, prev_eval,
+
+        std::vector<Move> childPV;
+        eval = -negamax(board, movegen, evaluator, depth - 1, -beta, -alpha, childPV, local_prev_eval,
             start_time, time_limit_ms, out_of_time);
+        if (m.MoveFlag() == Move::castleFlag) {eval += 50;} // bias castling
+        foundMove = true;
+        
         board.UnmakeMove(m);
 
-        if (out_of_time) return maximizing ? -100000 : 100000;
+        local_prev_eval[i] = eval;
 
-        bool isBetter;
-        if (maximizing) {
-            isBetter = (eval > bestEval);
-        } else {
-            isBetter = (eval < bestEval);
-        }
-        if (isBetter) {
+        if (eval > bestEval) { // check if first move, forcing pv/best_eval to update
             bestEval = eval;
-            it_pvMove = m;
             tt_move = m;
-            if (maximizing) alpha = std::max(alpha, eval);
-            else beta = std::min(beta, eval);
+            // build PV
+            pv.clear();
+            pv.push_back(m);
+            pv.insert(pv.end(), childPV.begin(), childPV.end());
         }
 
-        if (beta <= alpha) {
+        if (out_of_time) break;
+
+        alpha = std::max(alpha, eval);
+        if (alpha >= beta) {
             if (board.getCapturedPiece(m.TargetSquare()) == -1) {  // quiet move
                 if (!Move::SameMove(killerMoves[depth][0], m)) {
                     killerMoves[depth][1] = killerMoves[depth][0];
@@ -123,12 +157,11 @@ int Searcher::minimax(Board& board, MoveGenerator& movegen, Evaluator& evaluator
             }
             break;
         }
-
     }
 
     // Store result in TT
     TTEntry newEntry;
-    newEntry.eval = bestEval;
+    newEntry.eval = board.is_white_move ? bestEval : -bestEval; // store as whites perspective
     newEntry.bestMove = tt_move;
     newEntry.depth = depth;
     // Set flag based on alpha-beta bounds logic (EXACT, LOWERBOUND, UPPERBOUND)
@@ -144,27 +177,28 @@ int Searcher::minimax(Board& board, MoveGenerator& movegen, Evaluator& evaluator
 // call before makeMove()
 int Searcher::moveScore(const Move& move, const Board& board, int depth, const Move& ttMove, const Move& pvMove, int prev_eval) {
     // TT move
-    if (Move::SameMove(pvMove, move)) return 1100000;
-    if ((Move::SameMove(ttMove, move))) return 1000000;
+    // movegen count solves pvMove null move concern
+    if (Move::SameMove(pvMove, move)) return MATE_SCORE + 500;
+    if (Move::SameMove(ttMove, move)) return MATE_SCORE + 100;
 
     // Captures — MVV-LVA
     if (board.getCapturedPiece(move.TargetSquare()) != -1) {
         int attacker = board.getMovedPiece(move.StartSquare());
         int victim = board.getMovedPiece(move.TargetSquare());
-        return 100000 + 10 * victim - attacker;
+        return MATE_SCORE + 10 * Evaluator::pieceValues[victim] - Evaluator::pieceValues[attacker];
     }
 
     // Killer moves
-    if (Move::SameMove(killerMoves[depth][0], move)) return 90000;
-    if (Move::SameMove(killerMoves[depth][1], move)) return 80000;
+    if (Move::SameMove(killerMoves[depth][0], move)) return MATE_SCORE - 500;
+    if (Move::SameMove(killerMoves[depth][1], move)) return MATE_SCORE - 600;
 
     // History heuristic
     int piece = board.getMovedPiece(move.StartSquare());
-    return historyHeuristic[board.is_white_move ? piece : piece+6][move.TargetSquare()] + prev_eval;
+    return historyHeuristic[board.is_white_move ? piece : piece+6][move.TargetSquare()]; // + prev_eval;
 }
 
 
-void Searcher::orderedMoves(Move moves[MoveGenerator::max_moves], int count, const Board& board, int depth, const Move& pvMove, int prev_eval[MoveGenerator::max_moves]) {
+void Searcher::orderedMoves(Move moves[MAX_MOVES], int count, const Board& board, int depth, const Move& pvMove, int prev_eval[MAX_MOVES]) {
     U64 hash = board.zobrist_hash;
     Move ttMove = Move::NullMove();
 
@@ -189,7 +223,7 @@ void Searcher::orderedMoves(Move moves[MoveGenerator::max_moves], int count, con
     }
 }
 
-int Searcher::generateAndOrderMoves(Board& board, MoveGenerator& movegen, Move moves[], int depth, const Move& pvMove, int prev_eval[MoveGenerator::max_moves]) {
+int Searcher::generateAndOrderMoves(Board& board, MoveGenerator& movegen, Move moves[], int depth, const Move& pvMove, int prev_eval[MAX_MOVES]) {
     int count = movegen.generateMovesList(&board, moves);
     orderedMoves(moves, count, board, depth, pvMove, prev_eval);
     return count;

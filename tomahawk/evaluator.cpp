@@ -104,7 +104,7 @@ bool Evaluator::loadPST(const std::string& filename, int pst[6][64]) {
                     //          << ", rank " << rank << ", file " << fileIdx << std::endl;
                     return false;
                 }
-                pst[piece][rank * 8 + fileIdx] = val;
+                pst[piece][(7-rank) * 8 + fileIdx] = val;
             }
         }
     }
@@ -126,7 +126,7 @@ std::unordered_map<std::string, int> Evaluator::componentEvals = { // eval is in
 
 const std::unordered_map<std::string, int> Evaluator::evalWeights = { // eval is in terms of centipawn
         {"Material", 100}, // material - raw        of which material is base units
-        {"PawnStructure", -50}, // pawn structure (bad stuff)
+        {"PawnStructure", -25}, // pawn structure (bad stuff)
         {"Mobility", 10}, // num legal moves
         {"PiecePosition", 1} // already in 10s
     };
@@ -161,6 +161,9 @@ int Evaluator::gamePhase(const Board* position) {
 }
 
 int Evaluator::taperedEval(const Board* board) {
+    // assume terminal evals have already been checked for in search
+    // if wanting a pure board eval, then that will need to be built into it (perhaps a new func)
+    /*
     Result result = Arbiter::GetGameState(board);
 
     // terminal eval
@@ -169,10 +172,28 @@ int Evaluator::taperedEval(const Board* board) {
             return -INF; 
         } else {
             return +INF;
-
         } 
+    } else if (Arbiter::isDrawResult(result)) {
+        return 0;
     }
-    if (Arbiter::isDrawResult(result)) {
+    */
+
+    int opening = openingEval(board);
+    int endgame = endgameEval(board);
+    int phase = gamePhase(board);
+
+    return ((opening * (256 - phase)) + (endgame * phase)) / 256;
+}
+
+int Evaluator::taperedEval(const Board* board, Result result) {
+    // terminal eval
+    if (Arbiter::isWinResult(result)) { // side to move is mated
+        if (board->is_white_move) {
+            return -MATE_SCORE; 
+        } else {
+            return +MATE_SCORE;
+        } 
+    } else if (Arbiter::isDrawResult(result)) {
         return 0;
     }
 
@@ -192,20 +213,20 @@ int Evaluator::endgameEval(const Board* board) {
 }
 
 int Evaluator::Evaluate(const Board* board, int pst[6][64]) {
-    Result result = Arbiter::GetGameState(board);
+    //Result result = Arbiter::GetGameState(board);
 
     // terminal eval
-    if (Arbiter::isWinResult(result)) { // side to move is mated
-        if (board->is_white_move) {
-            return -INF; 
-        } else {
-            return +INF;
-
-        } 
-    }
-    if (Arbiter::isDrawResult(result)) {
-        return 0;
-    }
+    //if (Arbiter::isWinResult(result)) { // side to move is mated
+    //    if (board->is_white_move) {
+    //        return -INF; 
+    //    } else {
+    //        return +INF;
+    //
+    //    } 
+    //}
+    //if (Arbiter::isDrawResult(result)) {
+    //    return 0;
+    //}
     // else, normal eval
     // computes components hash in function loop
     return computeEval(*board, pst);
@@ -265,6 +286,7 @@ float Evaluator::materialDifferences(const Board& board) { // add up material
             // exlude king
             bb = board.colorBitboards[side] & board.pieceBitboards[piece];
             pEval += std::pow(-1,side) * pieceValues[piece] * countBits(bb);
+            if (piece == bishop && countBits(bb) == 2) {pEval += std::pow(-1,side) * .4;} // 6.6 -> 7 for bishop pair
         }
     }
 

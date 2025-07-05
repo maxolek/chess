@@ -652,7 +652,7 @@ void Board::setFromFEN(std::string _fen) {
     }
     currentGameState.enPassantFile = (ep == "-") ? -1 : file_char.find(ep.substr(0,1));
     currentGameState.fiftyMoveCounter = int(fifty_move);
-    plyCount = is_white_move ? full_moves*2 : full_moves*2+1;
+    plyCount = is_white_move ? (full_moves-1)*2 : (full_moves-1)*2+1;
 
     // self generated
     move_color = is_white_move ? 0 : 1;

@@ -65,7 +65,8 @@ public:
 
     // tapered eval
     static int gamePhase(const Board* position); // 0->256 desc based on captured pieces
-    static int taperedEval(const Board* board);
+    static int taperedEval(const Board* board); // get eval of board
+    static int taperedEval(const Board* board, Result result); // get eval during search 
     static int openingEval(const Board* board);
     static int endgameEval(const Board* board);
     

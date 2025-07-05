@@ -41,16 +41,12 @@ Result Arbiter::GetGameState(const Board* board) {
     if (isInsufficientMaterial(*board)) {return InsufficientMaterial;}    
 
     MoveGenerator movegen = MoveGenerator(board);
-    movegen.generateMoves();
-
-    Move next_moves[MoveGenerator::max_moves]; 
-    movegen.generateMovesList(board, next_moves);
-    int count = movegen.count;
+    bool hasMoves = movegen.hasLegalMoves(board);
 
     // checkmate and stalemate
-    if (count == 0) {
+    if (!hasMoves) {
         if (board->is_in_check) return (board->is_white_move) ? WhiteIsMated : BlackIsMated;
-        else if (board->plyCount >= 20) {return Stalemate;}
+        else {return Stalemate;}
     }
     // repetition
     //else if (countPosDuplicates(board.repetitionPosHistory))

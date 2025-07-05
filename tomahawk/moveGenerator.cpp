@@ -125,6 +125,39 @@ int MoveGenerator::generateMovesList(const Board* _board, Move moveList[]) {
     return count;
 }
 
+bool MoveGenerator::hasLegalMoves(const Board* _board) {
+    // load movegen at given state
+    board = _board;
+    updateBitboards(_board);
+
+    // gen opponent moves
+    // detect checks, pins, etc.
+    generatePawnAttacks(false, false); // false, false normally
+    generateKnightMoves(false, false);
+    generateSlidingMoves(false, false, false);
+    generateKingMoves(false, false);
+
+    //if (check_ray_mask) {in_check = true;}
+    if (in_double_check) { // cannot capture or block out of a double check
+        generateKingMoves(true, true);
+    } else {
+        // gen moves
+        // uses stored information from gen oppponent moves to determine legality
+        generatePawnPushes(true, true);
+        if (count > 0) {return true;}
+        generatePawnAttacks(true, true);
+        if (count > 0) {return true;}
+        generateKnightMoves(true, true);
+        if (count > 0) {return true;}
+        generateSlidingMoves(true, true, false);
+        if (count > 0) {return true;}
+        generateKingMoves(true, true);
+        if (count > 0) {return true;}
+    }
+
+    return false;
+}
+
 
 // obstruction difference for sliding moves
 // includes blockers

@@ -13,9 +13,7 @@
 class MoveGenerator {
 private:
 public:
-    // preallocated array instead of dynamically allocated vector
-    static const int max_moves = 256; 
-    Move moves[max_moves];
+    Move moves[MAX_MOVES];
     int count; // for iteration
 
     // once building a more robust engine put this in the engine class not in movegen (to save time)
@@ -72,6 +70,8 @@ public:
     void generateMoves();
     void generateMoves(const Board* _board);
     int generateMovesList(const Board* _board, Move movesList[]);
+    // for arbiter, if there is a single legal moves then not (stale)mate, and dont need to generate the rest of the moves
+    bool hasLegalMoves(const Board* _board);
 
     // psuedo-legal moves: moves that are valid (position) but not rules (check)
     int white_mobility, black_mobility;
