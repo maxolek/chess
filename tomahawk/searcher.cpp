@@ -26,10 +26,11 @@ SearchResult Searcher::search(Board& board, MoveGenerator& movegen, Evaluator& e
 
         out_of_time = false;
         std::vector<Move> childPV;
+        std::vector<Move> emptyPV;
         int eval = -negamax(
             board, movegen, evaluator,
             depth - 1, 
-            -beta, -alpha, childPV, prev_evals,
+            -beta, -alpha, childPV, emptyPV, prev_evals,
             start_time, time_limit_ms, out_of_time
         );
 
@@ -38,7 +39,7 @@ SearchResult Searcher::search(Board& board, MoveGenerator& movegen, Evaluator& e
         prev_evals[i] = eval;
         if (out_of_time) {
             if (i > 0) break; // timeout after at least one good move: keep the best one
-            //else return {bestMove, bestEval, bestComponentEvals}; // first move timed out, return last iterations result
+            else return {Move::NullMove(), -100*MATE_SCORE, {}}; // first move timed out, return last iterations result
         }
 
         if ((i == 0) || eval > bestEval) {
@@ -51,6 +52,7 @@ SearchResult Searcher::search(Board& board, MoveGenerator& movegen, Evaluator& e
             principalVariation.clear();
             principalVariation.push_back(m);
             principalVariation.insert(principalVariation.end(), childPV.begin(), childPV.end());
+            best_line = principalVariation;
         }
 
         // update alpha/beta as usual if you want iterative deepening with pruning here
@@ -63,12 +65,11 @@ SearchResult Searcher::search(Board& board, MoveGenerator& movegen, Evaluator& e
         if (elapsed_ms >= time_limit_ms && i>0) {break;}//{bestMove = Move::NullMove(); break;}
     }
 
-    best_line = principalVariation;
     return {bestMove, bestEval, bestComponentEvals};
 }
 
-int Searcher::negamax(Board& board, MoveGenerator& movegen, Evaluator& evaluator, int depth, int alpha, int beta, std::vector<Move>& pv, int prev_eval[MAX_MOVES],
-                      std::chrono::steady_clock::time_point start_time, int time_limit_ms, bool &out_of_time) {
+int Searcher::negamax(Board& board, MoveGenerator& movegen, Evaluator& evaluator, int depth, int alpha, int beta, std::vector<Move>& pv, const std::vector<Move>& nextPV,
+                         int prev_eval[MAX_MOVES], std::chrono::steady_clock::time_point start_time, int time_limit_ms, bool &out_of_time) {
     
                         //if (out_of_time) return bestEval;
     nodesSearched++;
@@ -124,7 +125,9 @@ int Searcher::negamax(Board& board, MoveGenerator& movegen, Evaluator& evaluator
         board.MakeMove(m);
 
         std::vector<Move> childPV;
-        eval = -negamax(board, movegen, evaluator, depth - 1, -beta, -alpha, childPV, local_prev_eval,
+        std::vector<Move> nextPV; 
+        if (pv.size() > 1 && Move::SameMove(m, pv[0])) {nextPV.insert(nextPV.end(), pv.begin() + 1, pv.end());}
+        eval = -negamax(board, movegen, evaluator, depth - 1, -beta, -alpha, childPV, nextPV, local_prev_eval,
             start_time, time_limit_ms, out_of_time);
         if (m.MoveFlag() == Move::castleFlag) {eval += 50;} // bias castling
         foundMove = true;

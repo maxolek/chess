@@ -254,7 +254,7 @@ void Engine::iterativeDeepening(SearchSettings settings) {
     auto start_time = std::chrono::steady_clock::now();
     int elapsed_ms;
     int time_limit_ms = computeSearchTime(settings);
-    //Move iteration_bestMove; // if time reached mid-depth, return best from last depth
+    Move iteration_bestMove; // if time reached mid-depth, return best from last depth
     int iteration_bestEval;
     int depth_limit = settings.depth ? settings.depth : 10;
 
@@ -262,7 +262,7 @@ void Engine::iterativeDeepening(SearchSettings settings) {
     Move first_moves[MAX_MOVES];
     int count;    
     int prev_evals[MAX_MOVES];
-    Move pvMove = Move::NullMove();
+    Move pvMove = Searcher::best_line.empty() ? Move::NullMove() : Searcher::best_line[0];
     std::fill_n(prev_evals, MAX_MOVES, search_board.is_white_move ? -MATE_SCORE : MATE_SCORE);
     // until time stop
     // or depth limit (currently no limit)
@@ -274,9 +274,10 @@ void Engine::iterativeDeepening(SearchSettings settings) {
         auto now = std::chrono::steady_clock::now();
         elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
         
-        if (elapsed_ms >= time_limit_ms || depth == depth_limit) {stop = true;}
+        if (elapsed_ms >= time_limit_ms || depth == depth_limit) {stop = true; break;}
         //else if (!result.bestMove.IsNull()) {
-        bestMove = result.bestMove;
+        bestMove = Move::SameMove(result.bestMove,Move::NullMove()) ? iteration_bestMove : result.bestMove;
+        iteration_bestMove = result.bestMove;
         iteration_bestEval = result.eval;
         pvMove = Searcher::best_line[0];
         logSearchDepthInfo(depth, bestMove, Searcher::best_line, iteration_bestEval, elapsed_ms);

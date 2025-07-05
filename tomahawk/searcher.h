@@ -78,6 +78,7 @@ public:
         int depth, 
         int alpha, int beta, // alpha beta pruning (will be swapped in func calls)
         std::vector<Move>& pv, // best_line
+        const std::vector<Move>& inputPV, // for passing through negamax recursion
         int prev_evals[MAX_MOVES],
         std::chrono::steady_clock::time_point start_time, 
         int time_limit_ms, bool& out_of_time
