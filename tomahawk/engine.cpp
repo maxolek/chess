@@ -256,7 +256,7 @@ void Engine::iterativeDeepening(SearchSettings settings) {
     int time_limit_ms = computeSearchTime(settings);
     Move iteration_bestMove; // if time reached mid-depth, return best from last depth
     int iteration_bestEval;
-    int depth_limit = settings.depth ? settings.depth : 10;
+    int depth_limit = settings.depth ? settings.depth : 20;
 
     // generate first legal moves from current board position
     Move first_moves[MAX_MOVES];

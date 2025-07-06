@@ -84,6 +84,7 @@ int Searcher::negamax(Board& board, MoveGenerator& movegen, Evaluator& evaluator
         //movegen.mobility(&board); // doubles some key perft position depth5 times, not worth eval increase
         // but there is potential for these pseudo legal moves to be a part of regular movegeneration so 
         // mobility is calculated en-route
+        pv = {}; // leaf node = no children
         eval = evaluator.taperedEval(&board);
         return board.is_white_move ? eval : -eval; // eval is side to move agnostic but negamax
     }                                              // returns the eval from the perspective of side to move
@@ -125,9 +126,9 @@ int Searcher::negamax(Board& board, MoveGenerator& movegen, Evaluator& evaluator
         board.MakeMove(m);
 
         std::vector<Move> childPV;
-        std::vector<Move> nextPV; 
-        if (pv.size() > 1 && Move::SameMove(m, pv[0])) {nextPV.insert(nextPV.end(), pv.begin() + 1, pv.end());}
-        eval = -negamax(board, movegen, evaluator, depth - 1, -beta, -alpha, childPV, nextPV, local_prev_eval,
+        std::vector<Move> childNextPV; 
+        if (pv.size() >= 1 && Move::SameMove(m, pv[0])) {childNextPV.insert(childNextPV.end(), pv.begin() + 1, pv.end());}
+        eval = -negamax(board, movegen, evaluator, depth - 1, -beta, -alpha, childPV, childNextPV, local_prev_eval,
             start_time, time_limit_ms, out_of_time);
         if (m.MoveFlag() == Move::castleFlag) {eval += 50;} // bias castling
         foundMove = true;

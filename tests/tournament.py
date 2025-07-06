@@ -9,12 +9,14 @@ import concurrent.futures
 import threading
 
 ENGINES = {
-    "it_deep": r"C:\Users\maxol\code\chess\version_history\v1.1_iterative_deepening.exe",
+    #"it_deep": r"C:\Users\maxol\code\chess\version_history\v1.1_iterative_deepening.exe",
     #"tap_ev": r"C:\Users\maxol\code\chess\version_history\v1.2_tapered_eval.exe",
     #"alphabeta": r"C:\Users\maxol\code\chess\version_history\v1.3_alphabeta.exe",
     #"transpoition_table": r"C:\Users\maxol\code\chess\version_history\v1.4_transposition_table.exe",
     #"move_list_array": r"C:\Users\maxol\code\chess\version_history\v1.5_moveListArray.exe",
-    "pstLoadFIX": r"C:\Users\maxol\code\chess\version_history\v1.6_pstLoadFIX.exe"
+    "pstLoadFIX": r"C:\Users\maxol\code\chess\version_history\v1.6_pstLoadFIX.exe",
+    "moveOrdering": r"C:\Users\maxol\code\chess\version_history\v1.7_moveOrdering.exe",
+    "negamax": r"C:\Users\maxol\code\chess\version_history\v2_negamax.exe"
     #"stockfish": "engines/stockfish.exe"
 }
 
@@ -80,9 +82,9 @@ def write_pgn_threadsafe(lock, pgn_file, data):
     game_text = "\n".join(headers) + "\n\n" + moves_str.strip() + f" {data['result']}\n\n"
 
     #already single threaded
-    #with lock:
-    #    with open(pgn_file, "a") as f:
-    #        f.write(game_text)
+    with lock:
+        with open(pgn_file, "a") as f:
+            f.write(game_text)
 
 def run_tournament_parallel():
     players = list(ENGINES.keys())

@@ -347,7 +347,7 @@ int Evaluator::countDoubledPawns(U64 pawns) {
 
 // Detect isolated pawns
 int Evaluator::countIsolatedPawns(U64 pawns) {
-    std::vector<int> isolatedSquares;
+    int isolatedCount = 0;//std::vector<int> isolatedSquares;
 
     for (int file = 0; file < 8; file++) {
         U64 pawnsOnFile = pawns & Bits::file_masks[file];
@@ -362,16 +362,16 @@ int Evaluator::countIsolatedPawns(U64 pawns) {
 
         // For each pawn on this file, check if adjacent pawns exist
         while (pawnsOnFile) {
-            int sq = sqidx(pawnsOnFile); // find LS1B
-            U64 sqMask = 1ULL << sq;
+            //int sq = sqidx(pawnsOnFile); // find LS1B
+            //U64 sqMask = 1ULL << sq;
 
             // If no adjacent pawns, this pawn is isolated
-            if ((adjacentPawns & sqMask) == 0) {
-                isolatedSquares.push_back(sq);
+            if (adjacentPawns == 0) {
+                isolatedCount++;//isolatedSquares.push_back(sq);
             }
 
             pawnsOnFile &= pawnsOnFile - 1; // pop LS1B
         }
     }
-    return isolatedSquares.size();
+    return isolatedCount;
 }
