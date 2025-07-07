@@ -5,21 +5,25 @@
 #include "helpers.h"
 #include "arbiter.h" // term evals 
 #include "moveGenerator.h" // mobility
+#include "PrecomputedMoveData.h" // masks
 #include <fstream>  // for file output
 #include <iomanip>  // for formatting
 
 class Evaluator {
 private:
     static bool open_pstLoaded; static bool end_pstLoaded;
+    static const PrecomputedMoveData* precomp;
 public:
 
     Evaluator ();
+    Evaluator (const PrecomputedMoveData* _precomp);
 
     static void writeEvalDebug(const MoveGenerator* movegen, Board& board, const std::string& filename);
 
 
     // pieces
-    static constexpr float pieceValues[5] = {1, 3, 3.3, 5, 9}; 
+    static constexpr float pieceValues[5] = {1, 3.2, 3.5, 5, 9}; 
+    static constexpr int passedBonus[8] = { 0, 10, 20, 30, 50, 70, 100, 0 }; // passed pawn rank (white)
     // pawn knight bishop rook queen
     // piece positions
 
@@ -76,11 +80,20 @@ public:
     // currently mobilityDiff lags the position to eval by 1 ply as it relies on movegen which ran on the prior position
     static float mobilityDifferences(const MoveGenerator* movegen); // # moves (psuedo possibilities)
     static float positionDifferences(const Board& position, int pst[6][64]); // pst with phase
+    static int centerControlDifferences(const Board& position); // precomp masks
+    // end game
+    static int mopUp(const Board& position); // late endgames without pawns -- drive opp king to edge
+    // opening
+    static int earlyQueenPenalty(const Board& board); // penalty based on other piece development
 
-    // helpers
+    // static exchange evaluation - run through exchanges on a square and see results
+    static int SEE(const Board& board, int sq, bool white);
+    static U64 attackersTo(const Board& board, int sq, bool white); // get all attackers to a square
+    // pawns
     static int countDoubledPawns(U64 pawns); // via file masks
     static int countIsolatedPawns(U64 pawns); // via file masks
-
+    static bool isPassedPawn(bool white, int sq, U64 opp_pawns); // via precomp masks
+    static int passedPawnDifferences(const Board& board); // add bonuses (+based on file) for passed pawns to eval
 };
 
 #endif

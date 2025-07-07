@@ -2,6 +2,7 @@
 .vscode/
 # and lichess-bot repo
 lichess-bot/
+tests/logs/
 
 # Ignore JSON configuration files
 launch.json
@@ -13,6 +14,7 @@ settings.json
 # Ignore log files
 *.log
 *.txt
+*.pgn
 
 # ignore object files
 *.o

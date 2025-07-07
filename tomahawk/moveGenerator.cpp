@@ -288,7 +288,8 @@ void MoveGenerator::generateSlidingMoves(bool ours, bool add_to_list, bool post_
     int start_square;
     int target_square;
     U64 o_diff;
-    U64 potential_moves_bitboard = Bits::fullSet;
+    U64 occ = own | opp;
+    U64 potential_moves_bitboard; // = Bits::fullSet;
     
     U64 valid_bishops;
     U64 valid_rooks;
@@ -314,54 +315,54 @@ void MoveGenerator::generateSlidingMoves(bool ours, bool add_to_list, bool post_
         start_square = tzcnt(valid_rooks) - 1; // get LSB
         valid_rooks &= valid_rooks - 1; // clear LSB
 
-        for (int direction = 0; direction < 2; direction++) {
-            if (!ours) {
-                if (!post_move_attacks_only) {
-                    o_diff = odiff(own | opp, PrecomputedMoveData::blankRookAttacks[start_square][direction]);
-                    potential_moves_bitboard &= (o_diff & ~opp);
-                    // include protected pieces (prevent king capture)
-                    opponentAttackMap |= o_diff;
-                    if (potential_moves_bitboard & (own & kings)) {
-                        in_double_check = in_check;
-                        check_ray_mask |= (PrecomputedMoveData::rayMasks[start_square][own_king_square]);
-                        check_ray_mask_ext |= (PrecomputedMoveData::alignMasks[start_square][own_king_square]);
-                        in_check = true;
-                    }
-                    if (PrecomputedMoveData::blankRookAttacks[start_square][direction].lineEx & (own & kings)) {
-                        // full & reverse minus king
-                        pin_rays |= (PrecomputedMoveData::rayMasks[start_square][own_king_square] & ~(1ULL << own_king_square));
-                    }
-                } else {
-                    postEnpassantOpponentAttackMap |= (!side)  
-                        ? (odiff(enPassantMaskBlockers, PrecomputedMoveData::blankRookAttacks[start_square][direction]) & ~opp | (1ULL << (board->currentGameState.enPassantFile + 4*8)))
-                        : (odiff(enPassantMaskBlockers, PrecomputedMoveData::blankRookAttacks[start_square][direction]) & ~opp | (1ULL << (board->currentGameState.enPassantFile + 3*8)));
+        if (!ours) {
+            if (!post_move_attacks_only) {
+                //o_diff = odiff(own | opp, PrecomputedMoveData::blankRookAttacks[start_square][direction]);
+                o_diff = Magics::rookAttacks(start_square, occ);
+                potential_moves_bitboard = (o_diff & ~opp);
+                // include protected pieces (prevent king capture)
+                opponentAttackMap |= o_diff;
+                if (potential_moves_bitboard & (own & kings)) {
+                    in_double_check = in_check;
+                    check_ray_mask |= (PrecomputedMoveData::rayMasks[start_square][own_king_square]);
+                    check_ray_mask_ext |= (PrecomputedMoveData::alignMasks[start_square][own_king_square]);
+                    in_check = true;
+                }
+                if (PrecomputedMoveData::rayMasks[start_square][own_king_square] & (own & kings) && (start_square % 8 == own_king_square % 8 || start_square / 8 == own_king_square / 8)) {
+                    // full & reverse minus king
+                    pin_rays |= (PrecomputedMoveData::rayMasks[start_square][own_king_square] & ~(1ULL << own_king_square));
                 }
             } else {
-                potential_moves_bitboard &= (odiff(own | opp, PrecomputedMoveData::blankRookAttacks[start_square][direction]) & ~own);
-                ownAttackMap |= potential_moves_bitboard;
+                postEnpassantOpponentAttackMap |= (!side)  
+                    ? ((Magics::rookAttacks(start_square, enPassantMaskBlockers)) & ~opp) | (1ULL << (board->currentGameState.enPassantFile + 4*8))
+                    : (( Magics::rookAttacks(start_square, enPassantMaskBlockers)) & ~opp) | (1ULL << (board->currentGameState.enPassantFile + 3*8));
+            }
+        } else {
+            // potential_moves_bitboard &= (odiff(own | opp, PrecomputedMoveData::blankRookAttacks[start_square][direction]) & ~own);
+            potential_moves_bitboard = Magics::rookAttacks(start_square, occ) & ~own;
+            ownAttackMap |= potential_moves_bitboard;
 
-                if (isPinned(start_square)) { // limit moves to those along the pin array
-                    potential_moves_bitboard &= PrecomputedMoveData::alignMasks[start_square][own_king_square]; // cant use pin_rays as multiple pins could open up moves that jump from 1 pin line to another
-                }
-                if (in_check) { // captures and blocking sliding
-                    potential_moves_bitboard &= check_ray_mask;
-                    //print_bitboard(potential_moves_bitboard);
-                }
-                
-                if (add_to_list) {
-                    //std::cout << "rook moves" << std::endl;
-                    while (potential_moves_bitboard) {
-                        target_square = tzcnt(potential_moves_bitboard) - 1;
-                        potential_moves_bitboard &= potential_moves_bitboard - 1;
-
-                        moves[count++] = Move(start_square, target_square);
-                        //Move(start_square,target_square).PrintMove();
-                    }
-                }
+            if (isPinned(start_square)) { // limit moves to those along the pin array
+                potential_moves_bitboard &= PrecomputedMoveData::alignMasks[start_square][own_king_square]; // cant use pin_rays as multiple pins could open up moves that jump from 1 pin line to another
+            }
+            if (in_check) { // captures and blocking sliding
+                potential_moves_bitboard &= check_ray_mask;
+                //print_bitboard(potential_moves_bitboard);
             }
             
-            potential_moves_bitboard = Bits::fullSet; // reset for each direction
+            if (add_to_list) {
+                //std::cout << "rook moves" << std::endl;
+                while (potential_moves_bitboard) {
+                    target_square = tzcnt(potential_moves_bitboard) - 1;
+                    potential_moves_bitboard &= potential_moves_bitboard - 1;
+
+                    moves[count++] = Move(start_square, target_square);
+                    //Move(start_square,target_square).PrintMove();
+                }
+            }
         }
+        
+        potential_moves_bitboard = Bits::fullSet; // reset for each direction
     }
 
     potential_moves_bitboard = Bits::fullSet;
@@ -370,46 +371,47 @@ void MoveGenerator::generateSlidingMoves(bool ours, bool add_to_list, bool post_
         start_square = tzcnt(valid_bishops) - 1;
         valid_bishops &= valid_bishops -1;
 
-        for (int direction = 0; direction < 2; direction++) {
-            if (!ours) {
-                    o_diff = odiff(own | opp, PrecomputedMoveData::blankBishopAttacks[start_square][direction]);
-                    potential_moves_bitboard &= (o_diff & ~opp);
-                    // include protected pieces (prevent king capture)
-                    opponentAttackMap |= o_diff;// dont need to generate postEnpassantOpponentAttackMap for bishops (as only rooks/queens can lead to the type of check this is detecting)
-                if (potential_moves_bitboard & (own & kings)) {
-                    in_double_check = in_check;
-                    check_ray_mask |= (PrecomputedMoveData::rayMasks[start_square][own_king_square]);
-                    check_ray_mask_ext |= (PrecomputedMoveData::alignMasks[start_square][own_king_square]);
-                    in_check = true;
-                }
-                if (PrecomputedMoveData::blankBishopAttacks[start_square][direction].lineEx & (own & kings))
-                    pin_rays |= (PrecomputedMoveData::rayMasks[start_square][own_king_square] & ~(1ULL << own_king_square));
-
-            } else {
-                potential_moves_bitboard &= odiff(own | opp, PrecomputedMoveData::blankBishopAttacks[start_square][direction]) & ~own;
-                ownAttackMap |= potential_moves_bitboard;
-
-                if (isPinned(start_square)) { // limit moves to those along the pin array
-                    potential_moves_bitboard &= PrecomputedMoveData::alignMasks[start_square][own_king_square];
-                }
-                if (in_check) { // captures and blocking sliding
-                    potential_moves_bitboard &= check_ray_mask;
-                }
-
-                if (add_to_list) {
-                    //std::cout << "bishop moves" << std::endl;
-                    while (potential_moves_bitboard) {
-                        target_square = tzcnt(potential_moves_bitboard) - 1;
-                        potential_moves_bitboard &= potential_moves_bitboard - 1;
-
-                        moves[count++] = Move(start_square, target_square);
-                        //Move(start_square,target_square).PrintMove();
-                    }
-                }
+        if (!ours) {
+            //o_diff = odiff(own | opp, PrecomputedMoveData::blankBishopAttacks[start_square][direction]);
+            o_diff = Magics::bishopAttacks(start_square, occ);
+            potential_moves_bitboard = (o_diff & ~opp);
+            // include protected pieces (prevent king capture)
+            opponentAttackMap |= o_diff;// dont need to generate postEnpassantOpponentAttackMap for bishops (as only rooks/queens can lead to the type of check this is detecting)
+            if (potential_moves_bitboard & (own & kings)) {
+                in_double_check = in_check;
+                check_ray_mask |= (PrecomputedMoveData::rayMasks[start_square][own_king_square]);
+                check_ray_mask_ext |= (PrecomputedMoveData::alignMasks[start_square][own_king_square]);
+                in_check = true;
             }
             
-            potential_moves_bitboard = Bits::fullSet; // reset for each direction
+            if (PrecomputedMoveData::rayMasks[start_square][own_king_square] & (own & kings) && (start_square % 8 != own_king_square % 8 && start_square / 8 != own_king_square / 8))
+                pin_rays |= (PrecomputedMoveData::rayMasks[start_square][own_king_square] & ~(1ULL << own_king_square));
+
+        } else {
+            //potential_moves_bitboard &= odiff(own | opp, PrecomputedMoveData::blankBishopAttacks[start_square][direction]) & ~own;
+            potential_moves_bitboard = Magics::bishopAttacks(start_square, occ) & ~own;
+            ownAttackMap |= potential_moves_bitboard;
+
+            if (isPinned(start_square)) { // limit moves to those along the pin array
+                potential_moves_bitboard &= PrecomputedMoveData::alignMasks[start_square][own_king_square];
+            }
+            if (in_check) { // captures and blocking sliding
+                potential_moves_bitboard &= check_ray_mask;
+            }
+
+            if (add_to_list) {
+                //std::cout << "bishop moves" << std::endl;
+                while (potential_moves_bitboard) {
+                    target_square = tzcnt(potential_moves_bitboard) - 1;
+                    potential_moves_bitboard &= potential_moves_bitboard - 1;
+
+                    moves[count++] = Move(start_square, target_square);
+                    //Move(start_square,target_square).PrintMove();
+                }
+            }
         }
+        
+        potential_moves_bitboard = Bits::fullSet; // reset for each direction
     }
 
     potential_moves_bitboard = Bits::fullSet;
@@ -418,52 +420,51 @@ void MoveGenerator::generateSlidingMoves(bool ours, bool add_to_list, bool post_
         start_square = tzcnt(valid_queens) - 1;
         valid_queens &= valid_queens -1;   
 
-        for (int direction = 0; direction < 4; direction++) {
-            if (!ours) {
-                if (!post_move_attacks_only) {
-                    o_diff = odiff(own | opp, PrecomputedMoveData::blankQueenAttacks[start_square][direction]);
-                    potential_moves_bitboard &= (o_diff & ~opp);
-                    // include protected pieces (prevent king capture)
-                    opponentAttackMap |= o_diff;
-                    if (potential_moves_bitboard & (own & kings)) {
-                        in_double_check = in_check;
-                        check_ray_mask |= (PrecomputedMoveData::rayMasks[start_square][own_king_square]);
-                        check_ray_mask_ext |= (PrecomputedMoveData::alignMasks[start_square][own_king_square]);
-                        in_check = true;
-                    }
-                    if (PrecomputedMoveData::blankQueenAttacks[start_square][direction].lineEx & (own & kings))
-                        pin_rays |= (PrecomputedMoveData::rayMasks[start_square][own_king_square] & ~(1ULL << own_king_square));
-
-                } else {
-                    postEnpassantOpponentAttackMap |= (!side)  
-                        ? (odiff(enPassantMaskBlockers, PrecomputedMoveData::blankRookAttacks[start_square][direction]) & ~opp | (1ULL << (board->currentGameState.enPassantFile + 4*8)))
-                        : (odiff(enPassantMaskBlockers, PrecomputedMoveData::blankRookAttacks[start_square][direction]) & ~opp | (1ULL << (board->currentGameState.enPassantFile + 3*8)));
+        if (!ours) {
+            if (!post_move_attacks_only) {
+                //o_diff = odiff(own | opp, PrecomputedMoveData::blankQueenAttacks[start_square][direction]);
+                o_diff = Magics::bishopAttacks(start_square, occ) | Magics::rookAttacks(start_square, occ);
+                potential_moves_bitboard = (o_diff & ~opp);
+                // include protected pieces (prevent king capture)
+                opponentAttackMap |= o_diff;
+                if (potential_moves_bitboard & (own & kings)) {
+                    in_double_check = in_check;
+                    check_ray_mask |= (PrecomputedMoveData::rayMasks[start_square][own_king_square]);
+                    check_ray_mask_ext |= (PrecomputedMoveData::alignMasks[start_square][own_king_square]);
+                    in_check = true;
                 }
-            } else { 
-                potential_moves_bitboard &= odiff(own | opp, PrecomputedMoveData::blankQueenAttacks[start_square][direction]) & ~own;
-                ownAttackMap |= potential_moves_bitboard;
+                if (PrecomputedMoveData::rayMasks[start_square][own_king_square] & (own & kings))
+                    pin_rays |= (PrecomputedMoveData::rayMasks[start_square][own_king_square] & ~(1ULL << own_king_square));
 
-                if (ours && isPinned(start_square)) { // limit moves to those along the pin array
-                    potential_moves_bitboard &= PrecomputedMoveData::alignMasks[start_square][own_king_square];
-                }
-                if (ours && in_check) { // captures and blocking sliding
-                    potential_moves_bitboard &= check_ray_mask;
-                } 
+            } else {
+                postEnpassantOpponentAttackMap |= (!side)  
+                    ? ((Magics::rookAttacks(start_square, enPassantMaskBlockers)) & ~opp) | (1ULL << (board->currentGameState.enPassantFile + 4*8))
+                    : ((Magics::rookAttacks(start_square, enPassantMaskBlockers)) & ~opp) | (1ULL << (board->currentGameState.enPassantFile + 3*8));
+            }
+        } else { 
+            potential_moves_bitboard = (Magics::bishopAttacks(start_square, occ) | Magics::rookAttacks(start_square, occ)) & ~own;
+            ownAttackMap |= potential_moves_bitboard;
 
-                if (add_to_list) {
-                    //std::cout << "queen moves" << std::endl;
-                    while (potential_moves_bitboard) {
-                        target_square = tzcnt(potential_moves_bitboard) - 1;
-                        potential_moves_bitboard &= potential_moves_bitboard - 1;
+            if (ours && isPinned(start_square)) { // limit moves to those along the pin array
+                potential_moves_bitboard &= PrecomputedMoveData::alignMasks[start_square][own_king_square];
+            }
+            if (ours && in_check) { // captures and blocking sliding
+                potential_moves_bitboard &= check_ray_mask;
+            } 
 
-                        moves[count++] = Move(start_square, target_square);
-                        //Move(start_square,target_square).PrintMove();
-                    }
+            if (add_to_list) {
+                //std::cout << "queen moves" << std::endl;
+                while (potential_moves_bitboard) {
+                    target_square = tzcnt(potential_moves_bitboard) - 1;
+                    potential_moves_bitboard &= potential_moves_bitboard - 1;
+
+                    moves[count++] = Move(start_square, target_square);
+                    //Move(start_square,target_square).PrintMove();
                 }
             }
-            
-            potential_moves_bitboard = Bits::fullSet; // reset for each direction
         }
+        
+        potential_moves_bitboard = Bits::fullSet; // reset for each direction
     }
 }
 

@@ -6,20 +6,23 @@
 #include <sstream>
 
 Engine::Engine() {
+    clearState();
     //game_board = &Board();
     //search_board = *game_board;
     movegen = std::make_unique<MoveGenerator>(&search_board);
     int count = movegen->generateMovesList(game_board, legal_moves);
-    evaluator = Evaluator();
-    clearState();
+    //evaluator = Evaluator(&precomp);
+    //Magics::initMagics();
+    
 }
 
 Engine::Engine(Board* _board) {
     game_board = _board;
     search_board = *_board;
+    Magics::initMagics();
     movegen = std::make_unique<MoveGenerator>(&search_board);
     int count = movegen->generateMovesList(game_board, legal_moves);
-    evaluator = Evaluator();
+    evaluator = Evaluator(&precomp);
 }
 
 void Engine::clearState() {
@@ -30,7 +33,8 @@ void Engine::clearState() {
     search_depth = -1;
     time_left[0] = time_left[1] = 0;
     increment[0] = increment[1] = 0;
-    evaluator = Evaluator();
+    evaluator = Evaluator(&precomp);
+    Magics::initMagics();
 }
 
 void Engine::setOption(const std::string& name, const std::string& value) {
@@ -133,6 +137,8 @@ void Engine::playMovesStrings(const std::vector<std::string>& moves) {
 
 
 int Engine::computeSearchTime(SearchSettings settings) {
+    //return settings.movetime;
+
     int side = game_board->is_white_move ? 0 : 1;
     int ply = game_board->plyCount;
 
@@ -256,6 +262,9 @@ void Engine::iterativeDeepening(SearchSettings settings) {
     int time_limit_ms = computeSearchTime(settings);
     Move iteration_bestMove; // if time reached mid-depth, return best from last depth
     int iteration_bestEval;
+    // end on opp move results (may solve hanging_pieces/other issues from deep search miss evals)
+    bool submit_opp_iteration_best_move = true; // trying this out 
+    Move opp_it_bestMove; int opp_it_bestEval;
     int depth_limit = settings.depth ? settings.depth : 20;
 
     // generate first legal moves from current board position
@@ -274,11 +283,32 @@ void Engine::iterativeDeepening(SearchSettings settings) {
         auto now = std::chrono::steady_clock::now();
         elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
         
-        if (elapsed_ms >= time_limit_ms || depth == depth_limit) {stop = true; break;}
-        //else if (!result.bestMove.IsNull()) {
-        bestMove = Move::SameMove(result.bestMove,Move::NullMove()) ? iteration_bestMove : result.bestMove;
-        iteration_bestMove = result.bestMove;
-        iteration_bestEval = result.eval;
+        if (elapsed_ms >= time_limit_ms || depth == depth_limit) {
+            stop = true;
+        }
+
+    // Update iteration_bestMove and iteration_bestEval only if result.bestMove is not null
+        if (!result.bestMove.IsNull()) {
+            iteration_bestMove = result.bestMove;
+            iteration_bestEval = result.eval;
+        }
+
+        // Choose bestMove: fallback to iteration_bestMove if result.bestMove is null
+        bestMove = Move::SameMove(result.bestMove, Move::NullMove()) ? iteration_bestMove : result.bestMove;
+
+        // Update opponent's best move similarly, only if result.bestMove is valid
+        if (depth % 2 == 0 && search_board.plyCount > 6) {
+            if (!result.bestMove.IsNull()) {
+                opp_it_bestMove = iteration_bestMove;
+                opp_it_bestEval = iteration_bestEval;
+            }
+        }
+
+        // If configured, use opponent's best move but ensure it's valid
+        if (submit_opp_iteration_best_move && search_board.plyCount > 6 && !opp_it_bestMove.IsNull()) {
+            bestMove = opp_it_bestMove;
+        }
+
         pvMove = Searcher::best_line[0];
         logSearchDepthInfo(depth, bestMove, Searcher::best_line, iteration_bestEval, elapsed_ms);
         //}

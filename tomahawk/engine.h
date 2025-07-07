@@ -4,6 +4,7 @@
 
 //#include <jni.h>
 #include "board.h"
+#include "magics.h"
 #include "moveGenerator.h"
 #include "arbiter.h"
 #include "Searcher.h"

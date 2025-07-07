@@ -11,6 +11,10 @@ SMasks PrecomputedMoveData::blankQueenAttacks[64][4];
 U64 PrecomputedMoveData::blankKnightAttacks[64];
 U64 PrecomputedMoveData::blankKingAttacks[64];
 
+// eval masks
+U64 PrecomputedMoveData::passedPawnMasks[64][2];
+int PrecomputedMoveData::king_move_distances[64][64];
+
 U64 PrecomputedMoveData::rayMasks[64][64];
 U64 PrecomputedMoveData::alignMasks[64][64];
 int PrecomputedMoveData::distToEdge[64][8];
@@ -23,6 +27,9 @@ PrecomputedMoveData::PrecomputedMoveData() {
     generateBlankRookAttacks();
     generateBlankQueenAttacks();
     generateBlankKingAttacks();
+
+    generatePassedPawnsMasks();
+    generate_king_distances();
 
     generateDistToEdge();
     generateAlignMasks();
@@ -232,6 +239,59 @@ void PrecomputedMoveData::generateBlankQueenAttacks() {
             else
                 mask = blankRookAttacks[square][direction-2];
             blankQueenAttacks[square][direction] = mask;
+        }
+    }
+}
+
+void PrecomputedMoveData::generatePassedPawnsMasks() {
+    for (int sq = 0; sq < 64; sq++) {
+        int file = sq % 8;
+        int rank = sq / 8;
+
+        U64 maskWhite = 0;
+        U64 maskBlack = 0;
+
+        // White: scan forward ranks
+        for (int r = rank + 1; r < 8; r++) {
+            for (int f = file - 1; f <= file + 1; f++) {
+                if (f >= 0 && f < 8) {
+                    int targetSq = r * 8 + f;
+                    maskWhite |= (1ULL << targetSq);
+                }
+            }
+        }
+
+        // Black: scan backward ranks
+        for (int r = rank - 1; r >= 0; r--) {
+            for (int f = file - 1; f <= file + 1; f++) {
+                if (f >= 0 && f < 8) {
+                    int targetSq = r * 8 + f;
+                    maskBlack |= (1ULL << targetSq);
+                }
+            }
+        }
+
+        passedPawnMasks[sq][0] = maskWhite; // For white pawn at sq: enemy pawns here block it
+        passedPawnMasks[sq][1] = maskBlack; // For black pawn at sq: enemy pawns here block it
+    }
+}
+
+void PrecomputedMoveData::generate_king_distances() {
+    int file1, file2, rank1, rank2;
+    int rankDistance, fileDistance;
+
+    for (int sq1 = a1; sq1 <= h8; sq1++) {
+        for (int sq2 = a1; sq2 <= h8; sq2++) {
+
+            file1 = sq1  & 7;
+            file2 = sq2  & 7;
+            rank1 = sq1 >> 3;
+            rank2 = sq2 >> 3;
+
+            rankDistance = abs(rank2 - rank1);
+            fileDistance = abs(file2 - file1);
+
+            king_move_distances[sq1][sq2] = std::max(rankDistance, fileDistance);
         }
     }
 }

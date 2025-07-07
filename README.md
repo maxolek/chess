@@ -2,8 +2,9 @@
 
 tomahawk - static eval engine
 
-visual - gui to play against the engine
+play at https://lichess.org/@/tomahawkBOT
 
 -- future work --
 
 data - ETL, analysis, and visualization of engine performance/characteristics
+gui 

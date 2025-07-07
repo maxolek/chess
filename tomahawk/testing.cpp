@@ -1,4 +1,5 @@
 #include "moveGenerator.h"
+#include "magics.h"
 #include "board.h"
 #include "arbiter.h"
 #include "tests.h"
@@ -9,6 +10,7 @@
 int main(int argc, char* argv[]) {
     Tests tests = Tests();
     PrecomputedMoveData precomp = PrecomputedMoveData();  // must be initialized for movegen+board to work
+    Magics::initMagics();
 
     if (argc < 2) {
         std::cerr << "Usage: ./testing [zobrist|search|perft|divide] <fen> <depth>\n";

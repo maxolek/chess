@@ -16,9 +16,15 @@ public:
     static U64 blankKnightAttacks[64];
     static U64 blankKingAttacks[64];
 
+    static U64 passedPawnMasks[64][2]; // sq, white/black
+    static constexpr U64 centerMasks[2] = {
+        0x0000001818000000, 0x00003C3C3C3C0000
+    }; // 4 squares, 8 squares 
+
     static U64 rayMasks[64][64]; // square_a, square_b
     static U64 alignMasks[64][64]; // square_a, square_b 
     static int distToEdge[64][8]; // square, direction (cardinal)
+    static int king_move_distances[64][64]; // chebyshev (max of rank/file)
 
     PrecomputedMoveData();
 
@@ -32,6 +38,12 @@ public:
     void generateBlankQueenAttacks();
     // may be useful to have double array of bitboards with line connecting square a&b
     //      useful for MoveGenerator::isPinned()
+
+    // used for eval, looks are sqaures ahead of square for side to be used
+    // to see if void of enemy pawns
+    void generatePassedPawnsMasks();
+    // chebyshev distance (king moves)
+    void generate_king_distances();
 
     // straight line mask that contains the entire line containing square a&b
     // if squares are not connected by a straight line, empty bitboard

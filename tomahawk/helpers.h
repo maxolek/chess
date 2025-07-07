@@ -108,6 +108,8 @@ struct SearchSettings {
     bool infinite = false;
 };
 
+// max of rank,file
+int chebyshev_distance(int sq1, int sq2);
 
 // function to get the cardinal direction from start_square -> target_square
 //      clockwise from N indexing

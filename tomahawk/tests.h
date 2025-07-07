@@ -300,10 +300,6 @@ public:
 
             //if (Move::SameMove(Move(a2,a3),move)) {continue;}
 
-            if (Move::SameMove(Move(d5,c6,Move::enPassantCaptureFlag),move)) {
-                board.print_board();
-            }
-
             board.MakeMove(move);
 
             
@@ -382,7 +378,7 @@ public:
 
             auto start = std::chrono::steady_clock::now();
             // search eval
-            SearchResult search_result = Searcher::search(board, *movegen, evaluator, legalMoves, movegen->count, depth, start, timeLimitMs);
+            SearchResult search_result = Searcher::search(board, *movegen, evaluator, legalMoves, movegen->count, depth, Move::NullMove(), start, timeLimitMs);
             int eval_search = search_result.eval;
             std::unordered_map<std::string, int> component_search = search_result.component_evals;
             auto split = std::chrono::steady_clock::now();
