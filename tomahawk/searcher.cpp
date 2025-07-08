@@ -88,7 +88,8 @@ int Searcher::negamax(Board& board, MoveGenerator& movegen, Evaluator& evaluator
         // but there is potential for these pseudo legal moves to be a part of regular movegeneration so 
         // mobility is calculated en-route
         pv = {}; // leaf node = no children
-        eval = evaluator.taperedEval(&board);
+        //eval = evaluator.taperedEval(&board);
+        eval = quiescence(board, evaluator, movegen, alpha, beta, start_time, time_limit_ms);
         return board.is_white_move ? eval : -eval; // eval is side to move agnostic but negamax
     }                                              // returns the eval from the perspective of side to move
 
@@ -137,11 +138,11 @@ int Searcher::negamax(Board& board, MoveGenerator& movegen, Evaluator& evaluator
             if (pv.size() >= 1 && Move::SameMove(m, pv[0])) {childNextPV.insert(childNextPV.end(), pv.begin() + 1, pv.end());}
             eval = -negamax(board, movegen, evaluator, depth - 1, -beta, -alpha, childPV, childNextPV, local_prev_eval,
                 start_time, time_limit_ms, out_of_time);
-            if (m.MoveFlag() == Move::castleFlag) {eval += 50;} // bias castling
-            if (depth-1 % 2 == 0 && board.currentGameState.capturedPieceType > 0 && board.getMovedPiece(m.TargetSquare()) == 0) {
+            //if (m.MoveFlag() == Move::castleFlag) {eval += 50;} // bias castling
+            //if (depth-1 % 2 == 0 && board.currentGameState.capturedPieceType > 0 && board.getMovedPiece(m.TargetSquare()) == 0) {
             // discourage getting captured by pawn (bandaid)
-                eval -= 150;
-            }
+            //    eval -= 150;
+            //}
             foundMove = true;
             
             board.UnmakeMove(m);
@@ -188,6 +189,49 @@ int Searcher::negamax(Board& board, MoveGenerator& movegen, Evaluator& evaluator
     tt[hash] = newEntry;
 
     return bestEval;
+}
+
+// extends search for noisy positions
+int Searcher::quiescence(Board& board, Evaluator& evaluator, MoveGenerator& movegen, int alpha, int beta, std::chrono::steady_clock::time_point start_time, int time_limit_ms) {
+    nodesSearched++;
+
+    int standPat = evaluator.taperedEval(&board);
+    if (standPat >= beta) return beta;
+    if (standPat > alpha) alpha = standPat;
+
+    Move allMoves[MAX_MOVES];
+    int moveCount = movegen.generateMovesList(&board, allMoves);
+
+    for (int i = 0; i < moveCount; ++i) {
+        Move move = allMoves[i];
+
+        board.MakeMove(move);
+
+        // skip non-focus moves  + bad captures
+        if (
+            !(board.currentGameState.capturedPieceType > -1 || board.is_in_check || move.IsPromotion()) ||
+            (board.currentGameState.capturedPieceType > -1 &&
+            Evaluator::SEE(board, move.TargetSquare(), board.is_white_move) < Evaluator::pieceValues[board.currentGameState.capturedPieceType])
+        ) {
+            board.UnmakeMove(move);
+            continue;
+        }
+
+        int score = -quiescence(board, evaluator, movegen, -beta, -alpha, start_time, time_limit_ms);
+
+        board.UnmakeMove(move);
+
+        if (score >= beta) return beta;
+        if (score > alpha) alpha = score;
+
+        // check time
+        auto current_time = std::chrono::steady_clock::now();
+        int elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - start_time).count();
+        // if  evaluating prev search best move first then we can still return the best move
+        if (elapsed_ms >= time_limit_ms && i>0) {break;}//{bestMove = Move::NullMove(); break;}
+    }
+
+    return alpha;
 }
 
 // call before makeMove()
@@ -246,7 +290,7 @@ void Searcher::orderedMoves(Move moves[MAX_MOVES], int count, const Board& board
     }
 }
 
-int Searcher::generateAndOrderMoves(Board& board, MoveGenerator& movegen, Move moves[], int depth, const Move& pvMove, int prev_eval[MAX_MOVES]) {
+int Searcher::generateAndOrderMoves(Board& board, MoveGenerator& movegen, Move moves[MAX_MOVES], int depth, const Move& pvMove, int prev_eval[MAX_MOVES]) {
     int count = movegen.generateMovesList(&board, moves);
     orderedMoves(moves, count, board, depth, pvMove, prev_eval);
     return count;

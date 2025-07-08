@@ -14,9 +14,11 @@ ENGINES = {
     #"alphabeta": r"C:\Users\maxol\code\chess\version_history\v1.3_alphabeta.exe",
     #"transpoition_table": r"C:\Users\maxol\code\chess\version_history\v1.4_transposition_table.exe",
     #"move_list_array": r"C:\Users\maxol\code\chess\version_history\v1.5_moveListArray.exe",
-    "pstLoadFIX": r"C:\Users\maxol\code\chess\version_history\v1.6_pstLoadFIX.exe",
-    "moveOrdering": r"C:\Users\maxol\code\chess\version_history\v1.7_moveOrdering.exe",
-    "negamax": r"C:\Users\maxol\code\chess\version_history\v2_negamax.exe"
+    #"pstLoadFIX": r"C:\Users\maxol\code\chess\version_history\v1.6_pstLoadFIX.exe",
+    #"moveOrdering": r"C:\Users\maxol\code\chess\version_history\v1.7_moveOrdering.exe",
+    "negamax": r"C:\Users\maxol\code\chess\version_history\v2_negamax.exe",
+    "magics": r"C:\Users\maxol\code\chess\version_history\v3_magics.exe",
+    "plz no hang": r"C:\Users\maxol\code\chess\version_history\v3.1_evalimprov.exe"
     #"stockfish": "engines/stockfish.exe"
 }
 

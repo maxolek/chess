@@ -5,8 +5,8 @@ import chess.engine
 from datetime import datetime
 
 # ---- Engine Paths ----
-ENGINE_A = r"C:\Users\maxol\code\chess\version_history\v3_magics.exe"  # candidate
-ENGINE_B = r"C:\Users\maxol\code\chess\version_history\v2_negamax.exe"         # baseline
+ENGINE_A = r"C:\Users\maxol\code\chess\version_history\v4_quiescence.exe"  # candidate
+ENGINE_B = r"C:\Users\maxol\code\chess\version_history\v2_negamax.exe" # baseline
 
 # ---- SPRT Settings ----
 elo0 = 0        # null hypothesis: no improvement

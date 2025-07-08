@@ -72,13 +72,13 @@ public:
     }
 
     // getters
-    ushort Value() { return moveValue; }
-    bool IsNull() { return moveValue == 0; }
+    ushort Value() const { return moveValue; }
+    bool IsNull() const { return moveValue == 0; }
     int StartSquare() const { return moveValue & startSquareMask; }
     int TargetSquare() const { return ( moveValue & targetSquareMask) >> 6; }
-    bool IsPromotion() { return MoveFlag() >= promoteToQueenFlag; }
-    int MoveFlag() { return moveValue >> 12; }
-    void PrintMove() { 
+    bool IsPromotion() const { return MoveFlag() >= promoteToQueenFlag; }
+    int MoveFlag() const { return moveValue >> 12; }
+    void PrintMove() const { 
         int start = StartSquare();
         int target = TargetSquare();
         std::cout << square_to_algebraic(start) << "->" << square_to_algebraic(target) << std::endl; 

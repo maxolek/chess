@@ -73,6 +73,7 @@ public:
     static int taperedEval(const Board* board, Result result); // get eval during search 
     static int openingEval(const Board* board);
     static int endgameEval(const Board* board);
+    static int negamax_eval(const Board* board); // negamax still performs comparable to magic_bitboard version (so eval must be difference)
     
     // counts (weights are in above)
     static float materialDifferences(const Board& position); // add up material
@@ -85,10 +86,12 @@ public:
     static int mopUp(const Board& position); // late endgames without pawns -- drive opp king to edge
     // opening
     static int earlyQueenPenalty(const Board& board); // penalty based on other piece development
+    static int castleBias(const Board& board); // increase eval for castle moves
 
     // static exchange evaluation - run through exchanges on a square and see results
     static int SEE(const Board& board, int sq, bool white);
-    static U64 attackersTo(const Board& board, int sq, bool white); // get all attackers to a square
+    static int hangingPiecePenalty(const Board& board); // loop through pieces to see whats hanging via SEE
+    static U64 attackersTo(const Board& board, int sq, bool white, U64 occ); // get all attackers to a square
     // pawns
     static int countDoubledPawns(U64 pawns); // via file masks
     static int countIsolatedPawns(U64 pawns); // via file masks

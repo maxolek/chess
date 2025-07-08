@@ -70,7 +70,9 @@ public:
 
     void generateMoves();
     void generateMoves(const Board* _board);
-    int generateMovesList(const Board* _board, Move movesList[]);
+    int generateMovesList(const Board* _board, Move movesList[MAX_MOVES]);
+    int generateCaptures(const Board* _board, Move captureList[MAX_MOVES]);
+    int generateChecks(const Board* _board, Move checkList[MAX_MOVES]);
     // for arbiter, if there is a single legal moves then not (stale)mate, and dont need to generate the rest of the moves
     bool hasLegalMoves(const Board* _board);
 

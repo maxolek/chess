@@ -146,6 +146,7 @@ std::unordered_map<std::string, int> Evaluator::componentEvals = { // eval is in
         {"Mobility", 0}, 
         {"PiecePosition", 0},
         {"CenterControl", 0}
+        //{"HangingPieces", 0}
     };
 
 const std::unordered_map<std::string, int> Evaluator::evalWeights = { // eval is in terms of centipawn
@@ -155,12 +156,13 @@ const std::unordered_map<std::string, int> Evaluator::evalWeights = { // eval is
         {"Mobility", 10}, // num legal moves
         {"PiecePosition", 1}, // already in 10s
         {"CenterControl", 1} // attack counts so lots of 1,2,3s
+        //{"HangingPieces", -75} // value of SEE
     };
 
 
 
 int Evaluator::gamePhase(const Board* position) {
-    int pawn_phase = 0; int knight_phase = 1; int bishop_phase = 1;
+    int pawn_phase = 1; int knight_phase = 1; int bishop_phase = 1;
     int rook_phase = 2; int queen_phase = 4; 
     int total_phase = 16*pawn_phase + 4*knight_phase + 4*bishop_phase + 4*rook_phase + 2*queen_phase;
     int phase = total_phase;
@@ -209,15 +211,9 @@ int Evaluator::taperedEval(const Board* board) {
     int endgame = endgameEval(board);
     int phase = gamePhase(board);
 
-    if (board->pieceBitboards[0] == 0) { // no pawns
-        return ((opening * (256 - phase)) + (endgame * phase)) / 256 + mopUp(*board);
-    } else if (phase <= 128) { // early queen development penalty
-        return ((opening * (256 - phase)) + (endgame * phase)) / 256 - earlyQueenPenalty(*board);
-    } else {
-        return ((opening * (256 - phase)) + (endgame * phase)) / 256;
-    }
+    return ((opening * (256 - phase)) + (endgame * phase)) / 256;
 }
-
+/*
 int Evaluator::taperedEval(const Board* board, Result result) {
     // terminal eval
     if (Arbiter::isWinResult(result)) { // side to move is mated
@@ -242,6 +238,7 @@ int Evaluator::taperedEval(const Board* board, Result result) {
         return ((opening * (256 - phase)) + (endgame * phase)) / 256;
     }
 }
+    */
 
 int Evaluator::openingEval(const Board* board) {
     return Evaluate(board, PST_opening);
@@ -268,7 +265,16 @@ int Evaluator::Evaluate(const Board* board, int pst[6][64]) {
     //}
     // else, normal eval
     // computes components hash in function loop
-    return computeEval(*board, pst);
+
+    // eval adjustments (must return in centipawn from whites perspective)
+    int mop_up = board->pieceBitboards[0] == 0 ? mopUp(*board) : 0;
+    int early_queen = gamePhase(board) <= 128 ? earlyQueenPenalty(*board) : 0;
+    int hanging_pieces = hangingPiecePenalty(*board);
+    int castle_bias = castleBias(*board);
+
+    int eval_adj = /*mop_up +*/ early_queen + hanging_pieces + castle_bias;
+
+    return computeEval(*board, pst) + eval_adj;
 
 }
 
@@ -304,6 +310,9 @@ float Evaluator::evaluateComponent(const Board& board, std::string component, in
     } else if (component == "CenterControl") {
         componentEvals[component] = centerControlDifferences(board);
         return componentEvals[component];
+    //} else if (component == "HangingPieces") {
+    //    componentEvals[component] = hangingPiecePenalty(board);
+    //    return componentEvals[component];
     } else {
         return 1;
     }
@@ -321,6 +330,8 @@ std::unordered_map<std::string, int> Evaluator::computeComponents(const Board& b
     return component_hash;
 }
 
+//int Evaluator::negamax_eval(const Board& board)
+
 float Evaluator::materialDifferences(const Board& board) { // add up material
     U64 bb;
     float pEval = 0.0f;
@@ -331,7 +342,7 @@ float Evaluator::materialDifferences(const Board& board) { // add up material
             // exlude king
             bb = board.colorBitboards[side] & board.pieceBitboards[piece];
             pEval += std::pow(-1,side) * pieceValues[piece] * countBits(bb);
-            if (piece == bishop && countBits(bb) == 2) {pEval += std::pow(-1,side) * .3;} // 6.6 -> 7 for bishop pair
+            if (piece == bishop && countBits(bb) == 2) {pEval += (side==0) ? .3 : -.3;} // 7 -> 7.3 for bishop pair
         }
     }
 
@@ -342,7 +353,7 @@ float Evaluator::pawnStructureDifferences(const Board& position) { // double, bl
     U64 pawns = position.pieceBitboards[0];
     U64 white = position.colorBitboards[0]; U64 black = position.colorBitboards[1];
 
-    psEval += (countDoubledPawns(pawns&white)/2 - countDoubledPawns(pawns&black)/2); // count sets not pieces
+    psEval += (countDoubledPawns(pawns&white) - countDoubledPawns(pawns&black)); // func counts doubles files
     psEval += (countIsolatedPawns(pawns&white) - countIsolatedPawns(pawns&black));
     
     return psEval;
@@ -429,7 +440,7 @@ int Evaluator::centerControlDifferences(const Board& position) {
         }
     }
 
-    return score;
+    return score/3;
 }
 
 // not tested
@@ -469,7 +480,7 @@ int Evaluator::earlyQueenPenalty(const Board& board) {
         if (sq != d1) {
             int minor_count = countBits(board.colorBitboards[0] & 
                                         (board.pieceBitboards[knight] | board.pieceBitboards[bishop]));
-            if (minor_count >= 4) penalty += 50;
+            if (minor_count > 2) penalty += 50;
             else if (board.currentGameState.HasKingsideCastleRight(true) || board.currentGameState.HasQueensideCastleRight(true))
                 penalty -= 50;
             else if (sq / 8 >= 4) penalty += 30;
@@ -484,7 +495,7 @@ int Evaluator::earlyQueenPenalty(const Board& board) {
         if (sq != d8) {
             int minor_count = countBits(board.colorBitboards[1] & 
                                         (board.pieceBitboards[knight] | board.pieceBitboards[bishop]));
-            if (minor_count >= 2) penalty -= 50;
+            if (minor_count > 2) penalty -= 50;
             else if (board.currentGameState.HasKingsideCastleRight(false) || board.currentGameState.HasQueensideCastleRight(false))
                 penalty -= 50;
             else if (sq / 8 <= 3) penalty -= 30;
@@ -492,8 +503,33 @@ int Evaluator::earlyQueenPenalty(const Board& board) {
         }
     }
 
-    return penalty;
+    return -penalty;
 }
+int Evaluator::castleBias(const Board& board) {
+    int bonus = 0;
+
+    if (board.plyCount < 4) {return bonus;}
+
+    // Reward castling rights (only reward castle moves)
+    /*
+    if (board.currentGameState.HasKingsideCastleRight(true))
+        bonus += castleRightBonus;
+    if (board.currentGameState.HasQueensideCastleRight(true))
+        bonus += castleRightBonus;
+
+    if (board.currentGameState.HasKingsideCastleRight(false))
+        bonus -= castleRightBonus;
+    if (board.currentGameState.HasQueensideCastleRight(false))
+        bonus -= castleRightBonus;
+    */
+
+    // after move, color is flipped
+    if (!board.is_white_move && board.allGameMoves.back().MoveFlag() == Move::castleFlag) bonus += 40;
+    if (board.is_white_move && board.allGameMoves.back().MoveFlag() == Move::castleFlag) bonus -= 40;
+
+    return bonus;
+}
+
 
 // Detect doubled pawns on a color bitboard
 int Evaluator::countDoubledPawns(U64 pawns) {
@@ -539,66 +575,128 @@ int Evaluator::countIsolatedPawns(U64 pawns) {
 
 // static exchange evaluation
 int Evaluator::SEE(const Board& board, int sq, bool usWhite) {
-    std::vector<std::pair<int, int>> attackers[2]; // [0] = white, [1] = black
+    constexpr int pieceOrder[6] = { pawn, knight, bishop, rook, queen, king };
 
-    U64 whiteAttackers = attackersTo(board, sq, true);
-    U64 blackAttackers = attackersTo(board, sq, false);
-
-    for (int i = 0; i < 64; ++i) {
-        if ((whiteAttackers >> i) & 1ULL) {
-            int piece = board.getMovedPiece(i);
-            attackers[0].emplace_back(pieceValues[piece], i);
+    auto pieceAt = [&](int sq) -> int {
+        for (int pt = 0; pt < 12; ++pt) {
+            if (board.pieceBitboards[pt] & (1ULL << sq)) return pt;
         }
-        if ((blackAttackers >> i) & 1ULL) {
-            int piece = board.getMovedPiece(i);
-            attackers[1].emplace_back(pieceValues[piece], i);
-        }
-    }
+        return -1;
+    };
 
-    std::sort(attackers[0].begin(), attackers[0].end()); // LVA first
-    std::sort(attackers[1].begin(), attackers[1].end());
+    U64 occupied = board.colorBitboards[0] | board.colorBitboards[1];
 
-    int gain[32];
+    // Initialize attackers
+    U64 whiteAttackers = attackersTo(board, sq, true, occupied);
+    U64 blackAttackers = attackersTo(board, sq, false, occupied);
+
+    U64 attackers[2] = { whiteAttackers, blackAttackers };
+    int color = usWhite ? 0 : 1;
+
+    float gain[32] = {};
     int depth = 0;
-    int side = usWhite ? 0 : 1;
-    int score = pieceValues[board.getMovedPiece(sq)];
 
-    gain[depth++] = score;
+    int target = pieceAt(sq);
+    if (target == -1) return 0;
 
-    //U64 occupied = board.colorBitboards[0] | board.colorBitboards[1]; // For example purposes, you'd need to update this per capture
+    gain[depth++] = pieceValues[target];
 
-    while (!attackers[side].empty()) {
-        int attackerSquare = attackers[side].front().second;
-        int attackerValue = attackers[side].front().first;
-        attackers[side].erase(attackers[side].begin());
+    U64 used = 0ULL;
 
-        score = -score + attackerValue;
-        gain[depth] = std::max(-gain[depth - 1], score);
+    while (true) {
+        // Find the least valuable attacker
+        int from = -1;
+        float minValue = 10000.0f;
+
+        for (int i = 0; i < 64; ++i) {
+            if ((attackers[color] & (1ULL << i)) && !(used & (1ULL << i))) {
+                int pt = pieceAt(i);
+                if (pt != -1 && pieceValues[pt] < minValue) {
+                    minValue = pieceValues[pt];
+                    from = i;
+                }
+            }
+        }
+
+        if (from == -1) break;
+
+        // Remove attacker
+        used |= (1ULL << from);
+        occupied &= ~(1ULL << from);
+
+        int pt = pieceAt(from);
+        gain[depth] = pieceValues[pt] - gain[depth - 1];
+        gain[depth] = std::max(-gain[depth - 1], gain[depth]);
         depth++;
-        side ^= 1;
+
+        // Recalculate attackers dynamically (x-ray attacks)
+        attackers[0] = attackersTo(board, sq, true, occupied);
+        attackers[1] = attackersTo(board, sq, false, occupied);
+
+        color ^= 1;
     }
 
-    return gain[depth - 1];
+    return static_cast<int>(gain[depth - 1]);
 }
 
-U64 Evaluator::attackersTo(const Board& board, int sq, bool white) {
+
+int Evaluator::hangingPiecePenalty(const Board& board) {
+    int penalty = 0;
+
+    for (int color = 0; color <= 1; ++color) {
+        bool usWhite = (color == 0);
+        int sign = usWhite ? -1 : 1; // decrease eval for white hanging, increase for black
+
+        for (int piece = knight; piece <= queen; ++piece) {
+            U64 bb = board.colorBitboards[color] & board.pieceBitboards[piece];
+            while (bb) {
+                int sq = __builtin_ctzll(bb);
+                bb &= bb - 1;
+
+                int see = SEE(board, sq, usWhite);
+                if (see < 0) {
+                    int value = pieceValues[piece];
+                    penalty += sign * (2*value - see); // extra penalty for deeper loss
+                }
+            }
+        }
+    }
+
+    return penalty;
+}
+
+
+U64 Evaluator::attackersTo(const Board& board, int sq, bool white, U64 occ) {
     U64 attackers = 0ULL;
-    U64 occ = board.colorBitboards[0] | board.colorBitboards[1];
     U64 color = white ? board.colorBitboards[0] : board.colorBitboards[1];
 
     if (white) {
-        attackers |= ((color & board.pieceBitboards[0]) & PrecomputedMoveData::fullPawnAttacks[sq][1]); // opp for pawn
-        attackers |= ((color & board.pieceBitboards[1]) & PrecomputedMoveData::blankKnightAttacks[sq]);
-        attackers |= ((color & board.pieceBitboards[king]) & PrecomputedMoveData::blankKingAttacks[sq]);
+        // Pawn attacks: attacked by white pawn means we use black pawn attack mask
+        attackers |= (color & board.pieceBitboards[pawn]) & PrecomputedMoveData::fullPawnAttacks[sq][1];
+        attackers |= (color & board.pieceBitboards[knight]) & PrecomputedMoveData::blankKnightAttacks[sq];
+        attackers |= (color & board.pieceBitboards[king]) & PrecomputedMoveData::blankKingAttacks[sq];
 
-        U64 bishop_sliders = ((color & board.pieceBitboards[bishop]) | (color & board.pieceBitboards[queen]));
-        U64 rook_sliders = ((color & board.pieceBitboards[rook]) | (color & board.pieceBitboards[queen]));
-        attackers |= (bishop_sliders & (PrecomputedMoveData::blankBishopAttacks[sq][0].lineEx | PrecomputedMoveData::blankBishopAttacks[sq][1].lineEx));
-        attackers |= (rook_sliders & (PrecomputedMoveData::blankRookAttacks[sq][0].lineEx | PrecomputedMoveData::blankRookAttacks[sq][1].lineEx));
+        U64 bishop_sliders = (color & board.pieceBitboards[bishop]) | (color & board.pieceBitboards[queen]);
+        U64 rook_sliders   = (color & board.pieceBitboards[rook])   | (color & board.pieceBitboards[queen]);
+
+        attackers |= bishop_sliders & Magics::bishopAttacks(sq, occ);
+        attackers |= rook_sliders   & Magics::rookAttacks(sq, occ);
+    } else {
+        // Pawn attacks: attacked by black pawn means we use white pawn attack mask
+        attackers |= (color & board.pieceBitboards[pawn]) & PrecomputedMoveData::fullPawnAttacks[sq][0];
+        attackers |= (color & board.pieceBitboards[knight]) & PrecomputedMoveData::blankKnightAttacks[sq];
+        attackers |= (color & board.pieceBitboards[king]) & PrecomputedMoveData::blankKingAttacks[sq];
+
+        U64 bishop_sliders = (color & board.pieceBitboards[bishop]) | (color & board.pieceBitboards[queen]);
+        U64 rook_sliders   = (color & board.pieceBitboards[rook])   | (color & board.pieceBitboards[queen]);
+
+        attackers |= bishop_sliders & Magics::bishopAttacks(sq, occ);
+        attackers |= rook_sliders   & Magics::rookAttacks(sq, occ);
     }
 
     return attackers;
 }
+
 
 // count backwards pawns
 // passed pawns
@@ -656,7 +754,7 @@ int Evaluator::passedPawnDifferences(const Board& board) {
         }
     }
 
-    return (pp_white - pp_black)/5; // .2 scaling
+    return (pp_white - pp_black); 
 }
 
 // 

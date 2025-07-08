@@ -142,8 +142,6 @@ int Engine::computeSearchTime(SearchSettings settings) {
     int side = game_board->is_white_move ? 0 : 1;
     int ply = game_board->plyCount;
 
-    if (ply < 10) {return 3500;}
-
     int myTime = settings.wtime;
     int myInc = settings.winc;
     if (side == 1) {
@@ -158,6 +156,7 @@ int Engine::computeSearchTime(SearchSettings settings) {
     if (settings.movetime > 0) {
         return std::max(500, settings.movetime - overhead);
     }
+    if (ply < 10) {return 3500;}
 
     // Fallback time control
     double aggressiveness = .75;
@@ -297,7 +296,8 @@ void Engine::iterativeDeepening(SearchSettings settings) {
         bestMove = Move::SameMove(result.bestMove, Move::NullMove()) ? iteration_bestMove : result.bestMove;
 
         // Update opponent's best move similarly, only if result.bestMove is valid
-        if (depth % 2 == 0 && search_board.plyCount > 6) {
+        // currently removing last depth
+        if (depth % 2 == 0 && !stop && search_board.plyCount > 6) {
             if (!result.bestMove.IsNull()) {
                 opp_it_bestMove = iteration_bestMove;
                 opp_it_bestEval = iteration_bestEval;

@@ -13,7 +13,7 @@ int main(int argc, char* argv[]) {
     Magics::initMagics();
 
     if (argc < 2) {
-        std::cerr << "Usage: ./testing [zobrist|search|perft|divide] <fen> <depth>\n";
+        std::cerr << "Usage: ./testing [zobrist|search|SEE|perft|divide] <fen> <depth>\n";
         return 1;
     }
 
@@ -28,6 +28,10 @@ int main(int argc, char* argv[]) {
         tests.testSearch(fen);
         return 0;
     } 
+    else if (mode == "see" || mode == "SEE") {
+        tests.SEETest();
+        return 0;
+    }
     else if (mode == "perft" || mode == "divide") {
         if (argc < 9) {
             std::cerr << "Usage: ./testing " << mode << " <fen> <depth>\n";

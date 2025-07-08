@@ -125,6 +125,55 @@ int MoveGenerator::generateMovesList(const Board* _board, Move moveList[]) {
     return count;
 }
 
+// moves havent occurred yet
+// doesnt include discovered checks
+int MoveGenerator::generateChecks(const Board* _board, Move checkList[MAX_MOVES]) {
+    int checks = 0;
+    U64 enemy_king_bb = opp & kings; int enemy_king_sq = sqidx(enemy_king_bb);
+    U64 occ = own | opp;
+    U64 attacks = 0ULL;
+    int t_sq; int piece; 
+
+    for (int i = 0; i < count; i++) {
+        t_sq = moves[i].TargetSquare();
+        piece = _board->getMovedPiece(moves[i].StartSquare());
+
+        switch (piece) {
+            case pawn:
+                attacks = PrecomputedMoveData::fullPawnAttacks[t_sq][_board->is_white_move ? 0 : 1];
+                break;
+            case knight:
+                attacks = PrecomputedMoveData::blankKnightAttacks[t_sq];
+                break;
+            case bishop:
+                attacks = Magics::bishopAttacks(t_sq, occ);
+                break;
+            case rook:
+                attacks = Magics::rookAttacks(t_sq, occ);
+                break;
+            case queen:
+                attacks = Magics::rookAttacks(t_sq, occ) | Magics::bishopAttacks(t_sq, occ);
+                break;
+            default:
+                attacks = 0ULL;
+        }
+
+        if (attacks & enemy_king_bb) {checkList[checks++] = moves[i];}
+    }
+
+    return checks;
+}
+int MoveGenerator::generateCaptures(const Board* _board, Move captureList[MAX_MOVES]) {
+    int captures = 0;
+
+    for (int i = 0; i < count; i++) {
+        if ((1ULL << moves[i].TargetSquare()) & opp)
+            captureList[captures++] = moves[i];
+    }
+
+    return captures;
+}
+
 bool MoveGenerator::hasLegalMoves(const Board* _board) {
     // load movegen at given state
     board = _board;

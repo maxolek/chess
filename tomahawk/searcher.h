@@ -83,6 +83,14 @@ public:
         std::chrono::steady_clock::time_point start_time, 
         int time_limit_ms, bool& out_of_time
     );
+    static int quiescence(
+        Board& board,
+        Evaluator& evaluator,
+        MoveGenerator& movegen,
+        int alpha, int beta,
+        std::chrono::steady_clock::time_point start_time, 
+        int time_limit_ms
+    );
 
     static int moveScore(
         const Move& move, 
