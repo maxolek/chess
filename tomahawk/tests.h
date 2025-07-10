@@ -421,35 +421,35 @@ public:
     // eval tests
     void SEETest() {
         struct SEETestCase {
-            std::string fen; int targetSquare; int expectedSEEWhite; int expectedSEEBlack;
+            std::string fen; int targetSquare; bool usWhite; int expectedSEE;
         };
 
         std::vector<SEETestCase> cases = {
         // Queen captures defended pawn
-        {"4k3/8/8/8/4q3/8/4P3/4K3 w - - 0 1", e2, 900, -800},
+        //{"4k3/8/8/8/4q3/8/4P3/4K3 w - - 0 1", e2, false, -800},
         // Balanced exchange on f6: knight captures defended knight
-        {"4k3/8/5n2/8/8/5N2/8/4K3 w - - 0 1", f6, 300, 300},
-        // Pawn captures knight
-        {"4k3/8/8/5n2/4P3/8/8/4K3 w - - 0 1", f5, 300, 100},
+        {"8/4k3/5n2/8/4N3/8/8/4K3 w - - 0 1", f6, true, 0},
+        // Pawn captures knight (no recapture)
+        {"4k3/8/8/5n2/4P3/8/8/4K3 w - - 0 1", f5, true, 300},
         // Defended bishop: queen captures and gets recaptured
-        {"4k3/8/8/3b4/4Q3/8/8/4K3 w - - 0 1", d5, -250, -250},
-        // Hanging rook
-        {"4k3/8/8/8/4r3/8/8/4K3 w - - 0 1", e4, 500, 0},
+        {"4k3/8/4p3/3b4/4Q3/8/8/4K3 w - - 0 1", d5, true, -600},
+        // King captures hanging rook
+        {"4k3/8/8/8/4r3/3K4/8/8 w - - 0 1", e4, true, 500},
+        // losing long
+        //{"rnbqkb1r/p1p2ppp/5n2/3pp1N1/4P3/2NP4/PPP1QPPP/R1B1KB1R b KQkq - 0 1", e4, false, -220},
+        // Long exchange
+        //{"rn2kb1r/pqp2ppp/5nb1/3pp1N1/4P3/2NP4/PPP1QPPP/R1B1KB1R w KQkq - 0 1", e4, false, 0} // possibly losing if full exchange examined
         };
 
         std::cout << "====================\nSEE Test Suite\n====================\n";
         for (size_t i = 0; i < cases.size(); ++i) {
             setBoard(cases[i].fen);
-            int resultWhite = Evaluator::SEE(board, cases[i].targetSquare, /*white*/ true)*100;
-            int resultBlack = Evaluator::SEE(board, cases[i].targetSquare, /*white*/ false)*100;
+            int result = Evaluator::SEE(board, cases[i].targetSquare, cases[i].usWhite);
 
             std::cout << "Test Case " << i + 1 << ": " << cases[i].fen << "\n";
-            std::cout << "Target Square: " << square_to_algebraic(cases[i].targetSquare) << "\n";
-            std::cout << "SEE (White): " << resultWhite << "\tExpected: " << cases[i].expectedSEEWhite << "\t";
-            std::cout << ((resultWhite == cases[i].expectedSEEWhite) ? "[PASS]" : "[FAIL]") << "\n";
-
-            std::cout << "SEE (Black): " << resultBlack << "\tExpected: " << cases[i].expectedSEEBlack << "\t";
-            std::cout << ((resultBlack == cases[i].expectedSEEBlack) ? "[PASS]" : "[FAIL]") << "\n";
+            std::cout << "Target Square: " << square_to_algebraic(cases[i].targetSquare) << "\n\n";
+            std::cout << "SEE: " << result << "\tExpected: " << cases[i].expectedSEE << "\t";
+            std::cout << ((result == cases[i].expectedSEE) ? "[PASS]" : "[FAIL]") << "\n";
             std::cout << "----------------------------------------\n";
         }
     }

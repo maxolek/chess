@@ -22,7 +22,7 @@ public:
 
 
     // pieces
-    static constexpr float pieceValues[5] = {1, 3.2, 3.5, 5, 9}; 
+    static constexpr int pieceValues[6] = {100, 320, 350, 500, 900, 10000}; 
     static constexpr int passedBonus[8] = { 0, 10, 20, 30, 50, 70, 100, 0 }; // passed pawn rank (white)
     // pawn knight bishop rook queen
     // piece positions
@@ -60,7 +60,7 @@ public:
         const Board& board,
         int pst[6][64]
     ); // return dict constructed in above but on command
-    static float evaluateComponent(
+    static int evaluateComponent(
         //const MoveGenerator* movegen, 
         const Board& board, 
         std::string component,
@@ -76,11 +76,11 @@ public:
     static int negamax_eval(const Board* board); // negamax still performs comparable to magic_bitboard version (so eval must be difference)
     
     // counts (weights are in above)
-    static float materialDifferences(const Board& position); // add up material
-    static float pawnStructureDifferences(const Board& position); // double, block, iso (more is bad)
+    static int materialDifferences(const Board& position); // add up material
+    static int pawnStructureDifferences(const Board& position); // double, block, iso (more is bad)
     // currently mobilityDiff lags the position to eval by 1 ply as it relies on movegen which ran on the prior position
-    static float mobilityDifferences(const MoveGenerator* movegen); // # moves (psuedo possibilities)
-    static float positionDifferences(const Board& position, int pst[6][64]); // pst with phase
+    static int mobilityDifferences(const MoveGenerator* movegen); // # moves (psuedo possibilities)
+    static int positionDifferences(const Board& position, int pst[6][64]); // pst with phase
     static int centerControlDifferences(const Board& position); // precomp masks
     // end game
     static int mopUp(const Board& position); // late endgames without pawns -- drive opp king to edge

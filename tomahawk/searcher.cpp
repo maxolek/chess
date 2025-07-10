@@ -208,14 +208,18 @@ int Searcher::quiescence(Board& board, Evaluator& evaluator, MoveGenerator& move
         board.MakeMove(move);
 
         // skip non-focus moves  + bad captures
-        if (
-            !(board.currentGameState.capturedPieceType > -1 || board.is_in_check || move.IsPromotion()) ||
-            (board.currentGameState.capturedPieceType > -1 &&
-            Evaluator::SEE(board, move.TargetSquare(), board.is_white_move) < Evaluator::pieceValues[board.currentGameState.capturedPieceType])
-        ) {
+        bool isCapture = board.currentGameState.capturedPieceType > -1;
+        bool isPromo   = move.IsPromotion();
+        bool inCheck   = board.is_in_check;
+
+        bool interesting = isCapture || isPromo || inCheck;
+        bool badCapture  = isCapture && Evaluator::SEE(board, move.TargetSquare(), board.is_white_move) > 0;
+
+        if (!interesting || badCapture) {
             board.UnmakeMove(move);
             continue;
         }
+
 
         int score = -quiescence(board, evaluator, movegen, -beta, -alpha, start_time, time_limit_ms);
 

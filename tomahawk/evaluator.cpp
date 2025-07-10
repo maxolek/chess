@@ -1,7 +1,7 @@
 #include "evaluator.h"
 
 // static vars
-constexpr float Evaluator::pieceValues[5];
+constexpr int Evaluator::pieceValues[6];
 constexpr int Evaluator::passedBonus[8];
 bool Evaluator::end_pstLoaded = false; bool Evaluator::open_pstLoaded = false;
 int Evaluator::PST_endgame[6][64]; int Evaluator::PST_opening[6][64];
@@ -61,13 +61,13 @@ void Evaluator::writeEvalDebug(const MoveGenerator* movegen, Board& board, const
 
     file << "FEN: " << board.getBoardFEN() << "\n";
 
-    float material = materialDifferences(board);
-    float pawnStruct = pawnStructureDifferences(board);
+    int material = materialDifferences(board);
+    int pawnStruct = pawnStructureDifferences(board);
     int pass_pawn = passedPawnDifferences(board);
     int cent_cntrl = centerControlDifferences(board);
-    float mobility = mobilityDifferences(movegen);
-    float posDiff_open = positionDifferences(board, PST_opening);
-    float posDiff_end = positionDifferences(board, PST_endgame);
+    int mobility = mobilityDifferences(movegen);
+    int posDiff_open = positionDifferences(board, PST_opening);
+    int posDiff_end = positionDifferences(board, PST_endgame);
 
     file << std::fixed << std::setprecision(2);
     file << "Material:       " << material << "\n";
@@ -150,7 +150,7 @@ std::unordered_map<std::string, int> Evaluator::componentEvals = { // eval is in
     };
 
 const std::unordered_map<std::string, int> Evaluator::evalWeights = { // eval is in terms of centipawn
-        {"Material", 100}, // material - raw        of which material is base units 
+        {"Material", 1}, // material - raw        of which material is base units 
         {"PawnStructure", -25}, // pawn structure (bad stuff)
         {"PassedPawns", 1}, // 30-40s-ish with scaling
         {"Mobility", 10}, // num legal moves
@@ -284,14 +284,14 @@ int Evaluator::computeEval(const Board& board, int pst[6][64]) {
     for (const auto& pair : evalWeights) {
         const std::string& name = pair.first;
         int weight = pair.second;
-        float value = evaluateComponent(board, name, pst);
+        int value = evaluateComponent(board, name, pst);
         eval += int(weight * value);
     }
 
     return eval;
 }
 
-float Evaluator::evaluateComponent(const Board& board, std::string component, int pst[6][64]) {
+int Evaluator::evaluateComponent(const Board& board, std::string component, int pst[6][64]) {
     if (component == "Material") {
         componentEvals[component] = materialDifferences(board);
         return componentEvals[component];
@@ -323,7 +323,7 @@ std::unordered_map<std::string, int> Evaluator::computeComponents(const Board& b
     
     for (const auto& pair : evalWeights) { // used for analysis
         const std::string& name = pair.first;
-        float value = evaluateComponent(board, name, pst);
+        int value = evaluateComponent(board, name, pst);
         component_hash[name] = value;
     }
 
@@ -332,9 +332,9 @@ std::unordered_map<std::string, int> Evaluator::computeComponents(const Board& b
 
 //int Evaluator::negamax_eval(const Board& board)
 
-float Evaluator::materialDifferences(const Board& board) { // add up material
+int Evaluator::materialDifferences(const Board& board) { // add up material
     U64 bb;
-    float pEval = 0.0f;
+    int pEval = 0.0f;
 
     for (int side = 0; side < 2; side++) {
         // +white -black
@@ -348,7 +348,7 @@ float Evaluator::materialDifferences(const Board& board) { // add up material
 
     return pEval;
 }
-float Evaluator::pawnStructureDifferences(const Board& position) { // double, block, iso
+int Evaluator::pawnStructureDifferences(const Board& position) { // double, block, iso
     int psEval = 0;
     U64 pawns = position.pieceBitboards[0];
     U64 white = position.colorBitboards[0]; U64 black = position.colorBitboards[1];
@@ -358,13 +358,13 @@ float Evaluator::pawnStructureDifferences(const Board& position) { // double, bl
     
     return psEval;
 }
-float Evaluator::mobilityDifferences(const MoveGenerator* movegen) { // # moves (psuedo possibilities)
+int Evaluator::mobilityDifferences(const MoveGenerator* movegen) { // # moves (psuedo possibilities)
     // return values computed during movegen 
     //int w_mob = movegen->white_mobility; int b_mob = movegen->black_mobility;
     //return w_mob - b_mob;
     return 0;
 }
-float Evaluator::positionDifferences(const Board& position, int pst[6][64]) {
+int Evaluator::positionDifferences(const Board& position, int pst[6][64]) {
     int score = 0;
     U64 bb;
 
@@ -386,7 +386,7 @@ float Evaluator::positionDifferences(const Board& position, int pst[6][64]) {
         }
     }
 
-    return static_cast<float>(score);
+    return score;
 }
 int Evaluator::centerControlDifferences(const Board& position) {
     int score = 0;
@@ -575,89 +575,90 @@ int Evaluator::countIsolatedPawns(U64 pawns) {
 
 // static exchange evaluation
 int Evaluator::SEE(const Board& board, int sq, bool usWhite) {
-    constexpr int pieceOrder[6] = { pawn, knight, bishop, rook, queen, king };
-
     auto pieceAt = [&](int sq) -> int {
-        for (int pt = 0; pt < 12; ++pt) {
+        for (int pt = 0; pt < 6; ++pt) {
             if (board.pieceBitboards[pt] & (1ULL << sq)) return pt;
         }
         return -1;
     };
 
-    U64 occupied = board.colorBitboards[0] | board.colorBitboards[1];
-
-    // Initialize attackers
-    U64 whiteAttackers = attackersTo(board, sq, true, occupied);
-    U64 blackAttackers = attackersTo(board, sq, false, occupied);
-
-    U64 attackers[2] = { whiteAttackers, blackAttackers };
-    int color = usWhite ? 0 : 1;
-
-    float gain[32] = {};
-    int depth = 0;
-
-    int target = pieceAt(sq);
-    if (target == -1) return 0;
-
-    gain[depth++] = pieceValues[target];
-
+    U64 occ = board.colorBitboards[0] | board.colorBitboards[1];
     U64 used = 0ULL;
 
+    U64 whiteAttackers = attackersTo(board, sq, true, occ);
+    U64 blackAttackers = attackersTo(board, sq, false, occ);
+    U64 attackers[2] = { whiteAttackers, blackAttackers };
+
+    if (!usWhite && !blackAttackers) {return 0;}
+    if (usWhite && !whiteAttackers) {return 0;}
+
+    int side = usWhite ? 0 : 1; // 0: white, 1: black
+
+    int gain[32] = {};
+    int depth = 0;
+
+    int targetPiece = pieceAt(sq);
+    if (targetPiece == -1) return 0;
+    gain[depth++] = pieceValues[targetPiece];
+
     while (true) {
-        // Find the least valuable attacker
         int from = -1;
-        float minValue = 10000.0f;
+        int minValue = 100000;
+        int attackerPiece = -1;
 
         for (int i = 0; i < 64; ++i) {
-            if ((attackers[color] & (1ULL << i)) && !(used & (1ULL << i))) {
+            if ((attackers[side] & (1ULL << i)) && !(used & (1ULL << i))) {
                 int pt = pieceAt(i);
                 if (pt != -1 && pieceValues[pt] < minValue) {
                     minValue = pieceValues[pt];
                     from = i;
+                    attackerPiece = pt;
                 }
             }
         }
 
-        if (from == -1) break;
+        if (from == -1)
+            break;
 
-        // Remove attacker
         used |= (1ULL << from);
-        occupied &= ~(1ULL << from);
+        occ &= ~(1ULL << from);
 
-        int pt = pieceAt(from);
-        gain[depth] = pieceValues[pt] - gain[depth - 1];
-        gain[depth] = std::max(-gain[depth - 1], gain[depth]);
+        gain[depth] = ((attackerPiece == king) ? 0 : pieceValues[attackerPiece]) - gain[depth - 1];
         depth++;
 
-        // Recalculate attackers dynamically (x-ray attacks)
-        attackers[0] = attackersTo(board, sq, true, occupied);
-        attackers[1] = attackersTo(board, sq, false, occupied);
+        // Update attackers dynamically
+        attackers[0] = attackersTo(board, sq, true, occ);
+        attackers[1] = attackersTo(board, sq, false, occ);
 
-        color ^= 1;
+        side = 1-side; // Switch sides
     }
 
-    return static_cast<int>(gain[depth - 1]);
+    if (depth == 2) {return gain[0];}
+    // Evaluate best result by backtracking
+    while (--depth > 0) {
+        gain[depth - 1] = -std::max(-gain[depth - 1], gain[depth]);
+    }
+
+    return gain[0];
 }
 
 
 int Evaluator::hangingPiecePenalty(const Board& board) {
-    int penalty = 0;
+    int penalty = 0; int sign = board.is_white_move ? 1 : -1; 
+    // white to move = black just move = penalty to black = add to eval
+    // side to move is after move was made, so penalty is applied to previous player
+    // so if player to move has positive SEE then piece is hanging
 
-    for (int color = 0; color <= 1; ++color) {
-        bool usWhite = (color == 0);
-        int sign = usWhite ? -1 : 1; // decrease eval for white hanging, increase for black
+    for (int piece = knight; piece <= queen; piece++) {
+        U64 bb = board.colorBitboards[1-board.move_color] & board.pieceBitboards[piece];
+        while (bb) {
+            int sq = __builtin_ctzll(bb);
+            bb &= bb -1;
 
-        for (int piece = knight; piece <= queen; ++piece) {
-            U64 bb = board.colorBitboards[color] & board.pieceBitboards[piece];
-            while (bb) {
-                int sq = __builtin_ctzll(bb);
-                bb &= bb - 1;
-
-                int see = SEE(board, sq, usWhite);
-                if (see < 0) {
-                    int value = pieceValues[piece];
-                    penalty += sign * (2*value - see); // extra penalty for deeper loss
-                }
+            int see = SEE(board, sq, board.is_white_move);
+            if (see > 0) {
+                int value = pieceValues[piece];
+                penalty += sign*see;
             }
         }
     }

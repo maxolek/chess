@@ -43,6 +43,9 @@ void UCI::handleCommand(const std::string& line) {
             std::cout << "option name UCI_ShowWDL type check default false" << std::endl;
             std::cout << "uciok\n";
     }
+    else if (token == "print_board") {
+        game->printBoard();
+    }
     else if (token == "isready") {
         std::cout << "readyok\n";
     }
