@@ -95,7 +95,7 @@ public:
     void setFromFEN(std::string _fen);
     void setBoardFEN();
     std::string getBoardFEN();
-    void print_board();
+    void print_board() const;
 
 };
 

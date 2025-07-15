@@ -18,12 +18,12 @@ ENGINES = {
     #"moveOrdering": r"C:\Users\maxol\code\chess\version_history\v1.7_moveOrdering.exe",
     "negamax": r"C:\Users\maxol\code\chess\version_history\v2_negamax.exe",
     "magics": r"C:\Users\maxol\code\chess\version_history\v3_magics.exe",
-    "plz no hang": r"C:\Users\maxol\code\chess\version_history\v3.1_evalimprov.exe"
+    "quiescence": r"C:\Users\maxol\code\chess\version_history\v4_quiescence.exe"
     #"stockfish": "engines/stockfish.exe"
 }
 
 GAMES_PER_PAIR = 6  # 3 as white, 2 as black
-TIME_LIMIT = 3  # seconds per move
+TIME_LIMIT = 10  # seconds per move
 
 LOG_DIR = "logs"
 PGN_FILE = os.path.join(LOG_DIR, f"tournament_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pgn")

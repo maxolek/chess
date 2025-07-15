@@ -6,6 +6,7 @@ constexpr int Evaluator::passedBonus[8];
 bool Evaluator::end_pstLoaded = false; bool Evaluator::open_pstLoaded = false;
 int Evaluator::PST_endgame[6][64]; int Evaluator::PST_opening[6][64];
 const PrecomputedMoveData* Evaluator::precomp;
+int Evaluator::mvvLvaTable[6][6]; // viction/attacker higher is better
 
 Evaluator::Evaluator() {
      if (!open_pstLoaded) {
@@ -20,6 +21,8 @@ Evaluator::Evaluator() {
         }
         end_pstLoaded = true;
     }
+
+    initMVVLVA();
 }
 
 Evaluator::Evaluator(const PrecomputedMoveData* _precomp) {
@@ -37,6 +40,7 @@ Evaluator::Evaluator(const PrecomputedMoveData* _precomp) {
     }
 
     precomp = _precomp;
+    initMVVLVA();
 }
 
 void Evaluator::writeEvalDebug(const MoveGenerator* movegen, Board& board, const std::string& filename) {
@@ -61,6 +65,7 @@ void Evaluator::writeEvalDebug(const MoveGenerator* movegen, Board& board, const
 
     file << "FEN: " << board.getBoardFEN() << "\n";
 
+    // main eval
     int material = materialDifferences(board);
     int pawnStruct = pawnStructureDifferences(board);
     int pass_pawn = passedPawnDifferences(board);
@@ -68,6 +73,13 @@ void Evaluator::writeEvalDebug(const MoveGenerator* movegen, Board& board, const
     int mobility = mobilityDifferences(movegen);
     int posDiff_open = positionDifferences(board, PST_opening);
     int posDiff_end = positionDifferences(board, PST_endgame);
+    int phase = gamePhase(&board);
+
+    // adjustments
+    int mop_up = board.pieceBitboards[0] == 0 ? mopUp(board) : 0;
+    int early_queen = gamePhase(&board) <= 128 ? earlyQueenPenalty(board) : 0;
+    int hanging_pieces = hangingPiecePenalty(board);
+    int castle_bias = castleBias(board);
 
     file << std::fixed << std::setprecision(2);
     file << "Material:       " << material << "\n";
@@ -75,7 +87,10 @@ void Evaluator::writeEvalDebug(const MoveGenerator* movegen, Board& board, const
     file << "Passed Pawns: " << pass_pawn << "\n";
     file << "Center Control: " << cent_cntrl << "\n";
     file << "Mobility:       " << mobility << "\n";
-    file << "Piece Position (open / end): " << posDiff_open << " / " << posDiff_end << "\n";
+    file << "Piece Position (open / end): " << posDiff_open << " / " << posDiff_end << "\n\n";
+    file << "Phase: " << phase << "\n";
+    file << "Early Queen Penalty: " << early_queen << "\n";
+    file << "Hanging Pieces Penalty: " << hanging_pieces << "\n";
 
 
     int totalEval = taperedEval(&board);
@@ -137,6 +152,16 @@ bool Evaluator::loadPST(const std::string& filename, int pst[6][64]) {
 
     return true;
 }
+
+void Evaluator::initMVVLVA() {
+    for (int victim = 0; victim < 6; ++victim) {
+        for (int attacker = 0; attacker < 6; ++attacker) {
+            // More valuable victim, less valuable attacker -> higher score
+            mvvLvaTable[victim][attacker] = (victim + 1) * 10 - attacker;
+        }
+    }
+}
+
 
 
 std::unordered_map<std::string, int> Evaluator::componentEvals = { // eval is in terms of centipawn
@@ -213,6 +238,22 @@ int Evaluator::taperedEval(const Board* board) {
 
     return ((opening * (256 - phase)) + (endgame * phase)) / 256;
 }
+// replace SEE in evaluate
+int Evaluator::taperedEval(const Board* board, int SEE) {
+    int phase = gamePhase(board);
+    // SEE >0 is good, SEE < 0 is bad
+    // in these func calls, a bad capture was just made (so piece is hanging, so hanging_penalty is known)
+    int mop_up = board->pieceBitboards[0] == 0 ? mopUp(*board) : 0;
+    int early_queen = gamePhase(board) <= 64 ? earlyQueenPenalty(*board) : 0;
+    int castle_bias = castleBias(*board);
+
+    int eval_adj = /*mop_up +*/ early_queen /*+ SEE*/ + castle_bias;
+
+    //int eval = computeEval(*board,pst) + eval_adj;
+
+    return computeEval(*board, PST_opening) + computeEval(*board, PST_endgame) + eval_adj;
+}
+
 /*
 int Evaluator::taperedEval(const Board* board, Result result) {
     // terminal eval
@@ -272,7 +313,9 @@ int Evaluator::Evaluate(const Board* board, int pst[6][64]) {
     int hanging_pieces = hangingPiecePenalty(*board);
     int castle_bias = castleBias(*board);
 
-    int eval_adj = /*mop_up +*/ early_queen + hanging_pieces + castle_bias;
+    int eval_adj = /*mop_up +*/ early_queen + /*hanging_pieces*/ + castle_bias; // quiesence for hanging pieces
+
+    //int eval = computeEval(*board,pst) + eval_adj;
 
     return computeEval(*board, pst) + eval_adj;
 
@@ -307,9 +350,9 @@ int Evaluator::evaluateComponent(const Board& board, std::string component, int 
     } else if (component == "PiecePosition") {
         componentEvals[component] = positionDifferences(board, pst);
         return componentEvals[component];
-    } else if (component == "CenterControl") {
-        componentEvals[component] = centerControlDifferences(board);
-        return componentEvals[component];
+    //} else if (component == "CenterControl") {
+    //    componentEvals[component] = centerControlDifferences(board);
+    //    return componentEvals[component];
     //} else if (component == "HangingPieces") {
     //    componentEvals[component] = hangingPiecePenalty(board);
     //    return componentEvals[component];
@@ -342,7 +385,7 @@ int Evaluator::materialDifferences(const Board& board) { // add up material
             // exlude king
             bb = board.colorBitboards[side] & board.pieceBitboards[piece];
             pEval += std::pow(-1,side) * pieceValues[piece] * countBits(bb);
-            if (piece == bishop && countBits(bb) == 2) {pEval += (side==0) ? .3 : -.3;} // 7 -> 7.3 for bishop pair
+            if (piece == bishop && countBits(bb) == 2) {pEval += (side==0) ? 30 : -30;} // 7 -> 7.3 for bishop pair
         }
     }
 
@@ -508,7 +551,7 @@ int Evaluator::earlyQueenPenalty(const Board& board) {
 int Evaluator::castleBias(const Board& board) {
     int bonus = 0;
 
-    if (board.plyCount < 4) {return bonus;}
+    //if (board.plyCount < 4) {return bonus;}
 
     // Reward castling rights (only reward castle moves)
     /*
@@ -574,7 +617,8 @@ int Evaluator::countIsolatedPawns(U64 pawns) {
 }
 
 // static exchange evaluation
-int Evaluator::SEE(const Board& board, int sq, bool usWhite) {
+// called after capture is made and init gain[] to captured piece
+int Evaluator::SEE(const Board& board) {
     auto pieceAt = [&](int sq) -> int {
         for (int pt = 0; pt < 6; ++pt) {
             if (board.pieceBitboards[pt] & (1ULL << sq)) return pt;
@@ -582,31 +626,40 @@ int Evaluator::SEE(const Board& board, int sq, bool usWhite) {
         return -1;
     };
 
+    int sq = board.allGameMoves.back().TargetSquare();
+
     U64 occ = board.colorBitboards[0] | board.colorBitboards[1];
     U64 used = 0ULL;
 
     U64 whiteAttackers = attackersTo(board, sq, true, occ);
     U64 blackAttackers = attackersTo(board, sq, false, occ);
     U64 attackers[2] = { whiteAttackers, blackAttackers };
+    U64 tmp_attackers = 0ULL; // bitboard to iterate through rather than through all 64 squares
 
-    if (!usWhite && !blackAttackers) {return 0;}
-    if (usWhite && !whiteAttackers) {return 0;}
-
-    int side = usWhite ? 0 : 1; // 0: white, 1: black
+    int side = board.move_color; // 0: white, 1: black
 
     int gain[32] = {};
     int depth = 0;
 
     int targetPiece = pieceAt(sq);
     if (targetPiece == -1) return 0;
-    gain[depth++] = pieceValues[targetPiece];
+    gain[depth++] = pieceValues[board.currentGameState.capturedPieceType]; // gain[0] = captured piece
+    gain[depth++] = pieceValues[targetPiece] - gain[0]; // gain[1] = capturing piece (after made move) - captured piece
+
+    if (attackers[side] == 0) {return gain[0];} // hanging pieces (nothing to recapture with)
 
     while (true) {
+        if (!(attackers[0] & ~used) || !(attackers[1] & ~used)) {break;}
+        tmp_attackers = attackers[side];
+
         int from = -1;
         int minValue = 100000;
         int attackerPiece = -1;
 
-        for (int i = 0; i < 64; ++i) {
+        while (tmp_attackers) {
+            int i = tzcnt(tmp_attackers) - 1;
+            tmp_attackers &= tmp_attackers -1;
+
             if ((attackers[side] & (1ULL << i)) && !(used & (1ULL << i))) {
                 int pt = pieceAt(i);
                 if (pt != -1 && pieceValues[pt] < minValue) {
@@ -623,7 +676,8 @@ int Evaluator::SEE(const Board& board, int sq, bool usWhite) {
         used |= (1ULL << from);
         occ &= ~(1ULL << from);
 
-        gain[depth] = ((attackerPiece == king) ? 0 : pieceValues[attackerPiece]) - gain[depth - 1];
+        if (attackerPiece == king) {break;}
+        gain[depth] = pieceValues[attackerPiece] - gain[depth - 1];
         depth++;
 
         // Update attackers dynamically
@@ -633,7 +687,7 @@ int Evaluator::SEE(const Board& board, int sq, bool usWhite) {
         side = 1-side; // Switch sides
     }
 
-    if (depth == 2) {return gain[0];}
+    //if (depth == 2) {return gain[0];} 
     // Evaluate best result by backtracking
     while (--depth > 0) {
         gain[depth - 1] = -std::max(-gain[depth - 1], gain[depth]);
@@ -642,20 +696,21 @@ int Evaluator::SEE(const Board& board, int sq, bool usWhite) {
     return gain[0];
 }
 
-
+// would like to see if pieces are hanging before capture is made on board
 int Evaluator::hangingPiecePenalty(const Board& board) {
     int penalty = 0; int sign = board.is_white_move ? 1 : -1; 
+    // eval at leaf node is called after move is made
     // white to move = black just move = penalty to black = add to eval
     // side to move is after move was made, so penalty is applied to previous player
     // so if player to move has positive SEE then piece is hanging
 
-    for (int piece = knight; piece <= queen; piece++) {
+    for (int piece = knight; piece <= queen; piece++) { // include pawns is heavy
         U64 bb = board.colorBitboards[1-board.move_color] & board.pieceBitboards[piece];
         while (bb) {
             int sq = __builtin_ctzll(bb);
             bb &= bb -1;
 
-            int see = SEE(board, sq, board.is_white_move);
+            int see = SEE(board /*-1, sq, board.is_white_move*/);
             if (see > 0) {
                 int value = pieceValues[piece];
                 penalty += sign*see;

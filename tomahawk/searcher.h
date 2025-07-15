@@ -27,6 +27,7 @@ struct SearchResult {
     Move bestMove;
     int eval;
     std::unordered_map<std::string, int> component_evals;
+    std::vector<Move> best_line;
 };
 
 class Searcher {
@@ -35,6 +36,7 @@ private:
     //std::vector<Move>* potential_moves;
 public:
     static constexpr int KILL_SEARCH_RETURN = -5*MATE_SCORE;
+    static constexpr int MAX_DELTA = 1000; // queen + pawn --- delta pruning in quiesence
 
     inline static bool stop = false; // this will be externally reset by the engine to kill search
     static int nodesSearched;
@@ -71,17 +73,19 @@ public:
         std::chrono::steady_clock::time_point start_time, 
         int time_limit_ms
     );*/
-    static int negamax( // not negated on return as usual as eval is side agnostic
+    static int minimax( // not negated on return as usual as eval is side agnostic
         Board& board, // so flip is performed in the return, not the call
         MoveGenerator& movegen, 
         Evaluator& evaluator, 
         int depth, 
         int alpha, int beta, // alpha beta pruning (will be swapped in func calls)
         std::vector<Move>& pv, // best_line
-        const std::vector<Move>& inputPV, // for passing through negamax recursion
-        int prev_evals[MAX_MOVES],
+        Move pvMove,
+        //const std::vector<Move>& inputPV, // for passing through negamax recursion
+        //int prev_evals[MAX_MOVES],
         std::chrono::steady_clock::time_point start_time, 
-        int time_limit_ms, bool& out_of_time
+        int time_limit_ms, bool& out_of_time,
+        bool quiesence
     );
     static int quiescence(
         Board& board,
@@ -89,33 +93,36 @@ public:
         MoveGenerator& movegen,
         int alpha, int beta,
         std::chrono::steady_clock::time_point start_time, 
-        int time_limit_ms
+        int time_limit_ms, bool& out_of_time
     );
 
     static int moveScore(
+        const Evaluator& evaluator, // for attacks like see/mvvlva
         const Move& move, 
         const Board& board, 
         int depth, 
         const Move& ttMove,
-        const Move& pvMove,
-        int prev_eval
+        const Move& pvMove
+        /*int prev_eval*/
     );
     static void orderedMoves(
+        const Evaluator& evaluator,
         Move moves[MAX_MOVES], 
         int count, 
         const Board& board, 
         int depth, 
-        const Move& pvMove,
-        int prev_eval[MAX_MOVES]
+        const Move& pvMove
+        //int prev_eval[MAX_MOVES]
     ); // order in place
 
     static int generateAndOrderMoves(
         Board& board, 
         MoveGenerator& movegen, 
+        const Evaluator& evaluator,
         Move moves[MAX_MOVES], 
         int depth,
-        const Move& pvMove,
-        int prev_eval[MAX_MOVES]
+        const Move& pvMove
+        //int prev_eval[MAX_MOVES]
     );
 };
 

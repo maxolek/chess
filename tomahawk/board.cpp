@@ -719,7 +719,7 @@ void Board::setBoardFEN() {
     fen += std::to_string(plyCount/2+1);
 }
 
-void Board::print_board() {
+void Board::print_board() const {
     // Create a character array to store the board representation
     char pieces[64]; 
 
@@ -771,7 +771,7 @@ void Board::print_board() {
     std::cout << "\n    a   b   c   d   e   f   g   h\n" << std::endl;
 
     // Print gamestate info
-    setBoardFEN();
+    //setBoardFEN();
     std::cout << fen << std::endl;
     std::cout << "\nMove: " << plyCount/2 << std::endl;
     std::cout << (is_white_move ? "White to move" : "Black to move") << std::endl;

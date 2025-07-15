@@ -8,256 +8,311 @@ std::unordered_map<U64, TTEntry> Searcher::tt;
 std::vector<Move> Searcher::best_line;
 
 
-SearchResult Searcher::search(Board& board, MoveGenerator& movegen, Evaluator& evaluator, Move legal_moves[MAX_MOVES], int count, int depth, Move pvMove, std::chrono::steady_clock::time_point start_time, int time_limit_ms) {
+SearchResult Searcher::search(Board& board, MoveGenerator& movegen, Evaluator& evaluator,
+                             Move legal_moves[MAX_MOVES], int count, int depth, Move pvMove,
+                             std::chrono::steady_clock::time_point start_time, int time_limit_ms) {
     bool out_of_time = false;
-    int bestEval = -MATE_SCORE;
-    int alpha = -MATE_SCORE; int beta = MATE_SCORE;
-    Move bestMove = legal_moves[0]; //Move::NullMove();
+   // int prev_evals[MAX_MOVES] = {};
+    int bestEval = board.is_white_move ? -MATE_SCORE : MATE_SCORE;
+    int alpha = -MATE_SCORE, beta = MATE_SCORE;
+    Move bestMove = count>0 ? legal_moves[0] : Move::NullMove();
     std::unordered_map<std::string, int> bestComponentEvals;
-    int prev_evals[MAX_MOVES];
     std::vector<Move> principalVariation;
     best_line.clear();
     nodesSearched = 0;
-    std::fill_n(prev_evals, MAX_MOVES, -MATE_SCORE);
 
-    for (int i = 0; i < count; i++) {
-        Move m =  legal_moves[i];
-        if (Move::SameMove(m, Move::NullMove())) {continue;} 
-        else {
-            board.MakeMove(m);
+    for (int i = 0; i < count; ++i) {
+        Move m = legal_moves[i];
+        if (Move::SameMove(m, Move::NullMove())) continue;
 
-            out_of_time = false;
-            std::vector<Move> childPV;
-            std::vector<Move> emptyPV;
-            int eval = -negamax(
-                board, movegen, evaluator,
-                depth - 1, 
-                -beta, -alpha, childPV, emptyPV, prev_evals,
-                start_time, time_limit_ms, out_of_time
-            );
+        board.MakeMove(m);
+        out_of_time = false;
 
-            board.UnmakeMove(m);;
+        std::vector<Move> childPV;
+        int eval = minimax(board, movegen, evaluator, depth - 1, alpha, beta, // false because now opponent to move
+                           childPV, pvMove, start_time, time_limit_ms, out_of_time,
+                             depth <= 4 ? false : true); // fine with using static for low depth to build TT and other stuff, since these depths should not be submitting moves anyway
 
-            prev_evals[i] = eval;
-            if (out_of_time) {
-                if (i > 0) break; // timeout after at least one good move: keep the best one
-                else return {Move::NullMove(), -100*MATE_SCORE, {}}; // first move timed out, return last iterations result
-            }
+        board.UnmakeMove(m);
 
-            if ((i == 0) || eval > bestEval) {
-                bestEval = eval;
-                bestMove = m;
-                //best_line[0] = m; // start tracking new best move
-                //for (int i = 1; i < MAX_DEPTH; i++) {if(Move::SameMove(tmp_best_line[i],Move(0))){break;} else {best_line[i] = tmp_best_line[i];}}
-                //bestComponentEvals = Evaluator::computeComponents(board);
-                // Set PV to current root move + line from deeper search
-                principalVariation.clear();
-                principalVariation.push_back(m);
-                principalVariation.insert(principalVariation.end(), childPV.begin(), childPV.end());
-                best_line = principalVariation;
-            }
+        if (out_of_time) {
+            if (i > 0) break; // timeout after at least one move searched
+            else return {Move::NullMove(), -100 * MATE_SCORE, {}};
+        }
 
-            // update alpha/beta as usual if you want iterative deepening with pruning here
-            alpha = std::max(alpha, eval);
+        if (i == 0 || 
+            (board.is_white_move && eval > bestEval) || 
+            (!board.is_white_move && eval < bestEval)) {
 
-            // check time
-            auto current_time = std::chrono::steady_clock::now();
-            int elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - start_time).count();
-            // if  evaluating prev search best move first then we can still return the best move
-            if (elapsed_ms >= time_limit_ms && i>0) {out_of_time = true; break;}//{bestMove = Move::NullMove(); break;}
+            bestEval = eval;
+            bestMove = m;
+
+            principalVariation.clear();
+            principalVariation.push_back(m);
+            principalVariation.insert(principalVariation.end(), childPV.begin(), childPV.end());
+            best_line = principalVariation;
+        }
+
+
+        if (board.is_white_move) alpha = std::max(alpha, eval);
+        else beta = std::min(beta, eval);
+
+
+        // check time
+        auto current_time = std::chrono::steady_clock::now();
+        int elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - start_time).count();
+        if (elapsed_ms >= time_limit_ms && i > 0) {
+            out_of_time = true;
+            break;
         }
     }
 
-    return {bestMove, board.is_white_move ? bestEval : -bestEval, bestComponentEvals};
+    return {bestMove, bestEval, bestComponentEvals, best_line};
 }
 
-int Searcher::negamax(Board& board, MoveGenerator& movegen, Evaluator& evaluator, int depth, int alpha, int beta, std::vector<Move>& pv, const std::vector<Move>& nextPV,
-                         int prev_eval[MAX_MOVES], std::chrono::steady_clock::time_point start_time, int time_limit_ms, bool &out_of_time) {
-    
-                        //if (out_of_time) return bestEval;
+
+int Searcher::minimax(Board& board, MoveGenerator& movegen, Evaluator& evaluator,
+                      int depth, int alpha, int beta,
+                      std::vector<Move>& pv, Move pvMove,
+                      //int prev_evals[MAX_MOVES],
+                      std::chrono::steady_clock::time_point start_time, int time_limit_ms,
+                      bool &out_of_time, bool use_quiesence) {
     nodesSearched++;
-    int eval;
-    int local_prev_eval[MAX_MOVES] = {};
-    int bestEval = -MATE_SCORE;
-    bool foundMove = false;
-    //std::fill_n(tmp_best_line, MAX_DEPTH, Move(0));
-    //Result result = Arbiter::GetGameState(&board);
+    bool isWhiteToMove = board.is_white_move;
 
-    if (depth == 0 /*|| result != InProgress*/) {
-        //movegen.mobility(&board); // doubles some key perft position depth5 times, not worth eval increase
-        // but there is potential for these pseudo legal moves to be a part of regular movegeneration so 
-        // mobility is calculated en-route
-        pv = {}; // leaf node = no children
-        //eval = evaluator.taperedEval(&board);
-        eval = quiescence(board, evaluator, movegen, alpha, beta, start_time, time_limit_ms);
-        return board.is_white_move ? eval : -eval; // eval is side to move agnostic but negamax
-    }                                              // returns the eval from the perspective of side to move
+    if (depth == 0) {
+        int eval; pv.clear();
 
-    //if ((nodesSearched & 1023) == 0) {
-        auto now = std::chrono::steady_clock::now();
-        if (std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count() >= time_limit_ms) {
-            out_of_time = true;
-            if (foundMove) return bestEval;
-            else return alpha; // best lower bound ("no better eval found")
-            //return bestEval;
-        }
-    //}
-    
-    int alphaOrig = alpha;  // Save original alpha before searching
+        if (use_quiesence) eval = quiescence(board, evaluator, movegen, alpha, beta, start_time, time_limit_ms, out_of_time);
+        else eval = evaluator.taperedEval(&board);
+        //int eval = evaluator.taperedEval(&board);
+        return eval;
+    }
+
+    auto now = std::chrono::steady_clock::now();
+    if (std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count() >= time_limit_ms) {
+        out_of_time = true;
+        return isWhiteToMove ? alpha : beta;
+    }
+
+    int alphaOrig = alpha;
     U64 hash = board.zobrist_hash;
-    // Lookup TT entry
     auto tt_it = tt.find(hash);
     if (tt_it != tt.end()) {
         const TTEntry& entry = tt_it->second;
         if (entry.depth >= depth) {
             if (entry.flag == EXACT) return entry.eval;
-            if (entry.flag == LOWERBOUND && entry.eval >= beta) return  entry.eval; // cutoff- fail hard beta
-            if (entry.flag == UPPERBOUND && entry.eval <= alpha) return entry.eval; // cutoff- fail soft alpha
+            if (entry.flag == LOWERBOUND && entry.eval >= beta) return entry.eval;
+            if (entry.flag == UPPERBOUND && entry.eval <= alphaOrig) return entry.eval;
         }
     }
 
-    Move next_moves[MAX_MOVES]; 
-    Move tt_move = Move(0); Move pvMove = (!pv.empty( )) ? pv[0] : Move::NullMove();
-    int flipped_prev_eval[MAX_MOVES];
-    for (int i = 0; i < MAX_MOVES; i++) {flipped_prev_eval[i] = -prev_eval[i];}
-    int count = generateAndOrderMoves(board, movegen, next_moves, depth, pvMove, flipped_prev_eval);
-    // terminal eval check (rather than using arbiter and generating "twice")
-    if (count == 0) { 
-        if (board.is_in_check) {return -(MATE_SCORE - depth);}
-        else {return 0;}
-    }
-    
-    for (int i = 0; i < count; i++) {
-        Move m = next_moves[i];
-        if (Move::SameMove(m, Move::NullMove())) {continue;} 
-        else {
-            board.MakeMove(m);
+    Move moves[MAX_MOVES];
+    Move ttMove = Move::NullMove();
+    int count = generateAndOrderMoves(board, movegen, evaluator, moves, depth, pvMove);
 
-            std::vector<Move> childPV;
-            std::vector<Move> childNextPV; 
-            if (pv.size() >= 1 && Move::SameMove(m, pv[0])) {childNextPV.insert(childNextPV.end(), pv.begin() + 1, pv.end());}
-            eval = -negamax(board, movegen, evaluator, depth - 1, -beta, -alpha, childPV, childNextPV, local_prev_eval,
-                start_time, time_limit_ms, out_of_time);
-            //if (m.MoveFlag() == Move::castleFlag) {eval += 50;} // bias castling
-            //if (depth-1 % 2 == 0 && board.currentGameState.capturedPieceType > 0 && board.getMovedPiece(m.TargetSquare()) == 0) {
-            // discourage getting captured by pawn (bandaid)
-            //    eval -= 150;
-            //}
-            foundMove = true;
-            
-            board.UnmakeMove(m);
+    if (count == 0) {
+        if (board.is_in_check) {
+            return isWhiteToMove ? -(MATE_SCORE - depth) : (MATE_SCORE - depth);
+        } else {
+            return 0;
+        }
+    } else {count = std::min(MAX_MOVES, count);}
 
-            local_prev_eval[i] = eval;
+    int bestEval = isWhiteToMove ? -MATE_SCORE : MATE_SCORE;
+    bool foundMove = false; int score;
+    int seeScore; bool prune = false;
 
-            if (eval > bestEval) { // check if first move, forcing pv/best_eval to update
-                bestEval = eval;
-                tt_move = m;
-                // build PV
+    for (int i = 0; i < count; ++i) {
+        Move m = moves[i];
+        if (Move::SameMove(m, Move::NullMove())) continue;
+
+        board.MakeMove(m);
+
+        if (board.hash_history[board.zobrist_hash] >= 3) {board.UnmakeMove(m); return 0;} // threefold
+
+        // Prune bad captures: if capture and not in check, run SEE
+        prune = false;
+        if (depth == 1 && board.currentGameState.capturedPieceType > -1 && !board.is_in_check) {
+            int seeScore = evaluator.SEE(board);
+            if (seeScore < 0) prune = true;
+        }
+
+        std::vector<Move> childPV;
+        if (!prune) {
+            score = minimax(board, movegen, evaluator, depth - 1, alpha, beta, childPV, m,
+                                start_time, time_limit_ms, out_of_time, use_quiesence);
+            }
+
+        board.UnmakeMove(m);
+
+        if (out_of_time) break;
+
+        foundMove = true;
+
+        if (isWhiteToMove) {
+            if (score > bestEval) {
+                bestEval = score;
+                ttMove = m;
                 pv.clear();
                 pv.push_back(m);
                 pv.insert(pv.end(), childPV.begin(), childPV.end());
             }
-
-            if (out_of_time) break;
-
-            alpha = std::max(alpha, eval);
-            if (alpha >= beta) {
-                if (board.getCapturedPiece(m.TargetSquare()) == -1) {  // quiet move
-                    if (!Move::SameMove(killerMoves[depth][0], m)) {
-                        killerMoves[depth][1] = killerMoves[depth][0];
-                        killerMoves[depth][0] = m;
-                    }
-
-                    int piece = board.getMovedPiece(m.StartSquare());
-                    historyHeuristic[board.is_white_move ? piece : piece+6][m.TargetSquare()] += depth * depth;
-                }
-                break;
+            alpha = std::max(alpha, bestEval);
+        } else {
+            if (score < bestEval) {
+                bestEval = score;
+                ttMove = m;
+                pv.clear();
+                pv.push_back(m);
+                pv.insert(pv.end(), childPV.begin(), childPV.end());
             }
+            beta = std::min(beta, bestEval);
+        }
+
+        if (beta <= alpha) {
+            // killer moves NOTS
+            if (!((Move::SameMove(killerMoves[depth][0], m)) // stored killer move
+                || ((1ULL << m.TargetSquare()) & board.colorBitboards[1-board.move_color]) // capture
+                || (m.IsPromotion()))) { // promotion
+                killerMoves[depth][1] = killerMoves[depth][0];
+                killerMoves[depth][0] = m;
+            }
+
+            int piece = board.getMovedPiece(m.StartSquare());
+            historyHeuristic[board.is_white_move ? piece : piece+6][m.TargetSquare()] += depth * depth;
+
+            break;
         }
     }
 
-    // Store result in TT
+    if (!foundMove) return evaluator.taperedEval(&board);
+
     TTEntry newEntry;
-    newEntry.eval = board.is_white_move ? bestEval : -bestEval; // store as whites perspective
-    newEntry.bestMove = tt_move;
+    newEntry.eval = bestEval;
+    newEntry.bestMove = ttMove;
     newEntry.depth = depth;
-    // Set flag based on alpha-beta bounds logic (EXACT, LOWERBOUND, UPPERBOUND)
     if (bestEval <= alphaOrig) newEntry.flag = UPPERBOUND;
     else if (bestEval >= beta) newEntry.flag = LOWERBOUND;
     else newEntry.flag = EXACT;
+    // only update if depth is better
+    auto it = tt.find(hash);
+    if (it == tt.end() || it->second.depth <= depth) {
+        tt[hash] = newEntry;
+    }
 
-    tt[hash] = newEntry;
 
     return bestEval;
 }
 
-// extends search for noisy positions
-int Searcher::quiescence(Board& board, Evaluator& evaluator, MoveGenerator& movegen, int alpha, int beta, std::chrono::steady_clock::time_point start_time, int time_limit_ms) {
+int Searcher::quiescence(Board& board, Evaluator& evaluator, MoveGenerator& movegen,
+                         int alpha, int beta,
+                         std::chrono::steady_clock::time_point start_time, int time_limit_ms, bool& out_of_time) {
     nodesSearched++;
 
+    bool isWhiteToMove = board.is_white_move;
+
+    bool isCapture = board.currentGameState.capturedPieceType > -1;
+    bool isPromo = !board.allGameMoves.empty() && board.allGameMoves.back().IsPromotion();
+    bool inCheck = board.is_in_check;
+
     int standPat = evaluator.taperedEval(&board);
+
     if (standPat >= beta) return beta;
     if (standPat > alpha) alpha = standPat;
 
-    Move allMoves[MAX_MOVES];
-    int moveCount = movegen.generateMovesList(&board, allMoves);
+    if (!inCheck && standPat + MAX_DELTA < alpha) return alpha; // delta pruning
 
-    for (int i = 0; i < moveCount; ++i) {
-        Move move = allMoves[i];
+    // If no tactical reason to search deeper, just return standPat
+    bool interesting = isCapture || isPromo || inCheck;
+    if (!interesting) return standPat;
 
+    Move moves[MAX_MOVES];
+    int moveCount = movegen.generateMovesList(&board, moves);
+    moveCount = std::min(MAX_MOVES, moveCount);
+
+    if (moveCount == 0) {
+        if (inCheck) {
+            return isWhiteToMove ? -MATE_SCORE : MATE_SCORE;
+        } else {
+            return standPat;  // no moves, no check => quiet position
+        }
+    }
+
+    // Filter: only captures, promotions, and evasions
+    Move interesting_moves[MAX_MOVES];
+    int filteredCount = 0;
+    for (int i = 0; i < moveCount; i++) {
+        if (board.getCapturedPiece(moves[i].TargetSquare()) != -1 || moves[i].IsPromotion() || inCheck) {
+            interesting_moves[filteredCount++] = moves[i];
+        }
+    }
+
+    if (filteredCount == 0) return standPat; // no interesting moves
+
+    filteredCount = std::min(filteredCount, MAX_MOVES);
+
+    for (int i = 0; i < filteredCount; i++) {
+        Move move = interesting_moves[i];
+
+        // Make move to check SEE on captures
         board.MakeMove(move);
 
-        // skip non-focus moves  + bad captures
-        bool isCapture = board.currentGameState.capturedPieceType > -1;
-        bool isPromo   = move.IsPromotion();
-        bool inCheck   = board.is_in_check;
-
-        bool interesting = isCapture || isPromo || inCheck;
-        bool badCapture  = isCapture && Evaluator::SEE(board, move.TargetSquare(), board.is_white_move) > 0;
-
-        if (!interesting || badCapture) {
-            board.UnmakeMove(move);
-            continue;
+        // Prune bad captures: if capture and not in check, run SEE
+        bool prune = false;
+        if (board.currentGameState.capturedPieceType > -1 && !board.is_in_check) {
+            int seeScore = evaluator.SEE(board);
+            if (seeScore < 0) prune = true;
         }
 
-
-        int score = -quiescence(board, evaluator, movegen, -beta, -alpha, start_time, time_limit_ms);
+        int score = 0;
+        if (!prune) {
+            score = quiescence(board, evaluator, movegen, alpha, beta,
+                               start_time, time_limit_ms, out_of_time);
+        }
 
         board.UnmakeMove(move);
+
+        if (prune) continue;  // skip bad capture
 
         if (score >= beta) return beta;
         if (score > alpha) alpha = score;
 
-        // check time
         auto current_time = std::chrono::steady_clock::now();
         int elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - start_time).count();
-        // if  evaluating prev search best move first then we can still return the best move
-        if (elapsed_ms >= time_limit_ms && i>0) {break;}//{bestMove = Move::NullMove(); break;}
+        if (elapsed_ms >= time_limit_ms && i > 0) {
+            out_of_time = true;
+            break;
+        }
     }
 
     return alpha;
 }
 
+
+
 // call before makeMove()
-int Searcher::moveScore(const Move& move, const Board& board, int depth, const Move& ttMove, const Move& pvMove, int prev_eval) {
+int Searcher::moveScore(const Evaluator& evaluator, const Move& move, const Board& board, int depth, const Move& ttMove, const Move& pvMove/*, int prev_eval*/) {
     // TT move
     // movegen count solves pvMove null move concern
     if (Move::SameMove(pvMove, move)) return MATE_SCORE + 500;
     if (Move::SameMove(ttMove, move)) return MATE_SCORE + 100;
 
-    // Captures — MVV-LVA
+    // MVV-LVA (hyeristic for all captures)
     if (board.getCapturedPiece(move.TargetSquare()) != -1) {
-        int attacker = board.getMovedPiece(move.StartSquare());
-        int victim = board.getMovedPiece(move.TargetSquare());
-        return MATE_SCORE + 10 * Evaluator::pieceValues[victim] - Evaluator::pieceValues[attacker];
+        int score = 100000 + evaluator.mvvLvaTable[board.getCapturedPiece(move.TargetSquare())][board.getMovedPiece(move.StartSquare())];
+        return score;
     }
-    // Catpures - SEE
+    // Captures — SEE
+    /*
     if (board.getCapturedPiece(move.TargetSquare()) != -1) {
-        int seeScore = Evaluator::SEE(board, move.TargetSquare(), board.is_white_move);
-        if (seeScore < 0) {
-            return -999999; // Bad trade, heavily deprioritize
+        int seeScore = Evaluator::SEE(board);
+        if (seeScore < 0)
+            return -999999; // bad capture
+        else
+            return MATE_SCORE + seeScore;
     }
-    }
+ */
 
     // Killer moves
     if (Move::SameMove(killerMoves[depth][0], move)) return MATE_SCORE - 500;
@@ -269,7 +324,7 @@ int Searcher::moveScore(const Move& move, const Board& board, int depth, const M
 }
 
 
-void Searcher::orderedMoves(Move moves[MAX_MOVES], int count, const Board& board, int depth, const Move& pvMove, int prev_eval[MAX_MOVES]) {
+void Searcher::orderedMoves(const Evaluator& evaluator, Move moves[MAX_MOVES], int count, const Board& board, int depth, const Move& pvMove) {
     U64 hash = board.zobrist_hash;
     Move ttMove = Move::NullMove();
 
@@ -281,7 +336,7 @@ void Searcher::orderedMoves(Move moves[MAX_MOVES], int count, const Board& board
     std::vector<std::pair<int, Move>> scored;
 
     for (int i = 0; i < count; ++i) {
-        int score = moveScore(moves[i], board, depth, ttMove, pvMove, prev_eval[i]);
+        int score = moveScore(evaluator, moves[i], board, depth, ttMove, pvMove/*,prev_eval[i]*/);
         scored.emplace_back(score, moves[i]);
     }
 
@@ -294,8 +349,9 @@ void Searcher::orderedMoves(Move moves[MAX_MOVES], int count, const Board& board
     }
 }
 
-int Searcher::generateAndOrderMoves(Board& board, MoveGenerator& movegen, Move moves[MAX_MOVES], int depth, const Move& pvMove, int prev_eval[MAX_MOVES]) {
+int Searcher::generateAndOrderMoves(Board& board, MoveGenerator& movegen, const Evaluator& evaluator, Move moves[MAX_MOVES], int depth, const Move& pvMove) {
     int count = movegen.generateMovesList(&board, moves);
-    orderedMoves(moves, count, board, depth, pvMove, prev_eval);
+    count = std::min(MAX_MOVES, count);
+    orderedMoves(evaluator, moves, count, board, depth, pvMove);
     return count;
 }

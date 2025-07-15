@@ -16,9 +16,6 @@ private:
     Move ponderMove;
     int search_depth;
     int time_left[2], increment[2]; //white,black
-
-    // internal helpers
-    void iterativeDeepening(SearchSettings settings);
     
 public:
     std::unique_ptr<MoveGenerator> movegen;
@@ -69,6 +66,8 @@ public:
     int computeSearchTime(SearchSettings settings);
 
     // best moves
+    void iterativeDeepening(SearchSettings settings);
+    
     Move getBestMove( Board& board); // move obj
     std::string getBestMoveUCI( Board& board); // uci
     // above are not const args as engine will reference game.cpp

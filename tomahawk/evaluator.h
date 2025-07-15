@@ -27,6 +27,10 @@ public:
     // pawn knight bishop rook queen
     // piece positions
 
+    // attack tables (like see)
+    static int mvvLvaTable[6][6]; // viction/attacker higher is better
+    static void initMVVLVA();
+
     // Load PST from file: 6 pieces, 64 squares each
     static bool loadPST(const std::string& filename, int pst[6][64]);
     static int PST_opening[6][64]; static int PST_endgame[6][64];
@@ -70,6 +74,7 @@ public:
     // tapered eval
     static int gamePhase(const Board* position); // 0->256 desc based on captured pieces
     static int taperedEval(const Board* board); // get eval of board
+    static int taperedEval(const Board* board, int SEE); // SEE is expense, if known pass through
     static int taperedEval(const Board* board, Result result); // get eval during search 
     static int openingEval(const Board* board);
     static int endgameEval(const Board* board);
@@ -88,8 +93,8 @@ public:
     static int earlyQueenPenalty(const Board& board); // penalty based on other piece development
     static int castleBias(const Board& board); // increase eval for castle moves
 
-    // static exchange evaluation - run through exchanges on a square and see results
-    static int SEE(const Board& board, int sq, bool white);
+    // static exchange evaluation - run through exchanges on a square and see results (after capture)
+    static int SEE(const Board& board);
     static int hangingPiecePenalty(const Board& board); // loop through pieces to see whats hanging via SEE
     static U64 attackersTo(const Board& board, int sq, bool white, U64 occ); // get all attackers to a square
     // pawns

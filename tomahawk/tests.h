@@ -421,20 +421,26 @@ public:
     // eval tests
     void SEETest() {
         struct SEETestCase {
-            std::string fen; int targetSquare; bool usWhite; int expectedSEE;
+            std::string fen; Move init_move; bool usWhite; int expectedSEE;
         };
 
         std::vector<SEETestCase> cases = {
         // Queen captures defended pawn
         //{"4k3/8/8/8/4q3/8/4P3/4K3 w - - 0 1", e2, false, -800},
         // Balanced exchange on f6: knight captures defended knight
-        {"8/4k3/5n2/8/4N3/8/8/4K3 w - - 0 1", f6, true, 0},
+        {"8/4k3/5n2/8/4N3/8/8/4K3 w - - 0 1", Move(e4,f6), true, 0},
         // Pawn captures knight (no recapture)
-        {"4k3/8/8/5n2/4P3/8/8/4K3 w - - 0 1", f5, true, 300},
+        {"4k3/8/8/5n2/4P3/8/8/4K3 w - - 0 1", Move(e4,f5), true, 320},
         // Defended bishop: queen captures and gets recaptured
-        {"4k3/8/4p3/3b4/4Q3/8/8/4K3 w - - 0 1", d5, true, -600},
+        {"4k3/8/4p3/3b4/4Q3/8/8/4K3 w - - 0 1", Move(e4,d5), true, -550},
         // King captures hanging rook
-        {"4k3/8/8/8/4r3/3K4/8/8 w - - 0 1", e4, true, 500},
+        {"4k3/8/8/8/4r3/3K4/8/8 w - - 0 1", Move(d3,e4), true, 500},
+        // leaf node rogue capture
+        {"rnb1kbnr/1p2pppp/p7/6B1/3pN3/8/PPP2PPP/R3KBNR w KQkq - 0 7", Move(f1,a6), true, -250},
+        // protected from king 
+        {"4k2r/4pp1p/8/p4b2/Nn6/4P2P/PPP5/2KR4 b - - 0 29", Move(f5,c2), false, 100},
+        // easy recapture 
+        {"3k1b1r/4pppp/1N3n2/p4b2/3Pq3/2Q1B2P/PPP2P2/2KR2R1 w - - 1 20", Move(g1,g7), true, -400}
         // losing long
         //{"rnbqkb1r/p1p2ppp/5n2/3pp1N1/4P3/2NP4/PPP1QPPP/R1B1KB1R b KQkq - 0 1", e4, false, -220},
         // Long exchange
@@ -444,14 +450,65 @@ public:
         std::cout << "====================\nSEE Test Suite\n====================\n";
         for (size_t i = 0; i < cases.size(); ++i) {
             setBoard(cases[i].fen);
-            int result = Evaluator::SEE(board, cases[i].targetSquare, cases[i].usWhite);
+            board.MakeMove(cases[i].init_move);
+
+            int result = Evaluator::SEE(board);
 
             std::cout << "Test Case " << i + 1 << ": " << cases[i].fen << "\n";
-            std::cout << "Target Square: " << square_to_algebraic(cases[i].targetSquare) << "\n\n";
+            std::cout << "Target Square: " << square_to_algebraic(cases[i].init_move.TargetSquare()) << "\n\n";
             std::cout << "SEE: " << result << "\tExpected: " << cases[i].expectedSEE << "\t";
             std::cout << ((result == cases[i].expectedSEE) ? "[PASS]" : "[FAIL]") << "\n";
             std::cout << "----------------------------------------\n";
+
+            board.UnmakeMove(cases[i].init_move);
         }
+    }
+
+    void evalTest(std::string fen) {
+        Evaluator evaluator = Evaluator();
+        setBoard(fen);
+        board.allGameMoves.push_back(Move(0)); // castling bias errors out without a movelist
+
+        if (!evaluator.loadPST("C:/Users/maxol/code/chess/bin/pst_opening.txt", evaluator.PST_opening)) {
+            std::cerr << "failed to load opening pst" << std::endl;
+        }
+        if (!evaluator.loadPST("C:/Users/maxol/code/chess/bin/pst_endgame.txt", evaluator.PST_endgame)) {
+            std::cerr << "failed to load endgame pst" << std::endl;
+        }
+
+        board.print_board();
+
+        // main eval
+        int material = evaluator.materialDifferences(board);
+        int pawnStruct = evaluator.pawnStructureDifferences(board);
+        int pass_pawn = evaluator.passedPawnDifferences(board);
+        int cent_cntrl = evaluator.centerControlDifferences(board);
+        //int mobility = evaluator.mobilityDifferences(movegen);
+        int posDiff_open = evaluator.positionDifferences(board, evaluator.PST_opening);
+        int posDiff_end = evaluator.positionDifferences(board, evaluator.PST_endgame);
+        int phase = evaluator.gamePhase(&board);
+
+        // adjustments
+        int mop_up = board.pieceBitboards[0] == 0 ? evaluator.mopUp(board) : 0;
+        int early_queen = evaluator.gamePhase(&board) <= 128 ? evaluator.earlyQueenPenalty(board) : 0;
+        int hanging_pieces = evaluator.hangingPiecePenalty(board);
+        //int castle_bias = evaluator.castleBias(board);
+
+        std::cout << "Material:       " << material << "\n";
+        std::cout << "Pawn Structure: " << pawnStruct << "\n";
+        std::cout << "Passed Pawns: " << pass_pawn << "\n";
+        std::cout << "Center Control: " << cent_cntrl << "\n";
+        //std::cout << "Mobility:       " << mobility << "\n";
+        std::cout << "Piece Position (open / end): " << posDiff_open << " / " << posDiff_end << "\n\n";
+        std::cout << "Phase: " << phase << "\n";
+        std::cout << "Early Queen Penalty: " << early_queen << "\n";
+        std::cout << "Hanging Pieces Penalty: " << hanging_pieces << "\n";
+
+
+        int totalEval = evaluator.taperedEval(&board);
+        std::cout << "Total Eval:     " << totalEval << "\n";
+        std::cout << "-----------------------------------\n";
+
     }
     
 
