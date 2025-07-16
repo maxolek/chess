@@ -217,6 +217,7 @@ int Searcher::quiescence(Board& board, Evaluator& evaluator, MoveGenerator& move
     bool inCheck = board.is_in_check;
 
     int standPat = evaluator.taperedEval(&board);
+    int bestEval = standPat;
 
     if (standPat >= beta) return beta;
     if (standPat > alpha) alpha = standPat;
@@ -265,7 +266,7 @@ int Searcher::quiescence(Board& board, Evaluator& evaluator, MoveGenerator& move
             if (seeScore < 0) prune = true;
         }
 
-        int score = 0;
+        int score = bestEval;
         if (!prune) {
             score = quiescence(board, evaluator, movegen, alpha, beta,
                                start_time, time_limit_ms, out_of_time);
@@ -276,7 +277,10 @@ int Searcher::quiescence(Board& board, Evaluator& evaluator, MoveGenerator& move
         if (prune) continue;  // skip bad capture
 
         if (score >= beta) return beta;
-        if (score > alpha) alpha = score;
+        if (score > bestEval) {
+            bestEval = score;
+            alpha = std::max(alpha, score);
+        }
 
         auto current_time = std::chrono::steady_clock::now();
         int elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - start_time).count();
@@ -286,7 +290,7 @@ int Searcher::quiescence(Board& board, Evaluator& evaluator, MoveGenerator& move
         }
     }
 
-    return alpha;
+    return bestEval;
 }
 
 
