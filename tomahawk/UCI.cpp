@@ -37,7 +37,7 @@ void UCI::handleCommand(const std::string& line) {
             std::cout << "id author maxolek\n";
             std::cout << "option name Move Overhead type spin default 30 min 0 max 1000\n";
             std::cout << "option name Hash type spin default 16 min 1 max 1024\n";
-            std::cout << "option name Threads type spin default 1 min 1 max 128\n";
+            std::cout << "option name Threads type spin default 4 min 1 max 128\n";
             std::cout << "option name Ponder type check default false\n";
             // Required for lichess
             std::cout << "option name UCI_ShowWDL type check default false" << std::endl;

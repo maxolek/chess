@@ -6,6 +6,8 @@ Move Searcher::killerMoves[64][2] = {};             // Assuming max search depth
 int Searcher::nodesSearched = 0;
 std::unordered_map<U64, TTEntry> Searcher::tt;
 std::vector<Move> Searcher::best_line;
+std::vector<Move> Searcher::best_quiescence_line;
+int Searcher::quiesence_depth = 0;  int Searcher::max_q_depth = 0;
 
 
 SearchResult Searcher::search(Board& board, MoveGenerator& movegen, Evaluator& evaluator,
@@ -67,7 +69,7 @@ SearchResult Searcher::search(Board& board, MoveGenerator& movegen, Evaluator& e
         }
     }
 
-    return {bestMove, bestEval, bestComponentEvals, best_line};
+    return {bestMove, bestEval, bestComponentEvals, best_line, best_quiescence_line};
 }
 
 
@@ -83,7 +85,7 @@ int Searcher::minimax(Board& board, MoveGenerator& movegen, Evaluator& evaluator
     if (depth == 0) {
         int eval; pv.clear();
 
-        if (use_quiesence) eval = quiescence(board, evaluator, movegen, alpha, beta, start_time, time_limit_ms, out_of_time);
+        if (use_quiesence) eval = quiescence(board, evaluator, movegen, alpha, beta, pv, start_time, time_limit_ms, out_of_time);
         else eval = evaluator.taperedEval(&board);
         //int eval = evaluator.taperedEval(&board);
         return eval;
@@ -139,6 +141,7 @@ int Searcher::minimax(Board& board, MoveGenerator& movegen, Evaluator& evaluator
         }
 
         std::vector<Move> childPV;
+        score = bestEval; // pruned moves get skipped while old score is still present
         if (!prune) {
             score = minimax(board, movegen, evaluator, depth - 1, alpha, beta, childPV, m,
                                 start_time, time_limit_ms, out_of_time, use_quiesence);
@@ -206,9 +209,13 @@ int Searcher::minimax(Board& board, MoveGenerator& movegen, Evaluator& evaluator
 }
 
 int Searcher::quiescence(Board& board, Evaluator& evaluator, MoveGenerator& movegen,
-                         int alpha, int beta,
+                         int alpha, int beta, std::vector<Move>& pv,
                          std::chrono::steady_clock::time_point start_time, int time_limit_ms, bool& out_of_time) {
     nodesSearched++;
+
+    if (board.getBoardFEN() == "r2qkb1r/pppb1Bpp/2np1n2/4p3/4P3/2N2N2/PPPP1PPP/R1BQ1RK1 b kq - 0 6") {
+        board.print_board();
+    }
 
     bool isWhiteToMove = board.is_white_move;
 
@@ -218,6 +225,8 @@ int Searcher::quiescence(Board& board, Evaluator& evaluator, MoveGenerator& move
 
     int standPat = evaluator.taperedEval(&board);
     int bestEval = standPat;
+    int score; bool prune;
+    int elapsed_ms;
 
     if (standPat >= beta) return beta;
     if (standPat > alpha) alpha = standPat;
@@ -226,7 +235,7 @@ int Searcher::quiescence(Board& board, Evaluator& evaluator, MoveGenerator& move
 
     // If no tactical reason to search deeper, just return standPat
     bool interesting = isCapture || isPromo || inCheck;
-    if (!interesting) return standPat;
+    if (!interesting) {pv.clear(); return standPat;}
 
     Move moves[MAX_MOVES];
     int moveCount = movegen.generateMovesList(&board, moves);
@@ -252,27 +261,31 @@ int Searcher::quiescence(Board& board, Evaluator& evaluator, MoveGenerator& move
     if (filteredCount == 0) return standPat; // no interesting moves
 
     filteredCount = std::min(filteredCount, MAX_MOVES);
+    std::vector<Move> childPV;
 
     for (int i = 0; i < filteredCount; i++) {
         Move move = interesting_moves[i];
 
         // Make move to check SEE on captures
         board.MakeMove(move);
+        quiesence_depth++;
 
         // Prune bad captures: if capture and not in check, run SEE
-        bool prune = false;
+        prune = false;
         if (board.currentGameState.capturedPieceType > -1 && !board.is_in_check) {
             int seeScore = evaluator.SEE(board);
             if (seeScore < 0) prune = true;
         }
 
-        int score = bestEval;
+        score = bestEval;
         if (!prune) {
-            score = quiescence(board, evaluator, movegen, alpha, beta,
+            score = quiescence(board, evaluator, movegen, alpha, beta, childPV,
                                start_time, time_limit_ms, out_of_time);
         }
 
         board.UnmakeMove(move);
+        max_q_depth = std::max(max_q_depth, quiesence_depth);
+        quiesence_depth=0;
 
         if (prune) continue;  // skip bad capture
 
@@ -280,10 +293,14 @@ int Searcher::quiescence(Board& board, Evaluator& evaluator, MoveGenerator& move
         if (score > bestEval) {
             bestEval = score;
             alpha = std::max(alpha, score);
+            pv.clear();
+            pv.push_back(move);
+            pv.insert(pv.end(), childPV.begin(), childPV.end());
+            best_quiescence_line = childPV;
         }
 
         auto current_time = std::chrono::steady_clock::now();
-        int elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - start_time).count();
+        elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - start_time).count();
         if (elapsed_ms >= time_limit_ms && i > 0) {
             out_of_time = true;
             break;

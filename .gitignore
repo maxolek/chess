@@ -16,6 +16,9 @@ settings.json
 *.txt
 *.pgn
 
+# ignore helper files
+*.bin
+
 # ignore object files
 *.o
 

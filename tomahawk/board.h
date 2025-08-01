@@ -83,6 +83,8 @@ public:
     int getSideAt(int square) const;
     int getPieceAt(int square, int side) const; 
 
+    bool canEnpassantCapture(int epFile) const;
+
     void updateFiftyMoveCounter(int moved_piece, bool isCapture, bool unmake);
 
     // called before side-to-move is updated
