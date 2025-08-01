@@ -8,10 +8,22 @@
 #include "moveGenerator.h"
 #include "arbiter.h"
 #include "Searcher.h"
+#include "msc_ver.h"
+
+struct BookEntry { // opening book
+    U64 key;
+    uint16_t move;
+};
 
 class Engine {
 private:
     PrecomputedMoveData precomp = PrecomputedMoveData();
+    std::unordered_map<U64, uint16_t> book;
+    int polyglotPieceIndex(int piece, bool isWhite);
+    U64 polyglotKey(const Board& board);
+    void loadOpeningBook(const std::string& filename);
+    Move bookMoveFromEncoded(uint16_t m);
+    Move getBookMove(const Board& board);
     
     Move ponderMove;
     int search_depth;
@@ -81,8 +93,9 @@ public:
 
     // logging
     void logSearchDepthInfo(
-        int depth, Move bestMove, std::vector<Move> best_line, int eval, int elapsed_ms,
-        std::string file_path = "C:/Users/maxol/code/chess/search_depth_eval.txt"
+        int depth, int quiesence_depth, Move bestMove, 
+        std::vector<Move> best_line, std::vector<Move> best_quiescence_line, int eval, 
+        int elapsed_ms, std::string file_path = "C:/Users/maxol/code/chess/search_depth_eval.txt"
     );
 };
 

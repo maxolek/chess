@@ -508,6 +508,24 @@ int Board::getPieceAt(int square, int side) const {
     return -1;
 }
 
+bool Board::canEnpassantCapture(int epFile) const {
+    if (epFile < 0 || epFile > 7) return false;
+
+    U64 epMask = 0ULL;
+    if (is_white_move) {
+        // Look for white pawns on rank 5 (square indices 32–39)
+        if (epFile > 0) epMask |= (1ULL << (32 + epFile - 1)); // pawn on left
+        if (epFile < 7) epMask |= (1ULL << (32 + epFile + 1)); // pawn on right
+        return (pieceBitboards[1] & colorBitboards[0] & epMask) != 0; // white pawn
+    } else {
+        // Look for black pawns on rank 4 (square indices 24–31)
+        if (epFile > 0) epMask |= (1ULL << (24 + epFile - 1));
+        if (epFile < 7) epMask |= (1ULL << (24 + epFile + 1));
+        return (pieceBitboards[1] & colorBitboards[1] & epMask) != 0; // black pawn
+    }
+}
+
+
 void Board::updateFiftyMoveCounter(int moved_piece, bool isCapture, bool unmake) {
     if (isCapture || moved_piece == pawn) {
         currentGameState.fiftyMoveCounter = 0;

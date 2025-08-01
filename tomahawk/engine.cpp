@@ -34,7 +34,6 @@ void Engine::clearState() {
     time_left[0] = time_left[1] = 0;
     increment[0] = increment[1] = 0;
     evaluator = Evaluator(&precomp);
-    Magics::initMagics();
 }
 
 void Engine::setOption(const std::string& name, const std::string& value) {
@@ -69,7 +68,87 @@ void Engine::setOption(const std::string& name, const std::string& value) {
     }
 }
 
+int Engine::polyglotPieceIndex(int piece, bool isWhite) {
+    // piece: 1 = Pawn, 2 = Knight, ..., 6 = King
+    // isWhite: true for white, false for black
+    if (piece < 1 || piece > 6) return -1; // invalid piece
 
+    return (isWhite ? 0 : 6) + (piece - 1);
+}
+
+
+U64 Engine::polyglotKey(const Board& board) {
+    U64 key = 0ULL;
+
+    // For each square, XOR the piece key if occupied
+    for (int sq = 0; sq < 64; ++sq) {
+        int piece = board.getMovedPiece(sq); // your method to get piece or 0 if empty
+
+        if (piece != 0) {
+            bool isWhite = board.colorBitboards[0] & (1ULL << sq);  // your method for color
+            int index = polyglotPieceIndex(piece, isWhite);
+            key ^= polyglotRandom[sq * 12 + index];
+        }
+    }
+
+    // Castling rights
+    // For each possible right (WKS, WQS, BKS, BQS)
+    if (board.currentGameState.HasKingsideCastleRight(true))  key ^= polyglotRandom[768];
+    if (board.currentGameState.HasQueensideCastleRight(true)) key ^= polyglotRandom[769];
+    if (board.currentGameState.HasKingsideCastleRight(false))  key ^= polyglotRandom[770];
+    if (board.currentGameState.HasQueensideCastleRight(false)) key ^= polyglotRandom[771];
+
+    // En passant file (only if there is a pawn on the 5th rank that can capture)
+    int epFile = board.currentGameState.enPassantFile; // -1 if none, else 0..7
+    if (epFile != -1) {
+        // Only XOR if there is a pawn that can capture en passant on that file
+        // (polyglot spec requires this)
+        if (board.canEnpassantCapture(epFile)) {
+            key ^= polyglotRandom[772 + epFile];
+        }
+    }
+
+    // Side to move
+    if (!board.is_white_move) {
+        key ^= polyglotRandom[780];
+    }
+
+    return key;
+}
+
+void Engine::loadOpeningBook(const std::string& filename) {
+    std::ifstream file(filename, std::ios::binary);
+    if (!file) return;
+
+    while (true) {
+        BookEntry entry;
+        file.read(reinterpret_cast<char*>(&entry.key), sizeof(U64));
+        file.read(reinterpret_cast<char*>(&entry.move), sizeof(uint16_t));
+        if (!file) break;
+        book[entry.key] = entry.move;
+    }
+}
+Move Engine::bookMoveFromEncoded(uint16_t m) {
+    int from = m & 0x3F;
+    int to = (m >> 6) & 0x3F;
+    int promo = (m >> 12) & 0xF;
+
+    int flag = 0; // castle??
+    switch (promo) {
+        case 1: flag = Move::promoteToKnightFlag; break;
+        case 2: flag = Move::promoteToBishopFlag; break;
+        case 3: flag = Move::promoteToRookFlag;   break;
+        case 4: flag = Move::promoteToQueenFlag;  break;
+    }
+
+    return Move(from, to, flag);  // Adjust to your Move constructor
+}
+Move Engine::getBookMove(const Board& board) {
+    U64 key = polyglotKey(board);  // Use same hashing as python-chess
+    auto it = book.find(key);
+    if (it == book.end()) return Move::NullMove();
+    return bookMoveFromEncoded(it->second);
+}
 
 void Engine::setPosition(const std::string& fen, const std::vector<Move>& moves) {
     if (fen == "startpos") {
@@ -156,7 +235,7 @@ int Engine::computeSearchTime(SearchSettings settings) {
     if (settings.movetime > 0) {
         return std::max(500, settings.movetime - overhead);
     }
-    if (ply < 10) {return 3500;}
+    //if (ply < 10) {return 3500;}
 
     // Fallback time control
     double aggressiveness = .75;
@@ -262,7 +341,7 @@ void Engine::iterativeDeepening(SearchSettings settings) {
     Move iteration_bestMove; // if time reached mid-depth, return best from last depth
     int iteration_bestEval;
     // end on opp move results (may solve hanging_pieces/other issues from deep search miss evals)
-    bool submit_opp_iteration_best_move = false; // trying this out - xx quiesencse 
+    bool submit_opp_iteration_best_move = true; // trying this out - xx quiesencse 
     Move opp_it_bestMove; int opp_it_bestEval;
     int depth_limit = settings.depth ? settings.depth : 20;
 
@@ -311,12 +390,13 @@ void Engine::iterativeDeepening(SearchSettings settings) {
         }
 
         pvMove = result.best_line.size() > 0 ? result.best_line[0] : first_moves[0];
-        logSearchDepthInfo(depth, bestMove, result.best_line, iteration_bestEval, elapsed_ms);
+        logSearchDepthInfo(depth, Searcher::max_q_depth, bestMove, result.best_line, result.best_q_line, iteration_bestEval, elapsed_ms);
         //}
         // searching at further depths for a move with proven mate is redudent
         if (std::abs(iteration_bestEval) >= MATE_SCORE - 10) break;
             
         depth++; // increase depth and re-search if time permits
+        Searcher::max_q_depth = 0;
     }
 
 }
@@ -330,7 +410,7 @@ void Engine::sendBestMove(Move best, Move ponder) {
 }
 
 
-void Engine::logSearchDepthInfo(int depth, Move bestMove,  std::vector<Move> best_line, int eval, int elapsed_ms, std::string file_path) {
+void Engine::logSearchDepthInfo(int depth, int quiesence_depth, Move bestMove, std::vector<Move> best_line, std::vector<Move> best_quiescence_line,  int eval, int elapsed_ms, std::string file_path) {
     std::ofstream file(file_path, std::ios::app); // append mode
 
     file << "-----------------------------\n";
@@ -338,9 +418,11 @@ void Engine::logSearchDepthInfo(int depth, Move bestMove,  std::vector<Move> bes
     file << "-----------------------------\n";
     file << "FEN: " << search_board.getBoardFEN() << "\n";
     file << "Depth: " << depth << "\n";
+    file << "Max Q Depth: " << quiesence_depth << "\n";
     file << "Best move: " << bestMove.uci() << "\n";
     file << "Eval: " << eval << "\nBest line: ";
     if (best_line.size() > 0) {for (int i = 0; i < best_line.size(); i++) {file << best_line[i].uci() << "  ";} file << "\n";}
+    if(best_quiescence_line.size() > 0) {for (int i = 0; i < best_quiescence_line.size(); i++) {file << best_quiescence_line[i].uci() << " ";} file << "\n";}
     file << "Time: " << elapsed_ms << " ms\n";
     file << "Nodes searched: " << Searcher::nodesSearched << "\n";
     file << "-----------------------------\n";

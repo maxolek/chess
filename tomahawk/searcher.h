@@ -27,7 +27,8 @@ struct SearchResult {
     Move bestMove;
     int eval;
     std::unordered_map<std::string, int> component_evals;
-    std::vector<Move> best_line;
+    std::vector<Move> best_line; 
+    std::vector<Move> best_q_line;
 };
 
 class Searcher {
@@ -41,7 +42,9 @@ public:
     inline static bool stop = false; // this will be externally reset by the engine to kill search
     static int nodesSearched;
     static std::unordered_map<U64, TTEntry> tt;
- 
+
+    static int quiesence_depth; // max depth reach from quiesence (total search detph = quiesence + original search depth)
+    static int max_q_depth;
 
     // eval enhancements (eval is based on board, not move)
     static const int castle_increase = 50; // centipawn
@@ -53,6 +56,7 @@ public:
     static int historyHeuristic[12][64];
 
     static std::vector<Move> best_line; // pv line tracker
+    static std::vector<Move> best_quiescence_line; // track pv lines built in quiescence
 
     static SearchResult search(
         Board& board,
@@ -92,6 +96,7 @@ public:
         Evaluator& evaluator,
         MoveGenerator& movegen,
         int alpha, int beta,
+        std::vector<Move>& pv, // best_q_line
         std::chrono::steady_clock::time_point start_time, 
         int time_limit_ms, bool& out_of_time
     );
