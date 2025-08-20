@@ -129,16 +129,19 @@ int Searcher::minimax(Board& board, MoveGenerator& movegen, Evaluator& evaluator
         Move m = moves[i];
         if (Move::SameMove(m, Move::NullMove())) continue;
 
+        // SEE prune: only for quiet situations to avoid missing critical defensive tactics
+        bool isCapture = board.getCapturedPiece(m.TargetSquare()) != -1;
+        if (isCapture && !m.IsPromotion() && !board.is_in_check) {
+            int seeGain = evaluator.SEE(board, m);      // net for the mover
+            if (seeGain < 0) {
+                // Losing capture -> prune
+                continue;
+            }
+        }
+
         board.MakeMove(m);
 
         if (board.hash_history[board.zobrist_hash] >= 3) {board.UnmakeMove(m); return 0;} // threefold
-
-        // Prune bad captures: if capture and not in check, run SEE
-        prune = false;
-        if (depth == 1 && board.currentGameState.capturedPieceType > -1 && !board.is_in_check) {
-            int seeScore = evaluator.SEE(board);
-            if (seeScore < 0) prune = true;
-        }
 
         std::vector<Move> childPV;
         score = bestEval; // pruned moves get skipped while old score is still present
@@ -213,10 +216,6 @@ int Searcher::quiescence(Board& board, Evaluator& evaluator, MoveGenerator& move
                          std::chrono::steady_clock::time_point start_time, int time_limit_ms, bool& out_of_time) {
     nodesSearched++;
 
-    if (board.getBoardFEN() == "r2qkb1r/pppb1Bpp/2np1n2/4p3/4P3/2N2N2/PPPP1PPP/R1BQ1RK1 b kq - 0 6") {
-        board.print_board();
-    }
-
     bool isWhiteToMove = board.is_white_move;
 
     bool isCapture = board.currentGameState.capturedPieceType > -1;
@@ -266,28 +265,29 @@ int Searcher::quiescence(Board& board, Evaluator& evaluator, MoveGenerator& move
     for (int i = 0; i < filteredCount; i++) {
         Move move = interesting_moves[i];
 
+        // SEE prune: only for quiet situations to avoid missing critical defensive tactics
+        bool isCapture = board.getCapturedPiece(move.TargetSquare()) != -1;
+        if (isCapture && !move.IsPromotion() && !board.is_in_check) {
+            int seeGain = evaluator.SEE(board, move);      // net for the mover
+            if (seeGain < 0) {
+                // Losing capture -> prune
+                continue;
+            }
+        }
+
         // Make move to check SEE on captures
         board.MakeMove(move);
         quiesence_depth++;
 
-        // Prune bad captures: if capture and not in check, run SEE
-        prune = false;
-        if (board.currentGameState.capturedPieceType > -1 && !board.is_in_check) {
-            int seeScore = evaluator.SEE(board);
-            if (seeScore < 0) prune = true;
-        }
-
-        score = bestEval;
-        if (!prune) {
-            score = quiescence(board, evaluator, movegen, alpha, beta, childPV,
+        //score = bestEval;
+        score = quiescence(board, evaluator, movegen, alpha, beta, childPV,
                                start_time, time_limit_ms, out_of_time);
-        }
 
         board.UnmakeMove(move);
         max_q_depth = std::max(max_q_depth, quiesence_depth);
-        quiesence_depth=0;
+        quiesence_depth--;
 
-        if (prune) continue;  // skip bad capture
+        //if (prune) continue;  // skip bad capture
 
         if (score >= beta) return beta;
         if (score > bestEval) {

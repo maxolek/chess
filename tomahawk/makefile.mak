@@ -1,14 +1,16 @@
 # Compiler and flags
-CXX = g++
+CXX = clang++
 CXXFLAGS = -std=c++17 -Wall -pthread
 
 # Toggle debug mode: make DEBUG=1
 ifeq ($(DEBUG),1)
-    CXXFLAGS += -g -O0 -DDEBUG
+    CXX = C:/msys64/mingw64/bin/clang++.exe
+    CXXFLAGS += -g -DDEBUG -O1 -fsanitize=address,undefined -fno-omit-frame-pointer
+    CXXFLAGS += -Wextra -Wshadow -Wuninitialized -Wconversion -Wpedantic
     TARGET = debug.exe
 # toggle test mode: make TEST=1
 else ifeq ($(TEST),1)
-    CXXFLAGS += -O2 
+    CXXFLAGS += -O2
     TARGET = testing.exe
 else
     CXXFLAGS += -O2
@@ -18,7 +20,8 @@ endif
 # Source files
 SRCS = arbiter.cpp board.cpp gamestate.cpp helpers.cpp moveGenerator.cpp \
        magics.cpp PrecomputedMoveData.cpp game.cpp UCI.cpp \
-       searcher.cpp evaluator.cpp engine.cpp tomahawk.cpp 
+       searcher.cpp evaluator.cpp engine.cpp testing.cpp
+       #tomahawk.cpp        
 
 OBJS = $(SRCS:.cpp=.o)
 

@@ -450,9 +450,10 @@ public:
         std::cout << "====================\nSEE Test Suite\n====================\n";
         for (size_t i = 0; i < cases.size(); ++i) {
             setBoard(cases[i].fen);
-            board.MakeMove(cases[i].init_move);
+            //board.MakeMove(cases[i].init_move);
 
-            int result = Evaluator::SEE(board);
+            board.print_board();
+            int result = Evaluator::SEE(board, cases[i].init_move);
 
             std::cout << "Test Case " << i + 1 << ": " << cases[i].fen << "\n";
             std::cout << "Target Square: " << square_to_algebraic(cases[i].init_move.TargetSquare()) << "\n\n";
@@ -460,7 +461,7 @@ public:
             std::cout << ((result == cases[i].expectedSEE) ? "[PASS]" : "[FAIL]") << "\n";
             std::cout << "----------------------------------------\n";
 
-            board.UnmakeMove(cases[i].init_move);
+            //board.UnmakeMove(cases[i].init_move);
         }
     }
 

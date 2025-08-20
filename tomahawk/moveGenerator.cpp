@@ -600,9 +600,14 @@ void MoveGenerator::generatePawnPushes(bool ours, bool add_to_list) {
         potential_moves &= PrecomputedMoveData::blankPawnMoves[start_square][side];
         // check if 1 move forward is possible
         // if not, make sure 2 move forward is removed
-        potential_moves &= (get_bit(potential_moves,start_square+std::pow(-1,side)*8)) 
-                            ? Bits::fullSet // if it is, change nothing
-                            : ~(1ULL << (start_square + static_cast<int>(std::pow(-1,side))*8*2)); 
+        // remove this for 2nd/7th rank pawns
+        if (!(side==0 && (Bits::mask_rank_7 & (1ULL << start_square)))
+            && !(side==1 && (Bits::mask_rank_2 & (1ULL << start_square)))) {
+
+            potential_moves &= (get_bit(potential_moves,start_square+((side==0) ? 8 : -8) ) 
+                                ? Bits::fullSet // if it is, change nothing
+                                : ~(1ULL << (start_square + ((side==0) ? 16 : -16)))); 
+            }
         // after 2 move check b/c a check that can be blocked
         // by 2x push will prevent 2x push in above method
         if (ours && in_check) {
@@ -614,7 +619,7 @@ void MoveGenerator::generatePawnPushes(bool ours, bool add_to_list) {
                 target_square = tzcnt(potential_moves) - 1;
                 potential_moves &= potential_moves - 1;
 
-                if (target_square == start_square + std::pow(-1,side) * 8 * 2) {  // double push
+                if (target_square == start_square + ((side==0) ? 16 : -16)) {  // double push
                     moves[count++] = Move(start_square, target_square,Move::pawnTwoUpFlag);
                 }
                 else if ((!side) && ((1ULL << start_square) & Bits::mask_rank_7)) {  // promotions
@@ -925,10 +930,15 @@ int MoveGenerator::pawnMobility(const Board* _board, bool ours) { // push+attack
         potential_moves &= PrecomputedMoveData::blankPawnMoves[start_square][ours ? side : 1-side];
         // check if 1 move forward is possible
         // if not, make sure 2 move forward is removed
-        potential_moves &= (get_bit(potential_moves,start_square+std::pow(-1,side)*8)) 
-                            ? Bits::fullSet // if it is, change nothing
-                            : ~(1ULL << (start_square + static_cast<int>(std::pow(-1,side))*8*2)); 
-
+        // ignore for white on 7th or black on 2nd
+        if (!(side==0 && (Bits::mask_rank_7 & (1ULL << start_square)))
+            && !(side==1 && (Bits::mask_rank_2 & (1ULL << start_square)))) {
+                
+            potential_moves &= (get_bit(potential_moves,start_square+((side==0) ? 8 : -8) ) 
+                                ? Bits::fullSet // if it is, change nothing
+                                : ~(1ULL << (start_square + ((side==0) ? 16 : -16)))); 
+            }
+    
         // captures
         potential_moves |= (potential_moves |= PrecomputedMoveData::fullPawnAttacks[start_square][ours ? side : 1-side] & (ours ? opp : own));
         

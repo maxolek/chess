@@ -22,7 +22,7 @@ public:
 
 
     // pieces
-    static constexpr int pieceValues[6] = {100, 320, 350, 500, 900, 10000}; 
+    static constexpr int pieceValues[6] = {100, 300, 330, 500, 900, 10000}; 
     static constexpr int passedBonus[8] = { 0, 10, 20, 30, 50, 70, 100, 0 }; // passed pawn rank (white)
     // pawn knight bishop rook queen
     // piece positions
@@ -91,10 +91,9 @@ public:
     static int mopUp(const Board& position); // late endgames without pawns -- drive opp king to edge
     // opening
     static int earlyQueenPenalty(const Board& board); // penalty based on other piece development
-    static int castleBias(const Board& board); // increase eval for castle moves
-
+    
     // static exchange evaluation - run through exchanges on a square and see results (after capture)
-    static int SEE(const Board& board);
+    static int SEE(const Board& board, const Move& move);
     static int hangingPiecePenalty(const Board& board); // loop through pieces to see whats hanging via SEE
     static U64 attackersTo(const Board& board, int sq, bool white, U64 occ); // get all attackers to a square
     // pawns
@@ -102,6 +101,19 @@ public:
     static int countIsolatedPawns(U64 pawns); // via file masks
     static bool isPassedPawn(bool white, int sq, U64 opp_pawns); // via precomp masks
     static int passedPawnDifferences(const Board& board); // add bonuses (+based on file) for passed pawns to eval
+
+    // king safety
+    static int kingSafety(const Board& board, bool usWhite);
+    static int kingSafetyDifferences(const Board& board);
+    static int castleBias(const Board& board); // increase eval when castled
+    static int kingShield(const Board& board, bool usWhite);
+    static int openFilesNearKing(const Board& board, bool usWhite);
+    static int tropism(const Board& board, bool usWhite); // distance between enemy pieces and king
+
+    // helpers
+    static bool isOpenFile(const Board& board, int file);
+    static bool isSemiOpenFile(const Board& board, int file, bool usWhite);
+    static int attackerMaterial(const Board& board, int opp_side);
 };
 
 #endif

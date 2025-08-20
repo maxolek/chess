@@ -6,7 +6,7 @@ from datetime import datetime
 
 # ---- Engine Paths ----
 ENGINE_A = r"C:\Users\maxol\code\chess\tomahawk\tomahawk.exe"  # candidate
-ENGINE_B = r"C:\Users\maxol\code\chess\version_history\v4.1_evalNotAlpha.exe" # baseline
+ENGINE_B = r"C:\Users\maxol\code\chess\version_history\v4.2_evenDepth.exe" # baseline
 
 # ---- SPRT Settings ----
 elo0 = 0        # null hypothesis: no improvement

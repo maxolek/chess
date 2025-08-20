@@ -262,6 +262,7 @@ Move Engine::getBestMove(Board& board) {
 
 void Engine::startSearch(SearchSettings settings) {
     search_board = *game_board;
+
     search_depth = settings.depth;
     time_left[0] = settings.wtime;
     time_left[1] = settings.btime;
@@ -377,7 +378,7 @@ void Engine::iterativeDeepening(SearchSettings settings) {
 
         // Update opponent's best move similarly, only if result.bestMove is valid
         // currently removing last depth
-        if (depth % 2 == 0 && !stop && search_board.plyCount > 6) {
+        if (depth % 2 == 0 && !stop && depth >= 6) {
             if (!result.bestMove.IsNull()) {
                 opp_it_bestMove = iteration_bestMove;
                 opp_it_bestEval = iteration_bestEval;
@@ -385,7 +386,7 @@ void Engine::iterativeDeepening(SearchSettings settings) {
         }
 
         // If configured, use opponent's best move but ensure it's valid
-        if (submit_opp_iteration_best_move && search_board.plyCount > 6 && !opp_it_bestMove.IsNull()) {
+        if (submit_opp_iteration_best_move && depth >= 6 && !opp_it_bestMove.IsNull()) {
             bestMove = opp_it_bestMove;
         }
 

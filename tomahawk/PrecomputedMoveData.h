@@ -17,9 +17,6 @@ public:
     static U64 blankKingAttacks[64];
 
     static U64 passedPawnMasks[64][2]; // sq, white/black
-    static constexpr U64 centerMasks[2] = {
-        0x0000001818000000, 0x00003C3C3C3C0000
-    }; // 4 squares, 8 squares 
 
     static U64 rayMasks[64][64]; // square_a, square_b
     static U64 alignMasks[64][64]; // square_a, square_b 

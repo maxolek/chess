@@ -68,9 +68,13 @@ extern std::string file_char;
 extern std::string results_string[];
 
 // set/get/pop macros
-inline void set_bit(U64 &bitboard, int square) {
+#include <iostream>
+#include <cstdlib>
+
+inline void set_bit(U64& bitboard, int square) {
     bitboard |= (1ULL << square);
 }
+
 inline int get_bit(U64 bitboard, int square) {
     return (bitboard >> square) & 1;
 }
@@ -83,6 +87,12 @@ inline void pop_bit(U64 &bitboard, int square) {
 template<typename T>
 constexpr const T& clamp(const T& v, const T& lo, const T& hi) {
     return (v < lo) ? lo : (hi < v) ? hi : v;
+}
+
+// integer sqrt
+inline int isqrt(int x) {
+    int r = static_cast<int>(std::sqrt(x));
+    return r;
 }
 
 // function to print a biboard to the console

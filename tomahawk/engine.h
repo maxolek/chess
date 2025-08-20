@@ -7,7 +7,7 @@
 #include "magics.h"
 #include "moveGenerator.h"
 #include "arbiter.h"
-#include "Searcher.h"
+#include "searcher.h"
 #include "msc_ver.h"
 
 struct BookEntry { // opening book

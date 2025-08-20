@@ -23,7 +23,7 @@ public:
     bool isGameOver() const; // Check for checkmate, stalemate, etc.
 
 private:
-    PrecomputedMoveData precomp = PrecomputedMoveData();
+    //PrecomputedMoveData precomp = PrecomputedMoveData();
 
     void displayResult();
     Move parseMove(const std::string& moveStr) const;

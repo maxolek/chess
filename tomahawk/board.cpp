@@ -288,9 +288,11 @@ void Board::MakeMove(Move move, bool in_search) {
         if (!move_color) {
             if (target_square == g1) MovePiece(rook, h1, f1);
             else MovePiece(rook, a1, d1);
+            white_castled = true;
         } else {
             if (target_square == g8) MovePiece(rook, h8, f8);
             else MovePiece(rook, a8, d8);
+            black_castled = true;
         }
     }
         // promotion
@@ -416,10 +418,10 @@ void Board::UnmakeMove(Move move, bool in_search) {
 
     // undo castling
     if (move_flag == Move::castleFlag) {
-        if (moved_to == g1) MovePiece(rook, f1, h1);
-        else if (moved_to == c1) MovePiece(rook, d1, a1);
-        else if (moved_to == g8) MovePiece(rook, f8, h8);
-        else if (moved_to == c8) MovePiece(rook, d8, a8);
+        if (moved_to == g1) {MovePiece(rook, f1, h1); white_castled = false;}
+        else if (moved_to == c1) {MovePiece(rook, d1, a1); white_castled = false;}
+        else if (moved_to == g8) {MovePiece(rook, f8, h8); black_castled = false;}
+        else if (moved_to == c8) {MovePiece(rook, d8, a8); black_castled = false;}
     }
 
     // detect rules after undoing move
@@ -453,9 +455,9 @@ void Board::MovePiece(int piece, int start_square, int target_square) {
 
 void Board::CapturePiece(int piece, int target_square, bool is_enpassant, bool captured_is_moved_piece) {
     if (is_enpassant) {
-        pop_bit(pieceBitboards[piece], target_square + std::pow(-1,1-move_color) * 8); // shift capture square by 1 rank
-        pop_bit(colorBitboards[1-move_color], target_square + std::pow(-1,1-move_color) * 8);
-        zobrist_hash ^= zobrist_table[(1-move_color)*6 + piece][int(target_square + std::pow(-1,1-move_color)*8)];
+        pop_bit(pieceBitboards[piece], target_square + ((1-move_color)==0) ? 8 : -8); // shift capture square by 1 rank
+        pop_bit(colorBitboards[1-move_color], target_square + ((1-move_color)==0) ? 8 : -8);
+        zobrist_hash ^= zobrist_table[(1-move_color)*6 + piece][int(target_square + ((1-move_color)==0) ? 8 : -8)];
     } else if (captured_is_moved_piece) {
         pop_bit(colorBitboards[1-move_color], target_square);
         zobrist_hash ^= zobrist_table[(1-move_color)*6 + piece][target_square];
@@ -506,6 +508,12 @@ int Board::getPieceAt(int square, int side) const {
             // black {1} : {10,11,12,13,14,15}
     }
     return -1;
+}
+
+int Board::kingSquare(bool white) const {
+    U64 kings = pieceBitboards[king];
+    U64 side = white ? colorBitboards[0] : colorBitboards[1];
+    return sqidx(kings & side);
 }
 
 bool Board::canEnpassantCapture(int epFile) const {
@@ -742,7 +750,7 @@ void Board::print_board() const {
     char pieces[64]; 
 
     // Iterate through all 64 squares on the board
-    for (int i = 64; i >= 0; i--) {
+    for (int i = 63; i >= 0; i--) {
         pieces[i] = '.'; // Default to empty square ('.')
         
         // Check for each piece type (pawn, knight, bishop, rook, queen, king)

@@ -60,6 +60,8 @@ public:
     std::vector<Move> allGameMoves;
     std::vector<GameState> gameStateHistory;
 
+    // castle trackers
+    bool white_castled = false; bool black_castled = false;
 
 
     Board();
@@ -82,6 +84,7 @@ public:
     int getCapturedPiece(int target_square) const;
     int getSideAt(int square) const;
     int getPieceAt(int square, int side) const; 
+    int kingSquare(bool white) const;
 
     bool canEnpassantCapture(int epFile) const;
 
