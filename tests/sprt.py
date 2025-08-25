@@ -6,15 +6,15 @@ from datetime import datetime
 
 # ---- Engine Paths ----
 ENGINE_A = r"C:\Users\maxol\code\chess\tomahawk\tomahawk.exe"  # candidate
-ENGINE_B = r"C:\Users\maxol\code\chess\version_history\v4.2_evenDepth.exe" # baseline
+ENGINE_B = r"C:\Users\maxol\code\chess\version_history\v5_phoenix.exe" # baseline
 
 # ---- SPRT Settings ----
 elo0 = 0        # null hypothesis: no improvement
 elo1 = 50        # alt hypothesis: at least +5 Elo
-alpha = 0.1    # type I error rate
-beta = 0.1     # type II error rate
-max_games = 10000
-TIME_LIMIT = .5  # seconds per move
+alpha = 0.05    # type I error rate
+beta = 0.05     # type II error rate
+max_games = 1000
+TIME_LIMIT = 2  # seconds per move
 
 # ---- PGN Output ----
 LOG_DIR = "logs"

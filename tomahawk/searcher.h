@@ -3,27 +3,8 @@
 
 #include "evaluator.h"
 #include "helpers.h"
-#include <unordered_map>
-#include <vector>
-#include <chrono>
+#include "tt.h"
 
-/**
- * BoundType for transposition table entries
- */
-enum BoundType { EXACT, LOWERBOUND, UPPERBOUND };
-
-/**
- * Transposition Table Entry
- */
-struct TTEntry {
-    U64 key;
-    int age;
-    int depth;      // Depth at which this entry was stored
-    int horizon;    // ply + depth
-    int eval;       // Stored evaluation
-    Move bestMove;  // Best move found at this node
-    BoundType flag; // Type of bound (EXACT / LOWERBOUND / UPPERBOUND)
-};
 
 /**
  * Struct for move scoring in move ordering
@@ -101,7 +82,7 @@ public:
 
     // Search stats
     static int nodesSearched;
-    static std::unordered_map<U64, TTEntry> tt;
+    static TranspositionTable tt;
 
     // Quiescence tracking
     static int quiesence_depth; // Current depth inside quiescence
@@ -192,27 +173,6 @@ public:
         Move moves[MAX_MOVES],
         int depth,
         const Move& pvMove
-    );
-
-    // -------------------------------
-    // Transposition table helpers
-    // -------------------------------
-    static TTEntry* probeTT(
-        U64 key,
-        int depth,
-        int ply,
-        int alpha,
-        int beta,
-        int& score
-    );
-
-    static void storeTT(
-        U64 key,
-        int depth,
-        int ply,
-        int score,
-        BoundType flag,
-        const std::vector<Move>& pv
     );
 
     // -------------------------------

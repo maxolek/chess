@@ -4,9 +4,6 @@
 #include "PrecomputedMoveData.h"
 #include "move.h"
 #include "gamestate.h"
-#include <unordered_map>
-#include <vector>
-#include <string>
 
 /**
  * @class Board
