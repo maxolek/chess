@@ -13,7 +13,7 @@ int main(int argc, char* argv[]) {
     Magics::initMagics();
 
     if (argc < 2) {
-        std::cerr << "Usage: ./testing [zobrist|search|eval|SEE|perft|divide] <fen> <depth>\n";
+        std::cerr << "Usage: ./testing [zobrist|search|qsearch|move_ordering|eval|SEE|perft|divide] <fen> <depth>\n";
         return 1;
     }
 
@@ -33,6 +33,30 @@ int main(int argc, char* argv[]) {
         tests.testSearch(fen);
         return 0;
     } 
+    else if (mode == "qsearch") {
+        std::string fen = argv[2];
+        for (int i = 3; i <= 7; ++i) {
+            fen += " ";
+            fen += argv[i];
+        }
+
+        tests.testQuiescence(fen);
+        return 0;
+    } 
+    else if (mode == "move_ordering") {
+        if (argv[2]) {
+            std::string fen = argv[2];
+            for (int i = 3; i <= 7; ++i) {
+                fen += " ";
+                fen += argv[i];
+            }   
+
+            tests.testMoveOrdering(fen, Move::NullMove());
+        } else {
+            tests.runMoveOrderingTests();
+        }
+        return 0;
+    }
     else if (mode == "eval") {
        std::string fen = argv[2];
         for (int i = 3; i <= 7; ++i) {

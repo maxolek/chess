@@ -4,150 +4,71 @@
 #include <thread>
 #include <chrono>
 #include <sstream>
+#include <fstream>
 
-Engine::Engine() {
-    clearState();
-    //game_board = &Board();
-    //search_board = *game_board;
-    movegen = std::make_unique<MoveGenerator>(&search_board);
-    int count = movegen->generateMovesList(game_board, legal_moves);
-    //evaluator = Evaluator(&precomp);
-    //Magics::initMagics();
-    
-}
+// ------------------
+// -- Constructors --
+// ------------------
 
 Engine::Engine(Board* _board) {
     game_board = _board;
-    search_board = *_board;
-    Magics::initMagics();
-    movegen = std::make_unique<MoveGenerator>(&search_board);
-    int count = movegen->generateMovesList(game_board, legal_moves);
+    search_board = *game_board;
+    movegen = std::make_unique<MoveGenerator>(search_board);
     evaluator = Evaluator(&precomp);
+    Magics::initMagics();
+    clearState();
+    movegen->generateMoves(search_board, false);
+    legal_move_count = movegen->count;
 }
 
+// ------------------
+// -- Engine State --
+// ------------------
+
 void Engine::clearState() {
-    stop = false;
     pondering = false;
     bestMove = Move::NullMove();
     ponderMove = Move::NullMove();
-    search_depth = -1;
+    search_depth = 0;
     time_left[0] = time_left[1] = 0;
     increment[0] = increment[1] = 0;
+    limits = SearchLimits(); // reset time control
     evaluator = Evaluator(&precomp);
 }
 
+// -------------------
+// -- UCI Handlers  --
+// -------------------
+
 void Engine::setOption(const std::string& name, const std::string& value) {
     if (name == "Move Overhead") {
-        moveOverhead = std::stoi(value);
-        std::cout << "info string set Move Overhead to " << moveOverhead << std::endl;
-    }
+        limits.stopped = false;
+        options.moveOverhead = std::stoi(value);
+        std::cout << "info string set Move Overhead = " << options.moveOverhead << std::endl;
+    } 
     else if (name == "Hash") {
-        hashSize = std::stoi(value);
-        std::cout << "info string set Hash to " << hashSize << std::endl;
-    }
+        options.hashSize = std::stoi(value);
+        std::cout << "info string set Hash = " << options.hashSize << std::endl;
+    } 
     else if (name == "Threads") {
-        threads = std::stoi(value);
-        std::cout << "info string set Threads to " << threads << std::endl;
-    }
+        options.threads = std::stoi(value);
+        std::cout << "info string set Threads = " << options.threads << std::endl;
+    } 
     else if (name == "Ponder") {
-        ponder = (value == "true" || value == "1");
-        std::cout << "info string set Ponder to " << (ponder ? "true" : "false") << std::endl;
-    }
+        options.ponder = (value == "true" || value == "1");
+        std::cout << "info string set Ponder = " << (options.ponder ? "true" : "false") << std::endl;
+    } 
     else if (name == "SyzygyPath") {
-        syzygyPath = value;
-        std::cout << "info string set SyzygyPath to " << syzygyPath << std::endl;
-    }
+        options.syzygyPath = value;
+        std::cout << "info string set SyzygyPath = " << options.syzygyPath << std::endl;
+    } 
     else if (name == "UCI_ShowWDL") {
-        // You can accept and ignore this option if you don't support WDL tablebases
-        uciShowWDL = (value == "true" || value == "1");
-        std::cout << "info string set UCI_ShowWDL to " << (uciShowWDL ? "true" : "false") << std::endl;
-    }
+        options.uciShowWDL = (value == "true" || value == "1");
+        std::cout << "info string set UCI_ShowWDL = " << (options.uciShowWDL ? "true" : "false") << std::endl;
+    } 
     else {
-        // Silently ignore unknown options to avoid errors
         std::cout << "info string ignoring unknown option: " << name << std::endl;
     }
-}
-
-int Engine::polyglotPieceIndex(int piece, bool isWhite) {
-    // piece: 1 = Pawn, 2 = Knight, ..., 6 = King
-    // isWhite: true for white, false for black
-    if (piece < 1 || piece > 6) return -1; // invalid piece
-
-    return (isWhite ? 0 : 6) + (piece - 1);
-}
-
-
-U64 Engine::polyglotKey(const Board& board) {
-    U64 key = 0ULL;
-
-    // For each square, XOR the piece key if occupied
-    for (int sq = 0; sq < 64; ++sq) {
-        int piece = board.getMovedPiece(sq); // your method to get piece or 0 if empty
-
-        if (piece != 0) {
-            bool isWhite = board.colorBitboards[0] & (1ULL << sq);  // your method for color
-            int index = polyglotPieceIndex(piece, isWhite);
-            key ^= polyglotRandom[sq * 12 + index];
-        }
-    }
-
-    // Castling rights
-    // For each possible right (WKS, WQS, BKS, BQS)
-    if (board.currentGameState.HasKingsideCastleRight(true))  key ^= polyglotRandom[768];
-    if (board.currentGameState.HasQueensideCastleRight(true)) key ^= polyglotRandom[769];
-    if (board.currentGameState.HasKingsideCastleRight(false))  key ^= polyglotRandom[770];
-    if (board.currentGameState.HasQueensideCastleRight(false)) key ^= polyglotRandom[771];
-
-    // En passant file (only if there is a pawn on the 5th rank that can capture)
-    int epFile = board.currentGameState.enPassantFile; // -1 if none, else 0..7
-    if (epFile != -1) {
-        // Only XOR if there is a pawn that can capture en passant on that file
-        // (polyglot spec requires this)
-        if (board.canEnpassantCapture(epFile)) {
-            key ^= polyglotRandom[772 + epFile];
-        }
-    }
-
-    // Side to move
-    if (!board.is_white_move) {
-        key ^= polyglotRandom[780];
-    }
-
-    return key;
-}
-
-void Engine::loadOpeningBook(const std::string& filename) {
-    std::ifstream file(filename, std::ios::binary);
-    if (!file) return;
-
-    while (true) {
-        BookEntry entry;
-        file.read(reinterpret_cast<char*>(&entry.key), sizeof(U64));
-        file.read(reinterpret_cast<char*>(&entry.move), sizeof(uint16_t));
-        if (!file) break;
-        book[entry.key] = entry.move;
-    }
-}
-Move Engine::bookMoveFromEncoded(uint16_t m) {
-    int from = m & 0x3F;
-    int to = (m >> 6) & 0x3F;
-    int promo = (m >> 12) & 0xF;
-
-    int flag = 0; // castle??
-    switch (promo) {
-        case 1: flag = Move::promoteToKnightFlag; break;
-        case 2: flag = Move::promoteToBishopFlag; break;
-        case 3: flag = Move::promoteToRookFlag;   break;
-        case 4: flag = Move::promoteToQueenFlag;  break;
-    }
-
-    return Move(from, to, flag);  // Adjust to your Move constructor
-}
-Move Engine::getBookMove(const Board& board) {
-    U64 key = polyglotKey(board);  // Use same hashing as python-chess
-    auto it = book.find(key);
-    if (it == book.end()) return Move::NullMove();
-    return bookMoveFromEncoded(it->second);
 }
 
 void Engine::setPosition(const std::string& fen, const std::vector<Move>& moves) {
@@ -167,46 +88,41 @@ void Engine::playMoves(const std::vector<Move>& moves) {
 
 void Engine::playMovesStrings(const std::vector<std::string>& moves) {
     for (const auto& moveStr : moves) {
+        // translate UCI string -> Move
         int start = algebraic_to_square(moveStr.substr(0, 2));
         int target = algebraic_to_square(moveStr.substr(2, 2));
         int flag = Move::noFlag;
-        int epSquare = -1;
 
         int movedPiece = game_board->getMovedPiece(start);
-        bool isPawn = movedPiece == pawn;
+        bool isPawn = (movedPiece == pawn);
 
-        // En Passant
+        // En passant
         if (isPawn && game_board->currentGameState.enPassantFile != -1) {
             int epRank = game_board->is_white_move ? 5 : 2;
-            epSquare = game_board->currentGameState.enPassantFile + epRank * 8;
-            if (target == epSquare) {
-                flag = Move::enPassantCaptureFlag;
-            }
+            int epSquare = game_board->currentGameState.enPassantFile + epRank * 8;
+            if (target == epSquare) flag = Move::enPassantCaptureFlag;
         }
 
-        // Pawn double push
+        // Double pawn push
         if (isPawn) {
             int startRank = start / 8;
             int targetRank = target / 8;
-            if (std::abs(startRank - targetRank) == 2) {
-                flag = Move::pawnTwoUpFlag;
-            }
+            if (std::abs(startRank - targetRank) == 2) flag = Move::pawnTwoUpFlag;
         }
 
-        // Promotion
+        // Promotions
         if (moveStr.length() == 5) {
-            char promo = moveStr[4];
-            switch (promo) {
+            switch (moveStr[4]) {
                 case 'q': flag = Move::promoteToQueenFlag; break;
-                case 'r': flag = Move::promoteToRookFlag; break;
+                case 'r': flag = Move::promoteToRookFlag;  break;
                 case 'b': flag = Move::promoteToBishopFlag; break;
                 case 'n': flag = Move::promoteToKnightFlag; break;
             }
         }
 
-        // Castling (optional: could be left to Move constructor if you detect it there)
+        // Castling
         if ((moveStr == "e1g1" || moveStr == "e1c1" || moveStr == "e8g8" || moveStr == "e8c8") 
-            && (movedPiece == king)) {
+            && movedPiece == king) {
             flag = Move::castleFlag;
         }
 
@@ -214,192 +130,120 @@ void Engine::playMovesStrings(const std::vector<std::string>& moves) {
     }
 }
 
+// --------------------
+// -- Search Control --
+// --------------------
 
-int Engine::computeSearchTime(SearchSettings settings) {
-    //return settings.movetime;
-
-    int side = game_board->is_white_move ? 0 : 1;
-    int ply = game_board->plyCount;
-
-    int myTime = settings.wtime;
-    int myInc = settings.winc;
-    if (side == 1) {
-        myTime = settings.btime;
-        myInc = settings.binc;
-    }
-
+void Engine::computeSearchTime(const SearchSettings& settings) {
     int movesToGo = settings.movestogo > 0 ? settings.movestogo : 25;
-    int overhead = moveOverhead > 0 ? moveOverhead : 15;
 
-    // If fixed movetime is specified, use that directly
-    if (settings.movetime > 0) {
-        return std::max(500, settings.movetime - overhead);
+    // hard coded time/depth
+    if (settings.movetime > 0 || settings.depth > 0) {
+        limits = SearchLimits(settings.movetime, settings.depth);
+        return;
     }
-    //if (ply < 10) {return 3500;}
+       
+    // game clock
+    int side = game_board->is_white_move ? 0 : 1;
+    int myTime = (side == 0 ? settings.wtime : settings.btime);
+    int myInc  = (side == 0 ? settings.winc  : settings.binc);
 
-    // Fallback time control
-    double aggressiveness = .75;
-    int timeBudget = static_cast<int>((myTime / movesToGo + myInc) * aggressiveness);
-    timeBudget -= overhead;
+    // compute function
+    double aggressiveness = 0.75;
+    int timeBudget = static_cast<int>((static_cast<double>(myTime) / movesToGo + myInc) * aggressiveness);
+    timeBudget = std::max(10, timeBudget - options.moveOverhead);
 
-    // Clamp to avoid negative time or overspending
-    timeBudget = clamp(timeBudget, 10, myTime - overhead);
-
-    std::ofstream file("C:/Users/maxol/code/chess/uci_interactions.txt", std::ios::app); // append mode = std::ios::app
-    file << "(ply " << ply << ")TIME BUDGET DECISION ---- " << timeBudget << std::endl;
-    file.close();
-
-    return timeBudget;
+    limits = SearchLimits(timeBudget);
 }
 
-// move object
-Move Engine::getBestMove(Board& board) {
-    search_board = *game_board; SearchSettings default_settings = SearchSettings();
-    iterativeDeepening(default_settings);
-    return bestMove;
-}
-
-
-void Engine::startSearch(SearchSettings settings) {
+void Engine::startSearch(const SearchSettings& settings) {
     search_board = *game_board;
+
     search_depth = settings.depth;
     time_left[0] = settings.wtime;
     time_left[1] = settings.btime;
     increment[0] = settings.winc;
     increment[1] = settings.binc;
-    stop = false;
     pondering = settings.infinite;
 
-    // Set remaining time for this side
-   // int side = game_board->is_white_move ? 0 : 1;
-    //int myTime = time_left[side];
-    //int myInc = increment[side];
+    computeSearchTime(settings);
 
-    // Time control handling (naive)
-    //int timeBudget = settings.movetime;
-    //if (timeBudget == -1 && myTime > 0) {
-    //    int movesToGo = settings.movestogo > 0 ? settings.movestogo : 75;
-    //    timeBudget = myTime / movesToGo + myInc;
-    //}
-
-    // Begin search
-    auto start = std::chrono::steady_clock::now();
-
-    iterativeDeepening(settings);
-
-    // Dummy search — just return the first legal move after sleeping
-    //if (timeBudget > 0) {
-    //    std::this_thread::sleep_for(std::chrono::milliseconds(std::min(timeBudget, 1000)));
-    //}
-
-    //ponderMove = moves.size() > 1 ? moves[1] : Move::NullMove(); // fake pondering target
-
-    auto end = std::chrono::steady_clock::now();
-    int elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-    //std::cerr << "info string search completed in " << elapsedMs << " ms\n";
-
-    sendBestMove(bestMove, ponderMove);
-}
-
-/*
-void Engine::startSearch(int depth, int movetime, int wtime, int btime, int winc, int binc) {
-    search_board = *game_board;
-    search_depth = depth;
-    time_left[0] = wtime;
-    time_left[1] = btime;
-    increment[0] = winc;
-    increment[1] = binc;
-
-    stop = false;
-    pondering = false;
-
-    // Fake search logic for now
-    // Start search on a separate thread to keep UCI responsive
-    //search_thread = std::thread(&Engine::iterativeDeepening, this, movetime);
     iterativeDeepening();
     sendBestMove(bestMove, ponderMove);
 }
-    */
 
 void Engine::stopSearch() {
-    stop = true;
-    //if (search_thread.joinable()) {
-    //    search_thread.join();
-    //}
+    limits.stopped = true;
 }
 
 void Engine::ponderHit() {
     pondering = false;
 }
 
+Move Engine::getBestMove(Board* board) {
+    game_board = board;
+    search_board = *game_board;
+    SearchSettings defaults;
+    iterativeDeepening();
+    return bestMove;
+}
 
-void Engine::iterativeDeepening(SearchSettings settings) {
-    // track search time
+// --------------------
+// -- Iterative Deep --
+// --------------------
+
+void Engine::iterativeDeepening() {
     auto start_time = std::chrono::steady_clock::now();
-    int elapsed_ms;
-    int time_limit_ms = computeSearchTime(settings);
-    Move iteration_bestMove; // if time reached mid-depth, return best from last depth
-    int iteration_bestEval;
-    // end on opp move results (may solve hanging_pieces/other issues from deep search miss evals)
-    bool submit_opp_iteration_best_move = true; // trying this out - xx quiesencse 
-    Move opp_it_bestMove; int opp_it_bestEval;
-    int depth_limit = settings.depth ? settings.depth : 20;
 
-    // generate first legal moves from current board position
-    Move first_moves[MAX_MOVES];
-    int count;    
-    //int prev_evals[MAX_MOVES];
-    Move pvMove = Searcher::best_line.empty() ? Move::NullMove() : Searcher::best_line[0];
-    //std::fill_n(prev_evals, MAX_MOVES, search_board.is_white_move ? -MATE_SCORE : MATE_SCORE);
-    // until time stop
-    // or depth limit (currently no limit)
+    Move iteration_bestMove = Move::NullMove();
+    int iteration_bestEval = 0;
+
+    Move opp_it_bestMove = Move::NullMove();
+    bool submit_opp_iteration_best_move = true;
+
     int depth = 1;
-    while (!stop) {
-        count = Searcher::generateAndOrderMoves(search_board, *movegen, evaluator, first_moves, depth, pvMove);
-        count = std::min(MAX_MOVES, count);
-        SearchResult result = Searcher::search(search_board, *movegen, evaluator, first_moves, count, depth, pvMove, start_time, time_limit_ms);
-    
-        auto now = std::chrono::steady_clock::now();
-        elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
+    while (!limits.should_stop(depth)) {
+        Move pvMove = Searcher::best_line.empty() ? Move::NullMove() : Searcher::best_line[0];
         
-        if (elapsed_ms >= time_limit_ms || depth == depth_limit) {
-            stop = true;
-        }
+        Move first_moves[MAX_MOVES];
+        int count = Searcher::generateAndOrderMoves(search_board, *movegen, evaluator, first_moves, depth, pvMove);
+        count = std::min(MAX_MOVES, count);
 
-    // Update iteration_bestMove and iteration_bestEval only if result.bestMove is not null
+        SearchResult result = Searcher::search(search_board, *movegen, evaluator, first_moves, count, depth, pvMove, limits);
+
+        auto now = std::chrono::steady_clock::now();
+        auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
+
         if (!result.bestMove.IsNull()) {
             iteration_bestMove = result.bestMove;
             iteration_bestEval = result.eval;
         }
 
-        // Choose bestMove: fallback to iteration_bestMove if result.bestMove is null
-        bestMove = Move::SameMove(result.bestMove, Move::NullMove()) ? iteration_bestMove : result.bestMove;
+        bestMove = result.bestMove.IsNull() ? iteration_bestMove : result.bestMove;
 
-        // Update opponent's best move similarly, only if result.bestMove is valid
-        // currently removing last depth
-        if (depth % 2 == 0 && !stop && search_board.plyCount > 6) {
-            if (!result.bestMove.IsNull()) {
-                opp_it_bestMove = iteration_bestMove;
-                opp_it_bestEval = iteration_bestEval;
-            }
+        if (depth % 2 == 0 && depth >= 6 && !iteration_bestMove.IsNull()) {
+            opp_it_bestMove = iteration_bestMove;
         }
 
-        // If configured, use opponent's best move but ensure it's valid
-        if (submit_opp_iteration_best_move && search_board.plyCount > 6 && !opp_it_bestMove.IsNull()) {
+        if (submit_opp_iteration_best_move && depth >= 6 && !opp_it_bestMove.IsNull()) {
             bestMove = opp_it_bestMove;
         }
 
-        pvMove = result.best_line.size() > 0 ? result.best_line[0] : first_moves[0];
-        logSearchDepthInfo(depth, Searcher::max_q_depth, bestMove, result.best_line, result.best_q_line, iteration_bestEval, elapsed_ms);
-        //}
-        // searching at further depths for a move with proven mate is redudent
+        pvMove = result.best_line.empty() ? first_moves[0] : result.best_line[0];
+
+        logSearchDepthInfo(depth, Searcher::max_q_depth, bestMove, 
+                           result.best_line, result.best_q_line, 
+                           iteration_bestEval, elapsed_ms);
+
         if (std::abs(iteration_bestEval) >= MATE_SCORE - 10) break;
-            
-        depth++; // increase depth and re-search if time permits
+        depth++;
         Searcher::max_q_depth = 0;
     }
-
 }
+
+// -------------------
+// -- Communication --
+// -------------------
 
 void Engine::sendBestMove(Move best, Move ponder) {
     std::cout << "bestmove " << best.uci();
@@ -409,153 +253,31 @@ void Engine::sendBestMove(Move best, Move ponder) {
     std::cout << std::endl;
 }
 
+// -------------------
+// -- Logging Utils --
+// -------------------
 
-void Engine::logSearchDepthInfo(int depth, int quiesence_depth, Move bestMove, std::vector<Move> best_line, std::vector<Move> best_quiescence_line,  int eval, int elapsed_ms, std::string file_path) {
-    std::ofstream file(file_path, std::ios::app); // append mode
+void Engine::logSearchDepthInfo(
+    int depth, int q_depth, Move _bestMove,
+    const std::vector<Move>& best_line,
+    const std::vector<Move>& best_q_line,
+    int eval, long long elapsed_ms,
+    const std::string& file_path) 
+{
+    std::ofstream file(file_path, std::ios::app);
 
-    file << "-----------------------------\n";
-    file << "-----------------------------\n";
     file << "-----------------------------\n";
     file << "FEN: " << search_board.getBoardFEN() << "\n";
     file << "Depth: " << depth << "\n";
-    file << "Max Q Depth: " << quiesence_depth << "\n";
-    file << "Best move: " << bestMove.uci() << "\n";
+    file << "Max Q Depth: " << q_depth << "\n";
+    file << "Best move: " << _bestMove.uci() << "\n";
     file << "Eval: " << eval << "\nBest line: ";
-    if (best_line.size() > 0) {for (int i = 0; i < best_line.size(); i++) {file << best_line[i].uci() << "  ";} file << "\n";}
-    if(best_quiescence_line.size() > 0) {for (int i = 0; i < best_quiescence_line.size(); i++) {file << best_quiescence_line[i].uci() << " ";} file << "\n";}
-    file << "Time: " << elapsed_ms << " ms\n";
+    for (auto& mv : best_line) file << mv.uci() << " ";
+    file << "\nQ line: ";
+    for (auto& mv : best_q_line) file << mv.uci() << " ";
+    file << "\nTime: " << elapsed_ms << " ms\n";
     file << "Nodes searched: " << Searcher::nodesSearched << "\n";
     file << "-----------------------------\n";
 
-    if (depth == 1) {evaluator.writeEvalDebug(movegen.get(), search_board, file_path);}
+    if (depth == 1) evaluator.writeEvalDebug(search_board, file_path);
 }
-
-
-
-
-/*
-void Engine::uciLoop() {
-    std::string line;
-    while (std::getline(std::cin, line)) {
-        if (line == "uci") {
-            std::cout << "id name MyEngine 1.0\n";
-            std::cout << "id author You\n";
-            std::cout << "uciok\n";
-        } else if (line == "isready") {
-            std::cout << "readyok\n";
-        } else if (line == "ucinewgame") {
-            clearState();
-            game_board->setFromFEN(STARTPOS_FEN);
-        } else if (line.rfind("position", 0) == 0) {
-            std::istringstream iss(line.substr(9));
-            std::string token, fen;
-            std::vector<Move> moves;
-
-            if (line.find("startpos") != std::string::npos) {
-                fen = "startpos";
-                while (iss >> token && token != "moves");
-            } else {
-                while (iss >> token && token != "moves") {
-                    fen += token + " ";
-                }
-            }
-
-            while (iss >> token) {
-                moves.push_back(Move(token));
-            }
-            setPosition(fen, moves);
-        } else if (line.rfind("go", 0) == 0) {
-            std::istringstream iss(line.substr(3));
-            std::string token;
-            int wtime = -1, btime = -1, winc = 0, binc = 0, depth = -1, movetime = -1;
-
-            while (iss >> token) {
-                if (token == "wtime") iss >> wtime;
-                else if (token == "btime") iss >> btime;
-                else if (token == "winc") iss >> winc;
-                else if (token == "binc") iss >> binc;
-                else if (token == "movetime") iss >> movetime;
-                else if (token == "depth") iss >> depth;
-            }
-            startSearch(depth, movetime, wtime, btime, winc, binc);
-        } else if (line == "stop") {
-            stopSearch();
-        } else if (line == "ponderhit") {
-            ponderHit();
-        } else if (line == "quit") {
-            break;
-        }
-    }
-    exit(0);
-}
-    */
-
-// OBSOLETE
-
-/*
-// uci
-std::string Engine::getBestMoveUCI(Board& board) {
-    movegen->generateMoves(&board);
-    legal_moves = movegen->moves;
-    Move best_move = Searcher::bestMove(search_board, *movegen, moves, 4);
-    return best_move.uci();
-}
-
-// for use with GAME.CPP
-// AN INTERFACE TO PLAY WITH USER
-void Engine::processPlayerMove(Move move) {
-    //board->MakeMove(move);
-    //movegen->generateMoves(board);
-    //legal_moves = movegen->moves;
-}
-
-std::string Engine::processEngineMoveString() {
-    Move best_move = Searcher::bestMove(search_board, *movegen, moves, 4);
-    //board->MakeMove(best_move);
-    return best_move.uci();
-}
-
-Move Engine::processEngineMove() {
-    Move best_move = Searcher::bestMove(search_board, *movegen, moves, 4);
-    //board->MakeMove(best_move);
-    return best_move;
-}
-*/
-
-// JAVA INTERFACE SUPPORT
-
-/*
-extern "C" JNIEXPORT jlong JNICALL Java_engine_Engine_initNativeEngine(JNIEnv* env, jobject obj) {
-    Engine* engine = new Engine();
-    return reinterpret_cast<jlong>(engine);
-}
-
-extern "C" JNIEXPORT void JNICALL Java_engine_Engine_freeNativeEngine(JNIEnv* env, jobject obj, jlong enginePtr) {
-    Engine* engine = reinterpret_cast<Engine*>(enginePtr);
-    delete engine;
-}
-
-extern "C" JNIEXPORT jstring JNICALL Java_engine_Engine_getBestMove(JNIEnv* env, jobject obj) {
-    jclass engineClass = env->GetObjectClass(obj);
-    jfieldID nativeEngineField = env->GetFieldID(engineClass, "nativeEngine", "J");
-    jlong nativeEnginePtr = env->GetLongField(obj, nativeEngineField);
-
-    Engine* engine = reinterpret_cast<Engine*>(nativeEnginePtr);
-    
-    std::string move = engine->processEngineMove();
-    
-    return env->NewStringUTF(move.c_str());
-}
-
-extern "C" JNIEXPORT jstring JNICALL Java_engine_Engine_getBoardState(JNIEnv* env, jobject obj) {
-    jclass engineClass = env->GetObjectClass(obj);
-    jfieldID nativeEngineField = env->GetFieldID(engineClass, "nativeEngine", "J");
-    jlong nativeEnginePtr = env->GetLongField(obj, nativeEngineField);
-
-    Engine* engine = reinterpret_cast<Engine*>(nativeEnginePtr);
-    
-    std::string fen = engine->getBoardState();
-    
-    return env->NewStringUTF(fen.c_str());
-}
-    */

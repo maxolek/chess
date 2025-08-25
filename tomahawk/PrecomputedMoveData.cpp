@@ -5,9 +5,6 @@
 // Define static members
 U64 PrecomputedMoveData::blankPawnMoves[64][2];
 U64 PrecomputedMoveData::fullPawnAttacks[64][2];
-SMasks PrecomputedMoveData::blankBishopAttacks[64][2];
-SMasks PrecomputedMoveData::blankRookAttacks[64][2];
-SMasks PrecomputedMoveData::blankQueenAttacks[64][4];
 U64 PrecomputedMoveData::blankKnightAttacks[64];
 U64 PrecomputedMoveData::blankKingAttacks[64];
 
@@ -23,9 +20,6 @@ PrecomputedMoveData::PrecomputedMoveData() {
     generateFullPawnMoves();
     generateFullPawnAttacks();
     generateBlankKnightAttacks();
-    generateBlankBishopAttacks();
-    generateBlankRookAttacks();
-    generateBlankQueenAttacks();
     generateBlankKingAttacks();
 
     generatePassedPawnsMasks();
@@ -41,11 +35,11 @@ void PrecomputedMoveData::generateFullPawnMoves() {
     bool isin_init_row;
 
     for (int side = 0; side < 2; side++) {
-        for (int square = a1; square <= h8; square++) {
-            set_bit(bitboard, square + std::pow(-1,side) * 8);
-            isin_init_row = (!side) ? ((1ULL << square) & Bits::mask_rank_2) : ((1ULL << square) & Bits::mask_rank_7);
+        for (int square = a2; square <= h7; square++) {
+            set_bit(bitboard, square + ((side==0) ? 8 : -8));
+            isin_init_row = (side==0) ? ((1ULL << square) & Bits::mask_rank_2) : ((1ULL << square) & Bits::mask_rank_7);
             if (isin_init_row) 
-                set_bit(bitboard, square + std::pow(-1,side) * 8 * 2);
+                set_bit(bitboard, square + ((side==0) ? 16 : -16));
             
             blankPawnMoves[square][side] = bitboard;
             bitboard = 0ULL;
@@ -59,7 +53,7 @@ void PrecomputedMoveData::generateFullPawnAttacks() {
     U64 attacks = 0ULL;
 
     for (int side = 0; side < 2; side++) {
-        for (int square = a1; square <= h8; square++) {
+        for (int square = a2; square <= h7; square++) {
             set_bit(bitboard,square);
 
             // white pawns
@@ -148,100 +142,6 @@ void PrecomputedMoveData::generateBlankKingAttacks() {
     }
 }
 
-void PrecomputedMoveData::generateBlankBishopAttacks() {
-    SMasks mask;
-    int file;
-    int rank;
-    int left_bound; int right_bound;
-    U64 bitboard = 0ULL;
-    
-    for (int square = a1; square <= h8; square++) {
-        file = square % 8;
-        rank = square / 8; // int trunc in division gives multiple of 8
-        for (int direction = 0; direction < 2; direction++) {
-            if (direction) {
-                    // BR -> UL    changes of 7
-                left_bound = std::min(file, 7 - rank); // distance from left or top
-                right_bound = std::min(rank, 7 - file); // distance from right or bottom
-                for (int i = -right_bound; i <= left_bound; i++) {
-                    if (i==0) {
-                        mask.lower = bitboard;
-                        continue;
-                    }
-                    set_bit(bitboard, square + 7*i);
-                }
-                mask.upper = bitboard ^ mask.lower;
-            } else {
-                    // BL -> UR    changes of 9
-                left_bound = std::min(file,rank); // distance from left or bottom
-                right_bound = 7 - std::max(file,rank); // distance from right or top
-                for (int i = -left_bound; i <= right_bound; i++) {
-                    if (i==0) {
-                        mask.lower = bitboard;
-                        continue;
-                    }
-                    set_bit(bitboard, square + 9*i);
-                }
-                mask.upper = bitboard ^ mask.lower;
-            }
-            
-            mask.lineEx = mask.lower | mask.upper;
-            blankBishopAttacks[square][direction] = mask;
-            bitboard = 0ULL;
-        }
-    }
-}
-
-void PrecomputedMoveData::generateBlankRookAttacks() {
-    SMasks mask;
-    int file;
-    int rank;
-    U64 bitboard = 0ULL;
-
-    for (int square = a1; square <= h8; square++) {
-        file = square % 8;
-        rank = square / 8;
-        for (int direction = 0; direction < 2; direction++) {
-            if (direction) {
-                for (int i = -file; i < 8-file; i++) {
-                    if (i==0) {
-                        mask.lower = bitboard;
-                        continue;
-                    }
-                    set_bit(bitboard, square + i);
-                }
-                mask.upper = bitboard ^ mask.lower;
-            } else {
-                for (int i = -rank; i < 8-rank; i++) {
-                    if (i==0) {
-                        mask.lower = bitboard;
-                        continue;
-                    }
-                    set_bit(bitboard, square + 8*i);
-                }
-                mask.upper = bitboard ^ mask.lower;
-            }
-
-            mask.lineEx = mask.lower | mask.upper;
-            blankRookAttacks[square][direction] = mask;
-            bitboard = 0ULL;
-        }
-    }
-
-}
-
-void PrecomputedMoveData::generateBlankQueenAttacks() {
-    SMasks mask;
-    for (int square = a1; square <= h8; square++) {
-        for (int direction = 0; direction < 4; direction++) {
-            if (direction < 2)
-                mask = blankBishopAttacks[square][direction];
-            else
-                mask = blankRookAttacks[square][direction-2];
-            blankQueenAttacks[square][direction] = mask;
-        }
-    }
-}
 
 void PrecomputedMoveData::generatePassedPawnsMasks() {
     for (int sq = 0; sq < 64; sq++) {
@@ -299,7 +199,6 @@ void PrecomputedMoveData::generate_king_distances() {
 
 // straight line mask that contains the entire line in the direction of a->b
 void PrecomputedMoveData::generateAlignMasks() {
-    alignMasks[64][64] = {0ULL};
     int a_rank, b_rank, a_file, b_file;
     int rank_dir, file_dir; // {-1,0,1}
     int target_rank, target_file;
@@ -320,7 +219,7 @@ void PrecomputedMoveData::generateAlignMasks() {
                     target_file = b_file + file_dir * i;
                     target_rank = b_rank + rank_dir * i;
                     square = target_rank * 8 + target_file;
-                    if ((target_file > -1 && target_file < 8) & (target_rank > -1 && target_rank < 8))
+                    if ((target_file > -1 && target_file < 8) && (target_rank > -1 && target_rank < 8))
                             alignMasks[a][b] |= 1ULL << square;
                 }
             } 
@@ -330,7 +229,6 @@ void PrecomputedMoveData::generateAlignMasks() {
 
 // ray that goes from square -> edge in all 8 directions
 void PrecomputedMoveData::generateRayMasks() {
-    rayMasks[64][64] = {0ULL};
     int a_rank, a_file, b_rank, b_file, rank_dir, file_dir, target_square, target_rank, target_file;
     for (int a = a1; a <= h8; a++) {
         for (int b = a1; b <= h8; b++) {

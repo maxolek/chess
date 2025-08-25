@@ -1,4 +1,4 @@
-#include "uci.h"
+#include "UCI.h"
 #include <vector>
 #include <string>
 #include <iostream>

@@ -5,18 +5,16 @@
 #include "helpers.h"
 #include "moveGenerator.h"
 
-
-
 class Arbiter {
 private:
 public:
 
     static bool isDrawResult(Result result);
-    static bool isInsufficientMaterial(const Board&board);
+    static bool isInsufficientMaterial(const Board& board);
     static bool isWinResult(Result result);
     static bool isWhiteWinResult(Result result);
     static bool isBlackWinResult(Result result);
-    static Result GetGameState(const Board* board);
+    static Result GetGameState(const Board& board);
 };
 
 #endif
