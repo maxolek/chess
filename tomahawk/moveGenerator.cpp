@@ -119,6 +119,7 @@ bool MoveGenerator::isPinned(int square) {
 //need to make sure this doesnt result in a check 
 //regular pins (e.g. file and diag) should already be handled via pin_rays
 //but along rank, enpassant capture could result in check since both pawns are now gone
+// whoops: can be diag too 
 bool MoveGenerator::isEnpassantPinned(int start_square, int target_file) {
     // occ before ep
     enPassantMaskBlockers = (own|opp);
@@ -130,7 +131,7 @@ bool MoveGenerator::isEnpassantPinned(int start_square, int target_file) {
     else pop_bit(enPassantMaskBlockers, 3*8 + target_file);
     // occ after enpassant
 
-    U64 relevant_opp_ep_sliders = opp & (rooks | queens) & PrecomputedMoveData::alignMasks[start_square][own_king_square];
+    U64 relevant_opp_ep_sliders = opp & (rooks | queens | bishops) & PrecomputedMoveData::alignMasks[start_square][own_king_square];
     while (relevant_opp_ep_sliders) {
         int opp_sq = getLSB(relevant_opp_ep_sliders);
         pop_bit(relevant_opp_ep_sliders, opp_sq);
@@ -139,8 +140,16 @@ bool MoveGenerator::isEnpassantPinned(int start_square, int target_file) {
         if (!(PrecomputedMoveData::alignMasks[own_king_square][opp_sq] & (1ULL << start_square))) {
             continue;
         }
-        
-        if (Magics::rookAttacks(opp_sq, enPassantMaskBlockers) & (own&kings)) {
+
+        if ((rooks|queens) & (1ULL << opp_sq) && 
+            (Magics::rookAttacks(opp_sq, enPassantMaskBlockers) & (own & kings)))
+        {
+            return true;
+        }
+
+        if ((bishops|queens) & (1ULL << opp_sq) && 
+            (Magics::bishopAttacks(opp_sq, enPassantMaskBlockers) & (own & kings)))
+        {
             return true;
         }
     }
