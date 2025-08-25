@@ -51,7 +51,7 @@ public:
     Move (std::string uci) { // ep handled by board (no known info here)
         std::string _start, _target;
         char _flag;
-        int start, target, flag;
+        int start, target;
 
         _start = uci.substr(0,2); _target = uci.substr(2,2);
         start = algebraic_to_square(_start); target = algebraic_to_square(_target);
@@ -78,19 +78,20 @@ public:
     int TargetSquare() const { return ( moveValue & targetSquareMask) >> 6; }
     bool IsPromotion() const { return MoveFlag() >= promoteToQueenFlag; }
     int MoveFlag() const { return moveValue >> 12; }
+
     void PrintMove() const { 
         int start = StartSquare();
         int target = TargetSquare();
         std::cout << square_to_algebraic(start) << "->" << square_to_algebraic(target) << std::endl; 
     }
-    std::string uci() {
+    std::string uci() const {
         int start = StartSquare(); int target = TargetSquare(); 
         if (IsPromotion())
             return square_to_algebraic(start) + square_to_algebraic(target) + piece_label(PromotionPieceType()+10); // +10 is lower case
         return square_to_algebraic(start) + square_to_algebraic(target);
     }
 
-    int PromotionPieceType() {
+    int PromotionPieceType() const {
         switch (MoveFlag()) {
             case promoteToQueenFlag:
                 return queen;

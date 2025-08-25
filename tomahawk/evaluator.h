@@ -3,116 +3,147 @@
 
 #include "board.h"
 #include "helpers.h"
-#include "arbiter.h" // term evals 
-#include "moveGenerator.h" // mobility
+#include "arbiter.h"          // terminal evals
+#include "moveGenerator.h"    // mobility
 #include "PrecomputedMoveData.h" // masks
-#include <fstream>  // for file output
-#include <iomanip>  // for formatting
+#include <array>
+#include <ostream>
 
+// =================== Eval Components ===================
+enum EvalComponent {
+    MATERIAL,
+    PAWN_STRUCTURE,
+    PASSED_PAWNS,
+    POSITION,
+    CENTER_CONTROL,
+    KING_SAFETY,
+    MOBILITY,
+    COMPONENT_COUNT
+};
+
+inline const char* EvalComponentNames[] = {
+    "Material",
+    "PawnStructure",
+    "PassedPawns",
+    "Position",
+    "CenterControl",
+    "KingSafety",
+    "Mobility"
+};
+
+
+// =================== Constants ===================
+static constexpr int pieceValues[6] = {100, 300, 330, 500, 900, 10000}; 
+static constexpr int passedBonus[8] = {0, 10, 20, 30, 50, 70, 100, 0}; // rank-based bonus
+static std::array<int, COMPONENT_COUNT> evalWeights = { 
+    1,   // MATERIAL
+    -20,  // PAWN_STRUCTURE
+    1,  // PASSED_PAWNS
+    1,  // POSITION
+    3,   // CENTER_CONTROL
+    1,  // KING_SAFETY
+    0   // MOBILITY
+};
+
+
+// =================== Eval Report ===================
+struct EvalReport {
+    std::array<int, COMPONENT_COUNT> components{}; // raw component values
+    int weightedTotal = 0; // weighted sum
+
+    void add(EvalComponent c, int val) { components[c] = val; }
+
+    int total() const { // raw sum
+        int sum = 0;
+        for (int val : components) sum += val;
+        return sum;
+    }
+
+    void computeWeighted(const std::array<int, COMPONENT_COUNT>& weights) {
+        weightedTotal = 0;
+        for (size_t i = 0; i < COMPONENT_COUNT; ++i)
+            weightedTotal += components[i] * weights[i];
+    }
+
+    void print(std::ostream& os, const std::array<int, COMPONENT_COUNT>* weights = nullptr) const {
+        for (size_t i = 0; i < COMPONENT_COUNT; ++i)
+            os << EvalComponentNames[i] << ": " << components[i] << "\n";
+
+        if (weights)
+            os << "Weighted Total: " << weightedTotal << "\n";
+        os << "Raw Total: " << total() << "\n";
+    }
+
+    void print(const std::array<int, COMPONENT_COUNT>* weights = nullptr) const {
+        for (size_t i = 0; i < COMPONENT_COUNT; ++i)
+            std::cout << EvalComponentNames[i] << ": " << components[i] << "\n";
+
+        if (weights)
+            std::cout << "Weighted Total: " << weightedTotal << "\n";
+        std::cout << "Raw Total: " << total() << "\n";
+    }
+};
+
+
+// =================== Evaluator ===================
 class Evaluator {
 private:
-    static bool open_pstLoaded; static bool end_pstLoaded;
     static const PrecomputedMoveData* precomp;
+
 public:
+    Evaluator();
+    Evaluator(const PrecomputedMoveData* _precomp);
 
-    Evaluator ();
-    Evaluator (const PrecomputedMoveData* _precomp);
+    // Debug output
+    static void writeEvalDebug(Board& board, const std::string& filename);
 
-    static void writeEvalDebug(const MoveGenerator* movegen, Board& board, const std::string& filename);
-
-
-    // pieces
-    static constexpr int pieceValues[6] = {100, 300, 330, 500, 900, 10000}; 
-    static constexpr int passedBonus[8] = { 0, 10, 20, 30, 50, 70, 100, 0 }; // passed pawn rank (white)
-    // pawn knight bishop rook queen
-    // piece positions
-
-    // attack tables (like see)
-    static int mvvLvaTable[6][6]; // viction/attacker higher is better
+    // MVV-LVA
+    static int mvvLvaTable[6][6];
     static void initMVVLVA();
 
-    // Load PST from file: 6 pieces, 64 squares each
+    // Piece-Square Tables
     static bool loadPST(const std::string& filename, int pst[6][64]);
-    static int PST_opening[6][64]; static int PST_endgame[6][64];
+    static int PST_opening[6][64];
+    static int PST_endgame[6][64];
 
-    // pawn structure
-    static constexpr int doubled_pawns = 1; 
-    static constexpr int blocked_pawns = 1; 
-    static constexpr int iso_pawns = 1;
+    // Main evaluation
+    static int gamePhase(const Board& board);
+    static int taperedEval(const Board& board); 
+    static EvalReport Evaluate(const Board& board, int pst[6][64]);
+    static EvalReport openingEval(const Board& board);
+    static EvalReport endgameEval(const Board& board);
 
-    // logistics
-    static constexpr int mobility = 1;
-
-
-    static const std::unordered_map<std::string, int> evalWeights; 
-    static std::unordered_map<std::string, int> componentEvals;
-
-    // run all
-    static int Evaluate(
-        //const MoveGenerator* movegen, 
-        const Board* position,
-        int pst[6][64]
-    ); 
-    // eval is scaled to centipawn (100=1) and converted to int
-    static int computeEval(
-        //const MoveGenerator* movegen, 
-        const Board& board,
-        int pst[6][64]
-    ); // add up below w/ weights
-    static std::unordered_map<std::string, int> computeComponents(
-        //const MoveGenerator* movegen, 
-        const Board& board,
-        int pst[6][64]
-    ); // return dict constructed in above but on command
-    static int evaluateComponent(
-        //const MoveGenerator* movegen, 
-        const Board& board, 
-        std::string component,
-        int pst[6][64]); // some components (pst) depend on phase of game 
-        // iterate through names and run below funcs
-
-    // tapered eval
-    static int gamePhase(const Board* position); // 0->256 desc based on captured pieces
-    static int taperedEval(const Board* board); // get eval of board
-    static int taperedEval(const Board* board, int SEE); // SEE is expense, if known pass through
-    static int taperedEval(const Board* board, Result result); // get eval during search 
-    static int openingEval(const Board* board);
-    static int endgameEval(const Board* board);
-    static int negamax_eval(const Board* board); // negamax still performs comparable to magic_bitboard version (so eval must be difference)
-    
-    // counts (weights are in above)
-    static int materialDifferences(const Board& position); // add up material
-    static int pawnStructureDifferences(const Board& position); // double, block, iso (more is bad)
-    // currently mobilityDiff lags the position to eval by 1 ply as it relies on movegen which ran on the prior position
-    static int mobilityDifferences(const MoveGenerator* movegen); // # moves (psuedo possibilities)
-    static int positionDifferences(const Board& position, int pst[6][64]); // pst with phase
-    static int centerControlDifferences(const Board& position); // precomp masks
-    // end game
-    static int mopUp(const Board& position); // late endgames without pawns -- drive opp king to edge
-    // opening
-    static int earlyQueenPenalty(const Board& board); // penalty based on other piece development
-    
-    // static exchange evaluation - run through exchanges on a square and see results (after capture)
-    static int SEE(const Board& board, const Move& move);
-    static int hangingPiecePenalty(const Board& board); // loop through pieces to see whats hanging via SEE
-    static U64 attackersTo(const Board& board, int sq, bool white, U64 occ); // get all attackers to a square
-    // pawns
-    static int countDoubledPawns(U64 pawns); // via file masks
-    static int countIsolatedPawns(U64 pawns); // via file masks
-    static bool isPassedPawn(bool white, int sq, U64 opp_pawns); // via precomp masks
-    static int passedPawnDifferences(const Board& board); // add bonuses (+based on file) for passed pawns to eval
-
-    // king safety
-    static int kingSafety(const Board& board, bool usWhite);
+    // Components
+    static int materialDifferences(const Board& board);
+    static int pawnStructureDifferences(const Board& board);
+    static int passedPawnDifferences(const Board& board);
+    static int positionDifferences(const Board& board, int pst[6][64]);
+    static int centerControlDifferences(const Board& board);
     static int kingSafetyDifferences(const Board& board);
-    static int castleBias(const Board& board); // increase eval when castled
+
+    // Specialized heuristics
+
+    // Exchange / hanging piece evaluation
+    static int SEE(const Board& board, const Move& move);
+    static U64 attackersTo(const Board& board, int sq, bool white, U64 occ);
+
+    // Pawn helpers
+    static int countDoubledPawns(U64 pawns);
+    static int countIsolatedPawns(U64 pawns);
+    static bool isPassedPawn(bool white, int sq, U64 opp_pawns);
+
+    // King safety helpers
+    static int kingSafety(const Board& board, bool usWhite);
+    static int castleBias(const Board& board);
     static int kingShield(const Board& board, bool usWhite);
     static int openFilesNearKing(const Board& board, bool usWhite);
-    static int tropism(const Board& board, bool usWhite); // distance between enemy pieces and king
+    static int tropism(const Board& board, bool usWhite);
 
-    // helpers
+    // File helpers
     static bool isOpenFile(const Board& board, int file);
     static bool isSemiOpenFile(const Board& board, int file, bool usWhite);
+
+    // Misc
     static int attackerMaterial(const Board& board, int opp_side);
 };
 

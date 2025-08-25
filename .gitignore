@@ -18,10 +18,12 @@ settings.json
 
 # ignore helper files
 *.bin
+*.profdata
 
 # ignore object files
 *.o
 
 # ignore executable files
+*.mak
 *.exe
 *.dll

@@ -1,31 +1,59 @@
-# Compiler and flags
+# -------------------
+# Compiler & Flags
+# -------------------
+
 CXX = clang++
-CXXFLAGS = -std=c++17 -Wall -pthread
+CXXSTD = -std=c++17
+COMMON_WARN = -Wall -Wextra -Wshadow -Wuninitialized -Wconversion -Wpedantic
+COMMON_LINK = -pthread
 
-# Toggle debug mode: make DEBUG=1
-ifeq ($(DEBUG),1)
-    CXX = C:/msys64/mingw64/bin/clang++.exe
-    CXXFLAGS += -g -DDEBUG -O1 -fsanitize=address,undefined -fno-omit-frame-pointer
-    CXXFLAGS += -Wextra -Wshadow -Wuninitialized -Wconversion -Wpedantic
-    TARGET = debug.exe
-# toggle test mode: make TEST=1
+# Sanitizer flags
+ASAN_FLAGS = -fsanitize=address -fno-omit-frame-pointer
+UBSAN_FLAGS = -fsanitize=undefined -fno-sanitize-recover=undefined
+
+EXTRA = -g -fno-optimize-sibling-calls
+PROD = -O3 -ffast-math -march=native -flto #-fprofile-generate
+
+# -------------------
+# Source Files
+# -------------------
+
+PROD_SRCS = arbiter.cpp board.cpp gamestate.cpp helpers.cpp moveGenerator.cpp \
+            magics.cpp PrecomputedMoveData.cpp game.cpp UCI.cpp \
+            searcher.cpp evaluator.cpp engine.cpp tomahawk.cpp
+
+TEST_SRCS = arbiter.cpp board.cpp gamestate.cpp helpers.cpp moveGenerator.cpp \
+            magics.cpp PrecomputedMoveData.cpp game.cpp UCI.cpp \
+            searcher.cpp evaluator.cpp engine.cpp testing.cpp
+
+# -------------------
+# Build Configuration
+# -------------------
+
+ifeq ($(DEBUG_OPT),1) # prod testing
+    CXXFLAGS = $(CXXSTD) -O0 $(EXTRA) $(COMMON_WARN) $(COMMON_LINK) -DDEBUG $(ASAN_FLAGS)
+    TARGET = debug_opt_sanitize.exe
+    SRCS = $(PROD_SRCS)
+else ifeq ($(DEBUG),1) # test testing
+    CXXFLAGS = $(CXXSTD) -O0 $(EXTRA) $(COMMON_WARN) $(COMMON_LINK) -DDEBUG $(ASAN_FLAGS)
+    TARGET = debug_noopt_sanitize.exe
+    SRCS = $(TEST_SRCS)
 else ifeq ($(TEST),1)
-    CXXFLAGS += -O2
+    CXXFLAGS = $(CXXSTD) $(PROD) $(COMMON_WARN) $(COMMON_LINK)
     TARGET = testing.exe
+    SRCS = $(TEST_SRCS)
 else
-    CXXFLAGS += -O2
+    CXXFLAGS = $(CXXSTD) $(PROD) $(COMMON_WARN) $(COMMON_LINK)
     TARGET = tomahawk.exe
+    SRCS = $(PROD_SRCS)
 endif
-
-# Source files
-SRCS = arbiter.cpp board.cpp gamestate.cpp helpers.cpp moveGenerator.cpp \
-       magics.cpp PrecomputedMoveData.cpp game.cpp UCI.cpp \
-       searcher.cpp evaluator.cpp engine.cpp testing.cpp
-       #tomahawk.cpp        
 
 OBJS = $(SRCS:.cpp=.o)
 
-# Default build
+# -------------------
+# Rules
+# -------------------
+
 all: $(TARGET)
 
 $(TARGET): $(OBJS)

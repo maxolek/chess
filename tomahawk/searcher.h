@@ -3,132 +3,254 @@
 
 #include "evaluator.h"
 #include "helpers.h"
+#include <unordered_map>
+#include <vector>
+#include <chrono>
 
-// transposition table
+/**
+ * BoundType for transposition table entries
+ */
 enum BoundType { EXACT, LOWERBOUND, UPPERBOUND };
 
+/**
+ * Transposition Table Entry
+ */
 struct TTEntry {
-    int eval;
-    int depth;
-    Move bestMove;
-    BoundType flag;
+    U64 key;
+    int age;
+    int depth;      // Depth at which this entry was stored
+    int horizon;    // ply + depth
+    int eval;       // Stored evaluation
+    Move bestMove;  // Best move found at this node
+    BoundType flag; // Type of bound (EXACT / LOWERBOUND / UPPERBOUND)
 };
 
+/**
+ * Struct for move scoring in move ordering
+ */
 struct ScoredMove {
     Move move;
     int score;
 
     bool operator<(const ScoredMove& other) const {
-        return score > other.score;  // Higher score = better
+        return score > other.score; // Higher score = better
     }
 };
 
+/**
+ * Result of a search
+ */
 struct SearchResult {
-    Move bestMove;
-    int eval;
-    std::unordered_map<std::string, int> component_evals;
-    std::vector<Move> best_line; 
-    std::vector<Move> best_q_line;
+    Move bestMove;                    // Best move found
+    int eval;                         // Evaluation score
+    EvalReport eval_report;           // Breakdown of evaluation components
+    std::vector<Move> best_line;      // Principal variation
+    std::vector<Move> best_q_line;    // Quiescence PV
 };
 
-class Searcher {
-private:
-    //Board* board;
-    //std::vector<Move>* potential_moves;
-public:
-    static constexpr int KILL_SEARCH_RETURN = -5*MATE_SCORE;
-    static constexpr int MAX_DELTA = 1000; // queen + pawn --- delta pruning in quiesence
+/**
+ * Time & Depth Management
+ */
+struct SearchLimits {
+    std::chrono::steady_clock::time_point start_time;
+    int time_limit_ms;   // total allowed time for the search
+    int max_depth;       // maximum depth allowed (-1 = no limit)
+    bool stopped;        // set true when we must stop
 
-    inline static bool stop = false; // this will be externally reset by the engine to kill search
+    SearchLimits(int ms = 0, int depth = -1)
+        : start_time(std::chrono::steady_clock::now()),
+          time_limit_ms(ms),
+          max_depth(depth),
+          stopped(false) {}
+
+    inline bool out_of_time() {
+        if (stopped) return true;
+        
+        auto now = std::chrono::steady_clock::now();
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
+        
+        if (time_limit_ms > 0 && elapsed >= time_limit_ms) {
+            stopped = true;
+            return true;
+        }
+        return false;
+    }
+
+    inline bool depth_reached(int current_depth) const {
+        return (max_depth >= 0 && current_depth > max_depth);
+    }
+
+    inline bool should_stop(int current_depth) {
+        return out_of_time() || depth_reached(current_depth);
+    }
+};
+
+
+/**
+ * Searcher class: handles all search-related functionality including
+ * minimax/negamax, quiescence search, move ordering, PV tracking, TT access.
+ */
+class Searcher {
+public:
+    // Constants
+    static constexpr int KILL_SEARCH_RETURN = -5 * MATE_SCORE;
+    static constexpr int MAX_DELTA = 1000; // Delta pruning threshold in quiescence
+
+    // Control flags
+    inline static bool stop = false; // Set externally to abort search
+
+    // Search stats
     static int nodesSearched;
     static std::unordered_map<U64, TTEntry> tt;
 
-    static int quiesence_depth; // max depth reach from quiesence (total search detph = quiesence + original search depth)
-    static int max_q_depth;
+    // Quiescence tracking
+    static int quiesence_depth; // Current depth inside quiescence
+    static int max_q_depth;     // Maximum depth reached by quiescence
 
-    // eval enhancements (eval is based on board, not move)
-    static const int castle_increase = 50; // centipawn
+    // Evaluation enhancements
+    static const int castle_increase = 50; // Bonus for castling
 
-    // move scoring
-    // Killer moves: [depth][2] (we store up to 2 killer moves per depth)
-    static Move killerMoves[MAX_DEPTH][2];
-    // History heuristic: [piece][toSquare]
-    static int historyHeuristic[12][64];
+    // Move scoring heuristics
+    static Move killerMoves[MAX_DEPTH][2]; // Up to 2 killer moves per depth
+    static int historyHeuristic[12][64];  // History heuristic table: [piece][toSquare]
 
-    static std::vector<Move> best_line; // pv line tracker
-    static std::vector<Move> best_quiescence_line; // track pv lines built in quiescence
+    // Principal variation storage
+    static std::vector<Move> best_line;             // PV line tracker
+    static std::vector<Move> best_quiescence_line;  // PV built in quiescence
 
+    // -------------------------------
+    // Main search entry
+    // -------------------------------
     static SearchResult search(
         Board& board,
         MoveGenerator& movegen,
         Evaluator& evaluator,
         Move potential_moves[MAX_MOVES],
-        int move_count, // potential_moves will possibly contain old moves, shielded by count
+        int move_count, // Only first `move_count` moves are valid
         int depth,
         Move pvMove,
-        std::chrono::steady_clock::time_point start_time, 
-        int time_limit_ms
+        SearchLimits& limits
     );
-    /*static Move bestMove(
-        Board& board, 
-        MoveGenerator& movegen, 
-        std::vector<Move>& potential_moves, 
-        int depth, 
-        std::chrono::steady_clock::time_point start_time, 
-        int time_limit_ms
-    );*/
-    static int minimax( // not negated on return as usual as eval is side agnostic
-        Board& board, // so flip is performed in the return, not the call
-        MoveGenerator& movegen, 
-        Evaluator& evaluator, 
-        int depth, 
-        int alpha, int beta, // alpha beta pruning (will be swapped in func calls)
-        std::vector<Move>& pv, // best_line
+
+    // -------------------------------
+    // Minimax / Negamax search
+    // -------------------------------
+    static int negamax(
+        Board& board,
+        MoveGenerator& movegen,
+        Evaluator& evaluator,
+        int depth,
+        int alpha,
+        int beta,
+        std::vector<Move>& pv,  // PV line
         Move pvMove,
-        //const std::vector<Move>& inputPV, // for passing through negamax recursion
-        //int prev_evals[MAX_MOVES],
-        std::chrono::steady_clock::time_point start_time, 
-        int time_limit_ms, bool& out_of_time,
+        SearchLimits& limits,
+        int ply,
         bool quiesence
     );
+
+    // -------------------------------
+    // Quiescence search
+    // -------------------------------
     static int quiescence(
         Board& board,
         Evaluator& evaluator,
         MoveGenerator& movegen,
-        int alpha, int beta,
-        std::vector<Move>& pv, // best_q_line
-        std::chrono::steady_clock::time_point start_time, 
-        int time_limit_ms, bool& out_of_time
+        int alpha,
+        int beta,
+        std::vector<Move>& pv,  // Quiescence PV line
+        SearchLimits& limits,
+        int ply
     );
 
+
+    // -------------------------------
+    // Move ordering and scoring
+    // -------------------------------
     static int moveScore(
-        const Evaluator& evaluator, // for attacks like see/mvvlva
-        const Move& move, 
-        const Board& board, 
-        int depth, 
+        const Evaluator& evaluator,
+        const Move& move,
+        const Board& board,
+        int depth,
         const Move& ttMove,
         const Move& pvMove
-        /*int prev_eval*/
     );
+
     static void orderedMoves(
         const Evaluator& evaluator,
-        Move moves[MAX_MOVES], 
-        int count, 
-        const Board& board, 
-        int depth, 
-        const Move& pvMove
-        //int prev_eval[MAX_MOVES]
-    ); // order in place
-
-    static int generateAndOrderMoves(
-        Board& board, 
-        MoveGenerator& movegen, 
-        const Evaluator& evaluator,
-        Move moves[MAX_MOVES], 
+        Move moves[MAX_MOVES],
+        size_t count,
+        const Board& board,
         int depth,
         const Move& pvMove
-        //int prev_eval[MAX_MOVES]
     );
+
+    static int generateAndOrderMoves(
+        Board& board,
+        MoveGenerator& movegen,
+        const Evaluator& evaluator,
+        Move moves[MAX_MOVES],
+        int depth,
+        const Move& pvMove
+    );
+
+    // -------------------------------
+    // Transposition table helpers
+    // -------------------------------
+    static TTEntry* probeTT(
+        U64 key,
+        int depth,
+        int ply,
+        int alpha,
+        int beta,
+        int& score
+    );
+
+    static void storeTT(
+        U64 key,
+        int depth,
+        int ply,
+        int score,
+        BoundType flag,
+        const std::vector<Move>& pv
+    );
+
+    // -------------------------------
+    // Principal variation helpers
+    // -------------------------------
+    static void updatePV(
+        std::vector<Move>& pv,
+        const Move& move,
+        const std::vector<Move>& childPV
+    );
+
+    // -------------------------------
+    // Pruning helpers
+    // -------------------------------
+    static bool shouldPrune(
+        Board& board,
+        Move& move,
+        Evaluator& evaluator,
+        int standPat,
+        int alpha
+    );
+
+    // -------------------------------
+    // Depth helpers
+    // -------------------------------
+    static void enterDepth();
+    static void exitDepth();
+
+
+    // -------------------------------
+    // Debugging
+    // -------------------------------
+    static int quiescenceVerbose(Board& board, Evaluator& evaluator, MoveGenerator& movegen,
+                                int alpha, int beta, std::vector<Move>& pv,
+                                SearchLimits& limits, int ply, std::ostream& log);
+    static int verboseSearch(Board& board, Evaluator& evaluator, MoveGenerator& movegen,
+                            int alpha, int beta, std::vector<Move>& pv,
+                            SearchLimits& limits, int ply, bool use_quiescence, std::ostream& log);
 };
 
-#endif
+#endif // SEARCHER_H

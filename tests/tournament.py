@@ -19,8 +19,9 @@ ENGINES = {
     "v2_negamax": r"C:\Users\maxol\code\chess\version_history\v2_negamax.exe",
     #"magics": r"C:\Users\maxol\code\chess\version_history\v3_magics.exe",
     #"quiescence": r"C:\Users\maxol\code\chess\version_history\v4_quiescence.exe",
-    "v4.1_evalNotAlpha": r"C:\Users\maxol\code\chess\version_history\v4.1_evalNotAlpha.exe",
-    "v4.2_evenDepth" : r"C:\Users\maxol\code\chess\version_history\v4.2_evenDepth.exe"
+    #"v4.1_evalNotAlpha": r"C:\Users\maxol\code\chess\version_history\v4.1_evalNotAlpha.exe",
+    "v4.2_evenDepth" : r"C:\Users\maxol\code\chess\version_history\v4.2_evenDepth.exe",
+    "v5_phoenix" : r"C:\Users\maxol\code\chess\version_history\v5_phoenix.exe"
     #"stockfish": "engines/stockfish.exe"
 }
 

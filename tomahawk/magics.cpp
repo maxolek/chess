@@ -29,7 +29,7 @@ namespace Magics {
                 bool fail = false;
 
                 for (size_t i = 0; i < occupancies.size(); ++i) {
-                    int index = (occupancies[i] * magic) >> (64 - rookBits);
+                    size_t index = (occupancies[i] * magic) >> (64 - rookBits);
                     if (used[index] == 0ULL) {
                         used[index] = attacks[i];
                     } else if (used[index] != attacks[i]) {
@@ -41,7 +41,7 @@ namespace Magics {
                 if (!fail) {
                     rookMagics[sq] = magic;
                     for (size_t i = 0; i < occupancies.size(); ++i) {
-                        int index = (occupancies[i] * magic) >> (64 - rookBits);
+                        size_t index = (occupancies[i] * magic) >> (64 - rookBits);
                         rookAttackTable[sq][index] = attacks[i];
                     }
                     break;
@@ -65,7 +65,7 @@ namespace Magics {
                 bool fail = false;
 
                 for (size_t i = 0; i < bOccupancies.size(); ++i) {
-                    int index = (bOccupancies[i] * magic) >> (64 - bishopBits);
+                    size_t index = (bOccupancies[i] * magic) >> (64 - bishopBits);
                     if (used[index] == 0ULL) {
                         used[index] = bAttacks[i];
                     } else if (used[index] != bAttacks[i]) {
@@ -77,7 +77,7 @@ namespace Magics {
                 if (!fail) {
                     bishopMagics[sq] = magic;
                     for (size_t i = 0; i < bOccupancies.size(); ++i) {
-                        int index = (bOccupancies[i] * magic) >> (64 - bishopBits);
+                        size_t index = (bOccupancies[i] * magic) >> (64 - bishopBits);
                         bishopAttackTable[sq][index] = bAttacks[i];
                     }
                     break;
@@ -117,7 +117,7 @@ namespace Magics {
             bool fail = false;
 
             for (size_t i = 0; i < occupancies.size(); ++i) {
-                int index = (occupancies[i] * magic) >> (64 - bits);
+                size_t index = (occupancies[i] * magic) >> (64 - bits);
                 if (table[index] == 0ULL) {
                     table[index] = attacks[i];
                 } else if (table[index] != attacks[i]) {
@@ -129,7 +129,7 @@ namespace Magics {
             if (!fail) {
                 outMagic = { mask, magic, 64 - bits, new U64[1ULL << bits] };
                 for (size_t i = 0; i < occupancies.size(); ++i) {
-                    int index = (occupancies[i] * magic) >> (64 - bits);
+                    size_t index = (occupancies[i] * magic) >> (64 - bits);
                     outMagic.attacks[index] = attacks[i];
                 }
                 return true;
@@ -189,7 +189,7 @@ namespace Magics {
     // all possible blocker combinations for a mask
     std::vector<U64> generateAllOccupancies(U64 mask) {
         std::vector<U64> occupancies;
-        int numBits = __builtin_popcountll(mask);  // number of bits set in the mask
+        size_t numBits = static_cast<size_t>(__builtin_popcountll(mask));  // number of bits set in the mask
 
         std::vector<int> bitPositions;
         for (int i = 0; i < 64; ++i) {
@@ -202,7 +202,7 @@ namespace Magics {
 
         for (int i = 0; i < permutations; ++i) {
             U64 occupancy = 0ULL;
-            for (int j = 0; j < numBits; ++j) {
+            for (size_t j = 0; j < numBits; ++j) {
                 if ((i >> j) & 1) {
                     occupancy |= (1ULL << bitPositions[j]);
                 }
@@ -285,12 +285,12 @@ namespace Magics {
     // generate attacks ... magics
     U64 rookAttacks(int sq, U64 occ) {
         // Multiply blockers by magic number and shift to get index into attack table
-        int index = ((occ & rookMasks[sq]) * rookMagics[sq]) >> rookShifts[sq];
+        size_t index = ((occ & rookMasks[sq]) * rookMagics[sq]) >> rookShifts[sq];
         return rookAttackTable[sq][index];
     }
 
     U64 bishopAttacks(int sq, U64 occ) {
-        int index = ((occ & bishopMasks[sq]) * bishopMagics[sq]) >> bishopShifts[sq];
+        size_t index = ((occ & bishopMasks[sq]) * bishopMagics[sq]) >> bishopShifts[sq];
         return bishopAttackTable[sq][index];
     }
 }

@@ -14,7 +14,6 @@ public:
     Game();
 
     void start(Engine* eng); // Main loop for playing a game
-    void startUCI(Engine* eng); // still main loop, limit output for UCI compatibility
     void userMove(const std::string& moveStr); // Process a move from user input
     void engineMove(Engine* eng); // Let engine choose a move
     void engineMoveUCI(Engine* eng); // cut output for UCI compatibility

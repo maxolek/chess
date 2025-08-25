@@ -10,11 +10,11 @@ ENGINE_B = r"C:\Users\maxol\code\chess\version_history\v4.2_evenDepth.exe" # bas
 
 # ---- SPRT Settings ----
 elo0 = 0        # null hypothesis: no improvement
-elo1 = 5        # alt hypothesis: at least +5 Elo
-alpha = 0.05    # type I error rate
-beta = 0.05     # type II error rate
+elo1 = 50        # alt hypothesis: at least +5 Elo
+alpha = 0.1    # type I error rate
+beta = 0.1     # type II error rate
 max_games = 10000
-TIME_LIMIT = 1.0  # seconds per move
+TIME_LIMIT = .5  # seconds per move
 
 # ---- PGN Output ----
 LOG_DIR = "logs"
@@ -78,18 +78,44 @@ def play_game(engine_a_path, engine_b_path, swap_colors):
     black_name = os.path.basename(black_path)
 
     board = chess.Board()
-    white = chess.engine.SimpleEngine.popen_uci(white_path)
-    black = chess.engine.SimpleEngine.popen_uci(black_path)
-    engines = {chess.WHITE: white, chess.BLACK: black}
     move_list = []
+
+    try:
+        white = chess.engine.SimpleEngine.popen_uci(white_path)
+    except Exception as e:
+        print(f"Failed to start White engine ({white_name}): {e}")
+        return None
+
+    try:
+        black = chess.engine.SimpleEngine.popen_uci(black_path)
+    except Exception as e:
+        print(f"Failed to start Black engine ({black_name}): {e}")
+        white.quit()
+        return None
+
+    engines = {chess.WHITE: white, chess.BLACK: black}
 
     try:
         while not board.is_game_over():
             color = board.turn
-            result = engines[color].play(board, chess.engine.Limit(time=TIME_LIMIT))
+            try:
+                result = engines[color].play(board, chess.engine.Limit(time=TIME_LIMIT))
+            except chess.engine.EngineTerminatedError as e:
+                print(f"❌ Engine crashed on move {board.fullmove_number}, color {'White' if color else 'Black'}: {e}")
+                print("Board state at crash:")
+                print(board)
+                return None
+            except Exception as e:
+                print(f"❌ Unexpected engine error on move {board.fullmove_number}: {e}")
+                print(board)
+                return None
+
             move = result.move
             if move not in board.legal_moves:
-                break
+                print(f"❌ Engine returned illegal move on move {board.fullmove_number}: {move}")
+                print(board)
+                return None
+
             board.push(move)
             move_list.append(move.uci())
 
@@ -97,18 +123,25 @@ def play_game(engine_a_path, engine_b_path, swap_colors):
         result_str = outcome.result() if outcome else "*"
 
     finally:
-        white.quit()
-        black.quit()
+        try:
+            white.quit()
+        except Exception as e:
+            print(f"⚠️ White engine quit failed: {e}")
+        try:
+            black.quit()
+        except Exception as e:
+            print(f"⚠️ Black engine quit failed: {e}")
 
     write_pgn(white_name, black_name, result_str, move_list)
 
-    # Result from candidate's perspective
+    # Candidate engine perspective
     if result_str == "1-0":
         return 0 if swap_colors else 1
     elif result_str == "0-1":
         return 1 if swap_colors else 0
     else:
         return 0.5
+
 
 # ---- Main SPRT Runner ----
 def run_sprt():
@@ -120,7 +153,10 @@ def run_sprt():
         swap = game_num % 2 == 0
         result = play_game(ENGINE_A, ENGINE_B, swap)
 
-        if result == 1:
+        if result is None:
+            print("Skipping game due to engine crash.")
+            continue
+        elif result == 1:
             n_win += 1
         elif result == 0.5:
             n_draw += 1

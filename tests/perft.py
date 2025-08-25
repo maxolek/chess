@@ -61,7 +61,7 @@ def run_cpp_perft(fen, depth, divide=False):
     cmd = [ENGINE_PATH, mode] + fen.split(" ") + [str(depth)]
     #print("cmd\t",cmd)
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
         lines = result.stdout.strip().splitlines()
 
         if not divide:

@@ -1,107 +1,95 @@
-// represents the current state of the board during a game
-// state: positions of all pieces, side to move, castling rights, en-passant square, etc.
-// additional information to aid in search/eval may be included
-
-// initial state is manual
-// subsequently made/unmade moves using MakeMove() and UnmakeMove()
-
 #ifndef BOARD_H
 #define BOARD_H
 
 #include "PrecomputedMoveData.h"
 #include "move.h"
 #include "gamestate.h"
+#include <unordered_map>
+#include <vector>
+#include <string>
 
+/**
+ * @class Board
+ * @brief Represents the current state of a chess game, including piece positions, side to move,
+ *        castling rights, en-passant square, Zobrist hash, and move history.
+ *
+ * The board can be initialized from a FEN string or a default starting position.
+ * Moves can be made/unmade with MakeMove/UnmakeMove, updating the internal state.
+ */
 class Board {
-private:
 public:
-    //PrecomputedMoveData align_masks = PrecomputedMoveData();
-    
-    
-    // zobrist hashing for board history store (repetition tables etc)
-    U64 zobrist_hash;
-    std::unordered_map<U64,int> hash_history;
-    U64 zobrist_table[12][64]; // 0-11: 6 pieces * 2 colors
-    U64 zobrist_side_to_move;
-    U64 zobrist_castling[4]; // KQkq
-    U64 zobrist_enpassant[8]; // a-h
-    U64 randomU64();
-    void initZobristKeys();
-    U64 computeZobristHash();
-    U64 zobristCastlingHash(int castling_rights); // returns the corresponding hash for the castling rights
-    void debugZobristDifference(U64 old_hash, U64 new_hash);
-    U64 updateHash( // called inside makeMove so these are all passed as args
-        U64 currentHash,  // since it isnt stored outside of that
-        int start_square, int target_square, int move_flag, bool is_promotion, int promotion_piece,
-        int moved_piece, int captured_piece, bool is_enpassant, int old_castling_rights
-    );
+    // ==================== Bitboards ====================
+    U64 colorBitboards[2];   ///< [0] = white, [1] = black
+    U64 pieceBitboards[6];   ///< 0=pawn, 1=knight, 2=bishop, 3=rook, 4=queen, 5=king
+    int sqToPiece[64];       ///< Maps square to piece index (0..11), -1 if empty
 
-    // default bitboards
-    U64 colorBitboards[2];
-    U64 pieceBitboards[6];
+    // ==================== Game state ====================
+    GameState currentGameState;          ///< Tracks castling, en-passant, fifty-move counter
+    std::string fen;                     ///< Current board FEN
+    int plyCount;                        ///< Number of half-moves played
+    bool is_white_move;                  ///< True if white to move
+    int move_color;                      ///< 0=white, 1=black
+    bool is_in_check;                    ///< True if the side to move is in check
 
-    // useful info
-    GameState currentGameState;
-    std::string fen;
+    // ==================== Move & position history ====================
+    std::vector<Move> allGameMoves;            ///< All moves played
+    std::vector<GameState> gameStateHistory;  ///< Game state history for unmaking moves
+    std::unordered_map<U64,int> hash_history; ///< Zobrist hash occurrences for repetition detection
 
-    // total plies (half-moves) played in game
-    int plyCount;
+    // ==================== Castling trackers ====================
+    bool white_castled = false; ///< True if white has castled
+    bool black_castled = false; ///< True if black has castled
 
-    // side to move info
-    bool is_white_move;
-    int move_color;
-    bool is_in_check;
+    // ==================== Zobrist hashing ====================
+    U64 zobrist_hash;                ///< Current Zobrist hash
+    U64 zobrist_table[12][64];       ///< Zobrist keys for 12 pieces x 64 squares
+    U64 zobrist_side_to_move;        ///< Side to move key
+    U64 zobrist_castling[4];         ///< Castling rights keys: KQkq
+    U64 zobrist_enpassant[8];        ///< En passant file keys: a-h
 
-    // list of positions since last pawn move or capture (for detecting repetitions)
-    //      improve with hash
-    //std::vector<U64[8]> repetitionPosHistory;
-    // move history
-    std::unordered_map<U64,int> positionHistory;
-    std::vector<Move> allGameMoves;
-    std::vector<GameState> gameStateHistory;
+    // ==================== Constructors ====================
+    Board();                 ///< Default starting position
+    Board(std::string _fen); ///< Initialize from FEN
 
-    // castle trackers
-    bool white_castled = false; bool black_castled = false;
+    // ==================== Move execution ====================
+    void MakeMove(Move move = false);   ///< Apply a move and update board state
+    void UnmakeMove(Move move = false); ///< Undo a move
 
+    // ==================== Piece manipulation ====================
+    void putPiece(int pt12, int sq);         ///< Place a piece on a square
+    void removePiece(int sq);                ///< Remove a piece from a square
+    void MovePiece(int piece, int start, int target); ///< Move a piece between squares
+    void CapturePiece(int piece, int target, bool is_enpassant, bool captured_is_moved_piece);
+    void PromoteToPiece(int piece, int target); ///< Promote pawn to another piece
 
-    Board();
-    Board(std::string _fen);
-    Board(int side, U64 color_bitboards[2], U64 piece_bitboards[6], GameState currentGameState);
-
-    // inSearch controls whether this move is recorded in the game history
-    // (for three-fold repetition)
-    void MakeMove(Move move, bool in_search = false);
-
-    void UnmakeMove(Move move, bool in_search = false);
-
-    // piece and color
-    void MovePiece(int piece, int start_square, int target_square);
-    void CapturePiece(int piece, int target_square, bool is_enpassant, bool captured_is_moved_piece);
-
-    void PromoteToPiece(int piece, int target_square);
-
+    // ==================== Piece queries ====================
     int getMovedPiece(int start_square) const;
     int getCapturedPiece(int target_square) const;
     int getSideAt(int square) const;
-    int getPieceAt(int square, int side) const; 
+    int getPieceAt(int square, int side) const;
     int kingSquare(bool white) const;
 
-    bool canEnpassantCapture(int epFile) const;
+    // ==================== Special move checks ====================
+    bool canEnpassantCapture(int epFile) const; ///< Checks if en-passant is possible
+    void updateFiftyMoveCounter(int moved_piece, bool isCapture);
 
-    void updateFiftyMoveCounter(int moved_piece, bool isCapture, bool unmake);
+    // ==================== Board state checks ====================
+    bool inCheck(bool init); ///< True if the given side is in check
 
-    // called before side-to-move is updated
-    //      attacks are from move_color
-    // generate sliding, knight, pawn from king position
-    // for opp_sliding_piece: countBits((opp_square - king_square) & align_mask[opp][king] & occ) == 0 -> check
-    bool inCheck(bool init);
+    // ==================== FEN handling ====================
+    void setFromFEN(std::string _fen); ///< Initialize board from FEN
+    void setBoardFEN();                 ///< Generate FEN string from current state
+    std::string getBoardFEN();          ///< Return current board FEN
 
-    // <board layout> <castling rights> <en passant> <half-move clock> <full move number>
-    void setFromFEN(std::string _fen);
-    void setBoardFEN();
-    std::string getBoardFEN();
-    void print_board() const;
+    // ==================== Zobrist helper functions ====================
+    U64 randomU64();                           ///< Generate random 64-bit number
+    void initZobristKeys();                    ///< Initialize Zobrist keys
+    U64 computeZobristHash();                  ///< Compute current Zobrist hash
+    U64 zobristCastlingHash(int castling_rights); ///< Hash from castling rights
+    void debugZobristDifference(uint64_t old_hash, uint64_t new_hash);
 
+    // ==================== Debug ====================
+    void print_board() const; ///< Pretty-print board with FEN and additional info
 };
 
-#endif
+#endif // BOARD_H
