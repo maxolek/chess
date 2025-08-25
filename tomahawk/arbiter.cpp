@@ -33,24 +33,21 @@ bool Arbiter::isBlackWinResult(Result result) {
     return result == WhiteIsMated || result == WhiteTimeout || result == WhiteIllegalMove;
 }
 
-Result Arbiter::GetGameState(const Board* board) {
+Result Arbiter::GetGameState(const Board& board) {
     //if (board.currentGameState.FiftyMoveCounter() > 100) {return FiftyMoveRule;}
-    if (board->currentGameState.fiftyMoveCounter > 100) {return FiftyMoveRule;}
-    auto it = board->hash_history.find(board->zobrist_hash);
-    if (it != board->hash_history.end() && it->second >= 3) {return Repetition;}
-    if (isInsufficientMaterial(*board)) {return InsufficientMaterial;}    
+    if (board.currentGameState.fiftyMoveCounter > 100) {return FiftyMoveRule;}
+    auto it = board.hash_history.find(board.zobrist_hash);
+    if (it != board.hash_history.end() && it->second >= 3) {return Repetition;}
+    if (isInsufficientMaterial(board)) {return InsufficientMaterial;}    
 
     MoveGenerator movegen = MoveGenerator(board);
     bool hasMoves = movegen.hasLegalMoves(board);
 
     // checkmate and stalemate
     if (!hasMoves) {
-        if (board->is_in_check) return (board->is_white_move) ? WhiteIsMated : BlackIsMated;
+        if (board.is_in_check) return (board.is_white_move) ? WhiteIsMated : BlackIsMated;
         else {return Stalemate;}
     }
-    // repetition
-    //else if (countPosDuplicates(board.repetitionPosHistory))
-    //else if (InsufficientMaterial(board)) return InsufficientMaterial;
 
     return InProgress;
 }

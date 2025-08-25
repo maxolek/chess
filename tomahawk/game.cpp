@@ -26,20 +26,6 @@ void Game::start(Engine* eng) {
     displayResult();
 }
 
-void Game::startUCI(Engine* eng) {
-    /*while (!isGameOver()) {
-        if ((board.move_color == white && userIsWhite) ||
-            (board.move_color == black && !userIsWhite)) {
-            std::string userInput;
-            //std::cout << "Your move: ";
-            std::getline(std::cin, userInput);
-            userMove(userInput);
-        } else {
-            engineMoveUCI(eng);
-        }
-    }*/
-}
-
 // Process a user move given as a string
 void Game::userMove(const std::string& moveStr) {
     if (moveStr == "quit" || moveStr == "kill") {exit(0); return;}
@@ -54,14 +40,14 @@ void Game::userMove(const std::string& moveStr) {
 
 // Let the engine choose and make a move
 void Game::engineMove(Engine* eng) {
-    Move bestMove = eng->getBestMove(board);
+    Move bestMove = eng->getBestMove(&board);
     std::cout << "Engine plays: " << bestMove.uci() << "\n";
     board.MakeMove(bestMove);
 }
 
 // UCI handles output so dont need any here, just making move
 void Game::engineMoveUCI(Engine* eng) {
-    Move bestMove = eng->getBestMove(board);
+    Move bestMove = eng->getBestMove(&board);
     board.MakeMove(bestMove);
 }
 
@@ -77,13 +63,13 @@ void Game::printBoard() {
 
 // Check if game over by checkmate, stalemate, or draw
 bool Game::isGameOver() const {
-    Result result = Arbiter::GetGameState(&board);
+    Result result = Arbiter::GetGameState(board);
     return result != InProgress;
 }
 
 // Display the game result to user
 void Game::displayResult() {
-    Result result = Arbiter::GetGameState(&board);
+    Result result = Arbiter::GetGameState(board);
     if (Arbiter::isWinResult(result)) {
         if ((board.move_color == white && userIsWhite) ||
             (board.move_color == white && !userIsWhite)) {

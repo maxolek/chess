@@ -16,10 +16,12 @@ ENGINES = {
     #"move_list_array": r"C:\Users\maxol\code\chess\version_history\v1.5_moveListArray.exe",
     #"pstLoadFIX": r"C:\Users\maxol\code\chess\version_history\v1.6_pstLoadFIX.exe",
     #"moveOrdering": r"C:\Users\maxol\code\chess\version_history\v1.7_moveOrdering.exe",
-    "negamax": r"C:\Users\maxol\code\chess\version_history\v2_negamax.exe",
+    "v2_negamax": r"C:\Users\maxol\code\chess\version_history\v2_negamax.exe",
     #"magics": r"C:\Users\maxol\code\chess\version_history\v3_magics.exe",
-    "quiescence": r"C:\Users\maxol\code\chess\version_history\v4_quiescence.exe",
-    "v4.1_evalNotAlpha": r"C:\Users\maxol\code\chess\version_history\v4.1_evalNotAlpha.exe"
+    #"quiescence": r"C:\Users\maxol\code\chess\version_history\v4_quiescence.exe",
+    #"v4.1_evalNotAlpha": r"C:\Users\maxol\code\chess\version_history\v4.1_evalNotAlpha.exe",
+    "v4.2_evenDepth" : r"C:\Users\maxol\code\chess\version_history\v4.2_evenDepth.exe",
+    "v5_phoenix" : r"C:\Users\maxol\code\chess\version_history\v5_phoenix.exe"
     #"stockfish": "engines/stockfish.exe"
 }
 
@@ -40,15 +42,35 @@ def play_single_game(white_path, black_path, white_name, black_name):
     }
 
     game_moves = []
-    while not board.is_game_over():
-        color = board.turn
-        result = engines[color].play(board, chess.engine.Limit(time=TIME_LIMIT))
-        move = result.move
-        if move not in board.legal_moves:
-            break
-        board.push(move)
-        game_moves.append(move.uci())
+    try:
+        while not board.is_game_over():
+            color = board.turn
+            result = engines[color].play(board, chess.engine.Limit(time=TIME_LIMIT))
+            move = result.move
 
+            if move not in board.legal_moves:
+                raise ValueError(f"Illegal move: {move} by {'White' if color == chess.WHITE else 'Black'}")
+
+            board.push(move)
+            game_moves.append(move.uci())
+
+    except Exception as e:
+        current_turn = "White" if board.turn == chess.WHITE else "Black"
+        error_engine = white_name if current_turn == "White" else black_name
+        fen = board.fen()
+        print(f"[ERROR] {error_engine}'s turn - FEN: {fen}")
+        print(f"[ERROR] Exception: {e}")
+        for engine in engines.values():
+            engine.quit()
+        return {
+            "white_name": white_name,
+            "black_name": black_name,
+            "result": "*",
+            "moves": game_moves,
+            "final_board": board
+        }
+
+    # Game finished successfully
     outcome = board.outcome()
     result_str = outcome.result() if outcome else "*"
 
@@ -62,6 +84,7 @@ def play_single_game(white_path, black_path, white_name, black_name):
         "moves": game_moves,
         "final_board": board
     }
+
 
 def write_pgn_threadsafe(lock, pgn_file, data):
     """Thread-safe PGN write."""

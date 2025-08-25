@@ -1,4 +1,4 @@
-#include "uci.h"
+#include "UCI.h"
 #include "engine.h"
 #include "game.h"
 #include <iostream>

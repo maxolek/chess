@@ -24,7 +24,6 @@ typedef uint64_t U64;
 typedef unsigned short ushort;
 
 constexpr const char* STARTPOS_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-const float INF = std::numeric_limits<float>::infinity();
 constexpr int MATE_SCORE = 100000;
 constexpr int MAX_DEPTH = 64;
 constexpr int MAX_MOVES = 256; 
@@ -68,9 +67,13 @@ extern std::string file_char;
 extern std::string results_string[];
 
 // set/get/pop macros
-inline void set_bit(U64 &bitboard, int square) {
+#include <iostream>
+#include <cstdlib>
+
+inline void set_bit(U64& bitboard, int square) {
     bitboard |= (1ULL << square);
 }
+
 inline int get_bit(U64 bitboard, int square) {
     return (bitboard >> square) & 1;
 }
@@ -85,31 +88,15 @@ constexpr const T& clamp(const T& v, const T& lo, const T& hi) {
     return (v < lo) ? lo : (hi < v) ? hi : v;
 }
 
+// integer sqrt
+inline int isqrt(int x) {
+    int r = static_cast<int>(std::sqrt(x));
+    return r;
+}
+
 // function to print a biboard to the console
 void print_bitboard(U64 bitboard);
 
-// struct for sliding piece rays
-struct SMasks {
-    U64 lower; // from lower idx square -> piece
-    U64 upper; // from piece -> upper idx square
-    U64 lineEx; // lower | upper
-};
-
-// for UCI game settings
-struct SearchSettings {
-    int wtime = 0;
-    int btime = 0;
-    int winc = 0;
-    int binc = 0;
-    int movestogo = 0;
-    int depth = -1;
-    int nodes = -1;
-    int movetime = -1;
-    bool infinite = false;
-};
-
-// max of rank,file
-int chebyshev_distance(int sq1, int sq2);
 
 // function to get the cardinal direction from start_square -> target_square
 //      clockwise from N indexing
@@ -121,13 +108,26 @@ U64 isolateMSB(U64 x);
 // function to count the number of set bits
 int countBits(U64 x);
 // function to get leading zero count
-int lzcnt(U64 x);
+int getMSB(U64 x);
 // function to get trailing zero count
-int tzcnt(U64 x);
+int getLSB(U64 x);
 // get 0-63 square index of bitboard with only 1 bit set
 int sqidx(U64 bitboard);
 // Flip square for black piece evaluation
 int mirror(int square);
+// masks
+U64 bitsBelow(int sq);
+U64 bitsAbove(int sq);
+// iterate through bitboard and perform func
+template<typename Func>
+inline void forEachBit(U64 bb, Func func) {
+    int sq;
+    while (bb) {
+        sq = getLSB(bb);
+        bb &= bb -1;
+        func(sq);
+    }
+}
 
 //int countPosDuplicates(std::vector<U64> &vec);
 

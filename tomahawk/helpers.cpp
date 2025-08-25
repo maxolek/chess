@@ -112,25 +112,25 @@ U64 isolateLSB(U64 x) {
 }
 
 U64 isolateMSB(U64 x) {
-    return 1ULL << (63 - lzcnt(x));
+    return 1ULL << getMSB(x);
 }
 
 int countBits(U64 x) {
     return __builtin_popcountll(x);
 }
 
-
-int lzcnt(U64 x) {
-    return __builtin_clzll(x);
+int getMSB(U64 x) {
+    return 63 - __builtin_clzll(x);
 }
 
-int tzcnt(U64 x) {
-    return __builtin_ffsll(x);
+int getLSB(U64 x) {
+    return __builtin_ffsll(static_cast<long long>(x)) - 1;
 }
 
 // Function to get the square index from a bitboard with only one bit set
 int sqidx(U64 bitboard) {
     // Assuming there is only one bit set
+    if (!bitboard) return -1;
     return __builtin_ctzll(bitboard);  // __builtin_ctzll is for GCC/Clang
 }
 
@@ -139,20 +139,17 @@ int mirror(int square) {
     return square ^ 56;
 }
 
-/* for repetition detection
-int countPosDuplicates(std::vector<U64[6]> &vec) {
-    std::unordered_map<U64, int> cnt_map;
-    int max_pos_dup = 0;
-
-    for (U64[6] &pos : vec) {
-        cnt_map[pos]++;
-        if (cnt_map[pos] > max_pos_dup)
-            max_pos_dup++;
-    }
-
-    return max_pos_dup;
+// Returns a mask of all bits below the given square (lower indices)
+U64 bitsBelow(int sq) {
+    if (sq == 0) return 0ULL;
+    return (1ULL << sq) - 1;
 }
-*/
+
+// Returns a mask of all bits above the given square (higher indices)
+U64 bitsAbove(int sq) {
+    if (sq == 63) return 0ULL;
+    return ~((1ULL << (sq + 1)) - 1);
+}
 
 char piece_label(int piece) {
     switch (piece) {
@@ -221,7 +218,7 @@ int piece_int(char piece) {
 // Converts a square index (0-63) to algebraic notation (a1-h8)
 std::string square_to_algebraic(int square) {
     char file = 'a' + (square % 8); // Get file (column)
-    char rank = '1' + (square / 8); // Get rank (row)
+    char rank = static_cast<char>('1' + (square / 8)); // Get rank (row)
     return std::string(1, file) + rank; // Combine file and rank
 }
 
@@ -237,29 +234,3 @@ int algebraic_to_square(std::string square) {
     int index = (rank_index * 8) + file_index;
     return index;
 }
-
-// prints a given move in algebraic notation
-/*
-void print_algebraic_move(Move move){
-    char piece_names[5] = {'N','B','R','Q','K'};
-    std::string move_string = "";
-
-    // if pawn, dont print piece name
-    if (move.piece) 
-        move_string += piece_names[move.piece -1];
-    if (move.captured_piece != -1) {
-        if (!move.piece) 
-            move_string += square_to_algebraic(move.from)[0];
-        move_string += "x";
-    }
-    move_string += square_to_algebraic(move.to);
-    if (move.promoted_piece != -1) {
-        move_string += "=";
-        move_string += piece_names[move.promoted_piece];
-    }
-    if (move.is_check)
-        move_string += "+";
-
-    std::cout << move_string << std::endl;
-}
-*/
