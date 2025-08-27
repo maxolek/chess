@@ -144,6 +144,7 @@ int Evaluator::taperedEval(const Board& board) {
     return board.is_white_move ? eval : -eval; // negamax
 }
 
+// will be expanded for better integration with biases (e.g. has_castling +40 lasts all game)
 EvalReport Evaluator::openingEval(const Board& board) {
     return Evaluate(board, PST_opening);
 }
@@ -402,20 +403,32 @@ int Evaluator::passedPawnDifferences(const Board& board) {
 
 /** Evaluate king safety for one side */
 int Evaluator::kingSafety(const Board& board, bool usWhite) {
-    int oppMat = attackerMaterial(board, !usWhite);
-    int material_factor = (oppMat * 1024) / (oppMat + 800);
-    int phase_scale = 1024 - (gamePhase(board) * 1024 / 24);
+    int shield_penalty = kingShield(board, usWhite);        // missing pawns
+    int open_penalty = openFilesNearKing(board, usWhite);   // open/semi-open files
+    int threat_score = tropism(board, !usWhite);            // attackers nearby
 
-    int shield = -kingShield(board, usWhite);
-    int open = -openFilesNearKing(board, usWhite);
-    int trop = tropism(board, !usWhite);
+    // Scale down each component
+    int scaled_shield = shield_penalty * 3;     // was 10-15 per missing pawn
+    int scaled_open = open_penalty * 2;         // was 10-25 per file
+    int scaled_threat = threat_score * .5;      // keep tropism additive
 
-    long long temp = (long long)(shield + open) * material_factor - (long long)isqrt(trop) * 10;
-    return static_cast<int>(temp * phase_scale / 1024 / 1024);
+    // Limit influence
+    scaled_shield = std::min(scaled_shield, 30);
+    scaled_open = std::min(scaled_open, 40);
+    scaled_threat = std::min(scaled_threat, 60);
+
+    // game phase tapering (king safety matters less in end game)
+    int phase = gamePhase(board);
+    double phase_factor = std::max(0.2, (24.0 - phase) / 24.0);
+
+
+    int score = static_cast<int>((scaled_shield + scaled_open + scaled_threat) * phase_factor);
+
+    return score;
 }
 
 /** King safety difference (including castling bonus) */
-int Evaluator::kingSafetyDifferences(const Board& board) {
+int Evaluator::kingSafetyDifferences(const Board& board) { // black perspective cause kingSafety is penalties
     return castleBias(board) + (kingSafety(board, false) - kingSafety(board, true));
 }
 
@@ -443,7 +456,7 @@ int Evaluator::kingShield(const Board& board, bool usWhite) {
     int right2 = right != 0 ? right + (usWhite ? 8 : -8) : 0;
 
     auto calcPenalty = [&](int sq1, int sq2) {
-        if (!(own_pawns & (1ULL << sq1))) return (!(own_pawns & (1ULL << sq2)) ? 15 : 10);
+        if (!(own_pawns & (1ULL << sq1))) return (!(own_pawns & (1ULL << sq2)) ? 8 : 3);
         return 0;
     };
 
@@ -459,13 +472,16 @@ int Evaluator::openFilesNearKing(const Board& board, bool usWhite) {
     int penalty = 0;
     int file = board.kingSquare(usWhite) % 8;
 
-    if (isOpenFile(board, file - 1)) penalty += 20;
-    if (isOpenFile(board, file)) penalty += 25;
-    if (isOpenFile(board, file + 1)) penalty += 20;
+    int open_adj = 10; int open_dir = 15;
+    int semi_adj = 5; int semi_dir = 8;
 
-    if (isSemiOpenFile(board, file - 1, usWhite)) penalty += 10;
-    if (isSemiOpenFile(board, file, usWhite)) penalty += 15;
-    if (isSemiOpenFile(board, file + 1, usWhite)) penalty += 10;
+    if (isOpenFile(board, file - 1)) penalty += open_adj;
+    if (isOpenFile(board, file)) penalty += open_dir;
+    if (isOpenFile(board, file + 1)) penalty += open_adj;
+
+    if (isSemiOpenFile(board, file - 1, usWhite)) penalty += semi_adj;
+    if (isSemiOpenFile(board, file, usWhite)) penalty += semi_dir;
+    if (isSemiOpenFile(board, file + 1, usWhite)) penalty += semi_adj;
 
     return penalty;
 }

@@ -135,7 +135,7 @@ void Engine::playMovesStrings(const std::vector<std::string>& moves) {
 // --------------------
 
 void Engine::computeSearchTime(const SearchSettings& settings) {
-    int movesToGo = settings.movestogo > 0 ? settings.movestogo : 25;
+    int movesToGo = settings.movestogo > 0 ? settings.movestogo : 20;
 
     // hard coded time/depth
     if (settings.movetime > 0 || settings.depth > 0) {
@@ -149,7 +149,7 @@ void Engine::computeSearchTime(const SearchSettings& settings) {
     int myInc  = (side == 0 ? settings.winc  : settings.binc);
 
     // compute function
-    double aggressiveness = 0.75;
+    double aggressiveness = 1;
     int timeBudget = static_cast<int>((static_cast<double>(myTime) / movesToGo + myInc) * aggressiveness);
     timeBudget = std::max(10, timeBudget - options.moveOverhead);
 
