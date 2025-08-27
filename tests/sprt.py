@@ -11,7 +11,7 @@ import book  # your book.py
 
 # ---- Engine Paths ----
 ENGINE_A = r"C:\Users\maxol\code\chess\tomahawk\tomahawk.exe"  # candidate
-ENGINE_B = r"C:\Users\maxol\code\chess\version_history\v5.3_pvOrdering.exe"  # baseline
+ENGINE_B = r"C:\Users\maxol\code\chess\version_history\v5.4_kingSafety.exe"  # baseline
 
 # ---- SPRT Settings ----
 elo0 = 0
