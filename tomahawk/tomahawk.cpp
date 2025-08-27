@@ -1,6 +1,5 @@
 #include "UCI.h"
 #include "engine.h"
-#include "game.h"
 #include <iostream>
 #include <atomic>
 #include <thread>
@@ -25,9 +24,9 @@ void listenLoop(UCI& uci) {
 }
 
 int main() {
-    Game game = Game();
-    Engine engine = Engine(&game.board);
-    UCI uci(engine, game);
+    Board board = Board();
+    Engine engine = Engine(&board);
+    UCI uci(engine);
 
     std::thread listener([&uci](){
         uci.loop(); // loop internally

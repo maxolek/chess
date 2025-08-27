@@ -18,12 +18,12 @@ PROD = -O3 -ffast-math -march=native -flto #-fprofile-generate
 # Source Files
 # -------------------
 
-PROD_SRCS = arbiter.cpp board.cpp gamestate.cpp helpers.cpp moveGenerator.cpp \
-            magics.cpp PrecomputedMoveData.cpp game.cpp UCI.cpp \
+PROD_SRCS = board.cpp gamestate.cpp helpers.cpp moveGenerator.cpp \
+            magics.cpp PrecomputedMoveData.cpp UCI.cpp \
             searcher.cpp evaluator.cpp engine.cpp tomahawk.cpp
 
-TEST_SRCS = arbiter.cpp board.cpp gamestate.cpp helpers.cpp moveGenerator.cpp \
-            magics.cpp PrecomputedMoveData.cpp game.cpp UCI.cpp \
+TEST_SRCS = board.cpp gamestate.cpp helpers.cpp moveGenerator.cpp \
+            magics.cpp PrecomputedMoveData.cpp UCI.cpp \
             searcher.cpp evaluator.cpp engine.cpp testing.cpp
 
 # -------------------
@@ -42,6 +42,10 @@ else ifeq ($(TEST),1)
     CXXFLAGS = $(CXXSTD) $(PROD) $(COMMON_WARN) $(COMMON_LINK)
     TARGET = testing.exe
     SRCS = $(TEST_SRCS)
+else ifeq ($(PROFILE),1)
+    CXXFLAGS = $(CXXSTD) -O1 -g $(COMMON_WARN) $(COMMON_LINK)
+    TARGET = tomahawk_profile.exe
+    SRCS = $(PROD_SRCS)
 else
     CXXFLAGS = $(CXXSTD) $(PROD) $(COMMON_WARN) $(COMMON_LINK)
     TARGET = tomahawk.exe

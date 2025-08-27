@@ -3,8 +3,8 @@
 #include <string>
 #include <iostream>
 
-UCI::UCI(Engine& eng, Game& gm) {
-    engine=&eng; game=&gm;
+UCI::UCI(Engine& eng) {
+    engine=&eng;
 }  
 
 void UCI::loop() {
@@ -44,7 +44,7 @@ void UCI::handleCommand(const std::string& line) {
             std::cout << "uciok\n";
     }
     else if (token == "print_board") {
-        game->printBoard();
+        engine->game_board->print_board();
     }
     else if (token == "isready") {
         std::cout << "readyok\n";

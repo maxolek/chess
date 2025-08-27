@@ -3,7 +3,6 @@
 
 #include "board.h"
 #include "helpers.h"
-#include "arbiter.h"          // terminal evals
 #include "moveGenerator.h"    // mobility
 #include "PrecomputedMoveData.h" // masks
 #include <array>

@@ -7,27 +7,41 @@
 
 
 /**
- * Struct for move scoring in move ordering
+ * Struct for tracking principal variation
  */
-struct ScoredMove {
-    Move move;
-    int score;
+struct PV {
+    std::vector<Move> line;
 
-    bool operator<(const ScoredMove& other) const {
-        return score > other.score; // Higher score = better
+    void clear() { line.clear(); }
+
+    inline void set(Move first, const PV& child) {
+        line.clear();
+        line.reserve(1 + child.line.size());
+        line.push_back(first);
+        line.insert(line.end(), child.line.begin(), child.line.end());
     }
 };
 
+
 /**
- * Result of a search
+ * Result of a search iteration
  */
 struct SearchResult {
-    Move bestMove;                    // Best move found
-    int eval;                         // Evaluation score
-    EvalReport eval_report;           // Breakdown of evaluation components
-    std::vector<Move> best_line;      // Principal variation
-    std::vector<Move> best_q_line;    // Quiescence PV
+    Move bestMove = Move::NullMove();   // Best move found
+    int eval = -MATE_SCORE;               // Evaluation score
+    EvalReport eval_report;             // Breakdown of evaluation components
+    PV best_line;                        // Principal variation (with normal_len)
+    // full root moves
+    Move root_moves[MAX_MOVES];
+    int root_evals[MAX_MOVES];
+    int root_count = 0;
+
+    // Convenience to copy PV from a child
+    inline void setPV(Move first, const PV& child) {
+        best_line.set(first, child);
+    }
 };
+
 
 /**
  * Time & Depth Management
@@ -50,7 +64,7 @@ struct SearchLimits {
         auto now = std::chrono::steady_clock::now();
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
         
-        if (time_limit_ms > 0 && elapsed >= time_limit_ms) {
+        if (elapsed >= time_limit_ms && time_limit_ms > 0 ) {
             stopped = true;
             return true;
         }
@@ -88,8 +102,6 @@ public:
     static int quiesence_depth; // Current depth inside quiescence
     static int max_q_depth;     // Maximum depth reached by quiescence
 
-    // Evaluation enhancements
-    static const int castle_increase = 50; // Bonus for castling
 
     // Move scoring heuristics
     static Move killerMoves[MAX_DEPTH][2]; // Up to 2 killer moves per depth
@@ -106,10 +118,9 @@ public:
         Board& board,
         MoveGenerator& movegen,
         Evaluator& evaluator,
-        Move potential_moves[MAX_MOVES],
+        Move potential_moves[MAX_MOVES], // sorted from prev_it_evals in engine.cpp
         int move_count, // Only first `move_count` moves are valid
         int depth,
-        Move pvMove,
         SearchLimits& limits
     );
 
@@ -123,8 +134,7 @@ public:
         int depth,
         int alpha,
         int beta,
-        std::vector<Move>& pv,  // PV line
-        Move pvMove,
+        PV& pv,  // PV line
         SearchLimits& limits,
         int ply,
         bool quiesence
@@ -139,7 +149,7 @@ public:
         MoveGenerator& movegen,
         int alpha,
         int beta,
-        std::vector<Move>& pv,  // Quiescence PV line
+        PV& pv,  // Quiescence PV line
         SearchLimits& limits,
         int ply
     );
@@ -154,7 +164,7 @@ public:
         const Board& board,
         int depth,
         const Move& ttMove,
-        const Move& pvMove
+        PV& pv
     );
 
     static void orderedMoves(
@@ -163,16 +173,16 @@ public:
         size_t count,
         const Board& board,
         int depth,
-        const Move& pvMove
+        PV& pv
     );
 
-    static int generateAndOrderMoves(
+    static int generateAndOrderMoves( // called in negamax/quiescence
         Board& board,
         MoveGenerator& movegen,
         const Evaluator& evaluator,
         Move moves[MAX_MOVES],
         int depth,
-        const Move& pvMove
+        PV& pv
     );
 
     // -------------------------------

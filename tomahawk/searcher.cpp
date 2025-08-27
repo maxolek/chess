@@ -70,7 +70,7 @@ bool Searcher::shouldPrune(Board& board, Move& move, Evaluator& evaluator, int s
 // - Killer moves preferred if they caused cutoffs earlier
 // - Quiet moves fall back to history heuristic
 int Searcher::moveScore(const Evaluator& evaluator, const Move& move, const Board& board,
-                        int depth, const Move& ttMove, const Move& pvMove) {
+                        int depth, const Move& ttMove, PV& pv) {
     constexpr int PV_BASE       = 10'000'000;
     constexpr int TT_BASE       = 9'000'000;
     constexpr int GOOD_CAP_BASE = 8'000'000;
@@ -79,7 +79,7 @@ int Searcher::moveScore(const Evaluator& evaluator, const Move& move, const Boar
     constexpr int QUIET_BASE    = 0;
     constexpr int BAD_CAP_BASE  = -1'000'000;
 
-    if (Move::SameMove(pvMove, move)) return PV_BASE;
+    if (depth < pv.line.size() && Move::SameMove(m, pv.line[ply])) return PV_BASE;
     if (Move::SameMove(ttMove, move)) return TT_BASE;
 
     // Promotions (scaled by piece value)
@@ -114,12 +114,13 @@ int Searcher::moveScore(const Evaluator& evaluator, const Move& move, const Boar
     // Quiet moves (history heuristic)
     int piece = board.getMovedPiece(move.StartSquare());
     int sidePiece = board.is_white_move ? piece : piece + 6;
+
     return QUIET_BASE + historyHeuristic[sidePiece][move.TargetSquare()];
 }
 
 // Score + sort moves in descending order
 void Searcher::orderedMoves(const Evaluator& evaluator, Move moves[MAX_MOVES], size_t count,
-                            const Board& board, int depth, const Move& pvMove) {
+                            const Board& board, int depth, PV& pv) {
     U64 hash = board.zobrist_hash;
 
     // transposition table
@@ -140,7 +141,7 @@ void Searcher::orderedMoves(const Evaluator& evaluator, Move moves[MAX_MOVES], s
 
     // score
     for (size_t i = 0; i < count; ++i) {
-        scored.emplace_back(moveScore(evaluator, moves[i], board, depth, ttMove, pvMove), moves[i]);
+        scored.emplace_back(moveScore(evaluator, moves[i], board, depth, ttMove, pv), moves[i]);
     }
 
     // sort
@@ -152,18 +153,19 @@ void Searcher::orderedMoves(const Evaluator& evaluator, Move moves[MAX_MOVES], s
     }
 }
 
-
 // Generate full move list, then order it
 int Searcher::generateAndOrderMoves(Board& board, MoveGenerator& movegen, const Evaluator& evaluator,
-                                    Move moves[MAX_MOVES], int depth, const Move& pvMove) {
+                                    Move moves[MAX_MOVES], int depth, PV& pv) {
     
     movegen.generateMoves(board, false);
     int count = std::min(MAX_MOVES, movegen.count);
-    std::copy_n(movegen.moves, count, moves);
 
-    orderedMoves(evaluator, moves, static_cast<size_t>(count), board, depth, pvMove);
+    std::copy_n(movegen.moves, count, moves);
+    orderedMoves(evaluator, moves, static_cast<size_t>(count), board, depth, pv);
+    
     return count;
 }
+
 
 // ============================================================================
 // QUIESCENCE SEARCH
@@ -173,7 +175,7 @@ int Searcher::generateAndOrderMoves(Board& board, MoveGenerator& movegen, const 
 // ============================================================================
 
 int Searcher::quiescence(Board& board, Evaluator& evaluator, MoveGenerator& movegen,
-                         int alpha, int beta, std::vector<Move>& pv,
+                         int alpha, int beta, PV& pv,
                          SearchLimits& limits, int ply) {
     nodesSearched++;
     if (limits.out_of_time()) return alpha;
@@ -206,7 +208,7 @@ int Searcher::quiescence(Board& board, Evaluator& evaluator, MoveGenerator& move
         board.MakeMove(m);
 
         enterDepth();
-        std::vector<Move> childPV;
+        PV childPV;
         int score = -quiescence(board, evaluator, movegen, -beta, -alpha, childPV, limits, ply+1);
         exitDepth();
 
@@ -218,8 +220,7 @@ int Searcher::quiescence(Board& board, Evaluator& evaluator, MoveGenerator& move
         if (score > bestEval) {
             bestEval = score;
             alpha = std::max(alpha, score);
-            updatePV(pv, m, childPV);
-            best_quiescence_line = pv;
+            pv.set(m, childPV);
         }
     }
 
@@ -232,8 +233,7 @@ int Searcher::quiescence(Board& board, Evaluator& evaluator, MoveGenerator& move
 // ============================================================================
 
 int Searcher::negamax(Board& board, MoveGenerator& movegen, Evaluator& evaluator,
-                      int depth, int alpha, int beta,
-                      std::vector<Move>& pv, Move pvMove,
+                      int depth, int alpha, int beta, PV& pv,
                       SearchLimits& limits, int ply, bool use_quiescence) {
     nodesSearched++;
     if (limits.out_of_time()) return alpha;
@@ -270,12 +270,11 @@ int Searcher::negamax(Board& board, MoveGenerator& movegen, Evaluator& evaluator
 
     // Generate and order moves
     Move moves[MAX_MOVES]; 
-    int count = generateAndOrderMoves(board, movegen, evaluator, moves, depth, pvMove);
+    int count = generateAndOrderMoves(board, movegen, evaluator, moves, depth, pv);
     if (count == 0) return board.is_in_check ? -(MATE_SCORE - ply) : 0;
 
     int bestEval = -MATE_SCORE; int score;
     Move bestMove = Move::NullMove();
-    std::vector<Move> childPV;
 
     for (int i = 0; i < count; i++) {
         if (limits.out_of_time()) break;
@@ -284,8 +283,9 @@ int Searcher::negamax(Board& board, MoveGenerator& movegen, Evaluator& evaluator
         board.MakeMove(m);
 
         // Recursive negamax (sign flip)
+        PV childPV;
         score = -negamax(board, movegen, evaluator, depth - 1,
-                            -beta, -alpha, childPV, m,
+                            -beta, -alpha, childPV,
                             limits, ply + 1, use_quiescence);
 
         board.UnmakeMove(m);
@@ -296,7 +296,7 @@ int Searcher::negamax(Board& board, MoveGenerator& movegen, Evaluator& evaluator
         if (score > bestEval) {
             bestEval = score;
             bestMove = m;
-            updatePV(pv, m, childPV);
+            pv.set(m, childPV);
         }
 
         // Alpha-beta update
@@ -331,15 +331,10 @@ int Searcher::negamax(Board& board, MoveGenerator& movegen, Evaluator& evaluator
 // ============================================================================
 
 SearchResult Searcher::search(Board& board, MoveGenerator& movegen, Evaluator& evaluator,
-                             Move legal_moves[MAX_MOVES], int count, int depth, Move pvMove,
+                             Move legal_moves[MAX_MOVES], int count, int depth, 
                              SearchLimits& limits) {
     nodesSearched = 0;
-    best_line.clear();
-    best_quiescence_line.clear();
-
-    int bestEval = -MATE_SCORE;
-    Move bestMove = Move::NullMove();
-    std::vector<Move> principalVariation;
+    SearchResult result = SearchResult();
 
     for (int i = 0; i < count; ++i) {
         if (limits.out_of_time()) break;
@@ -348,23 +343,28 @@ SearchResult Searcher::search(Board& board, MoveGenerator& movegen, Evaluator& e
         if (Move::SameMove(m, Move::NullMove())) continue;
 
         board.MakeMove(m);
-        std::vector<Move> childPV;
+        PV childPV;
         int eval = -negamax(board, movegen, evaluator, depth - 1,
-                            -MATE_SCORE, MATE_SCORE, childPV, m,
+                            -MATE_SCORE, MATE_SCORE, childPV,
                             limits, board.plyCount, true);
         board.UnmakeMove(m);
 
+        // update root evals
+        result.root_moves[i] = m;
+        result.root_evals[i] = eval;
+        result.root_count++;
+
         if (limits.out_of_time()) break;
 
-        if (i == 0 || eval > bestEval) {
-            bestEval = eval;
-            bestMove = m;
-            updatePV(principalVariation, m, childPV);
-            best_line = principalVariation;
+        // update best result
+        if (i == 0 || eval > result.eval) {
+            result.eval = eval;
+            result.bestMove = m;
+            result.best_line.set(m, childPV);
         }
     }
 
-    return {bestMove, bestEval, {}, best_line, best_quiescence_line};
+    return result;
 }
 
 
@@ -386,7 +386,7 @@ int Searcher::verboseSearch(Board& board, Evaluator& evaluator, MoveGenerator& m
 
     // Generate moves
     Move moves[MAX_MOVES];
-    int count = generateAndOrderMoves(board, movegen, evaluator, moves, 0, Move::NullMove());
+    int count = generateAndOrderMoves(board, movegen, evaluator, moves, 0, {});
     if (count == 0) {
         if (board.is_in_check) { exitDepth(); return -MATE_SCORE + ply; }
         exitDepth();

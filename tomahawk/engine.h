@@ -5,7 +5,6 @@
 #include "board.h"
 #include "magics.h"
 #include "moveGenerator.h"
-#include "arbiter.h"
 #include "searcher.h"
 #include "evaluator.h"
 
@@ -39,6 +38,7 @@ struct SearchSettings {
     bool ponder = false;   // pondering search
 };
 
+
 // ------------------
 // -- Engine Class --
 // ------------------
@@ -59,9 +59,13 @@ public:
     std::unique_ptr<MoveGenerator> movegen;
     Board* game_board;        // main game board
     Board search_board;       // modifable copy of game board
+    // movegen for current move
     int legal_move_count = 0;
     Move legal_moves[MAX_MOVES];
+    // output
     Move bestMove = Move::NullMove();
+    std::vector<Move> pv_line;
+
     bool pondering = false;
 
     Evaluator evaluator;                // preload PST tables, eval
@@ -91,7 +95,6 @@ public:
     void logSearchDepthInfo(
         int depth, int quiescence_depth, Move _bestMove,
         const std::vector<Move>& best_line,
-        const std::vector<Move>& best_quiescence_line,
         int eval, long long elapsed_ms,
         const std::string& file_path = "C:/Users/maxol/code/chess/search_depth_eval.txt"
     );

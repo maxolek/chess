@@ -188,56 +188,81 @@ Move Engine::getBestMove(Board* board) {
     return bestMove;
 }
 
-// --------------------
-// -- Iterative Deep --
-// --------------------
+
+// --------------------------------
+// -- Iterative Deepening Search --
+// --------------------------------
+
+// -- accounts for time / depth requirements
+// -- uses previous search information
+// ------ transposition table
+// ------ principle move ordering
 
 void Engine::iterativeDeepening() {
+    // constraints
     auto start_time = std::chrono::steady_clock::now();
+    limits.max_depth = std::min(limits.max_depth, 30); // limit depth to 30 (e.g. in rook v nothing endgame it can hit depth 837)
 
+    // updating best move
     Move iteration_bestMove = Move::NullMove();
     int iteration_bestEval = 0;
+    // previous result for last it_deep iteration
+    SearchResult last_result;
 
-    Move opp_it_bestMove = Move::NullMove();
-    bool submit_opp_iteration_best_move = true;
+    // generate first moves once
+    Move first_moves[MAX_MOVES]; int count = 0;
+    movegen->generateMoves(*game_board, false);
+    // copy
+    std::copy_n(movegen->moves, movegen->count, first_moves);
+    count = movegen->count;
 
+
+    // limits include time / depth
     int depth = 1;
     while (!limits.should_stop(depth)) {
-        Move pvMove = Searcher::best_line.empty() ? Move::NullMove() : Searcher::best_line[0];
-        
-        Move first_moves[MAX_MOVES];
-        int count = Searcher::generateAndOrderMoves(search_board, *movegen, evaluator, first_moves, depth, pvMove);
-        count = std::min(MAX_MOVES, count);
 
-        SearchResult result = Searcher::search(search_board, *movegen, evaluator, first_moves, count, depth, pvMove, limits);
+        // --- sort by previous iteration evals (descending) ---
+        if (depth > 1) {
+            // sort first_moves by previous iteration’s evals
+            std::sort(first_moves, first_moves + count,
+                    [&](Move a, Move b) {
+                        int eval_a = -MATE_SCORE, eval_b = -MATE_SCORE;
 
-        auto now = std::chrono::steady_clock::now();
-        auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
+                        // look up evals from last result
+                        for (int i = 0; i < last_result.root_count; ++i) {
+                            if (Move::SameMove(a, last_result.root_moves[i]))
+                                eval_a = last_result.root_evals[i];
+                            if (Move::SameMove(b, last_result.root_moves[i]))
+                                eval_b = last_result.root_evals[i];
+                        }
+                        return eval_a > eval_b; // higher eval first
+                    });
+        }
 
+        // search
+        SearchResult result = Searcher::search(search_board, *movegen, evaluator, first_moves, count, depth, limits);
+        last_result = result;
+
+        //
+        //  Best Move Handling
+        //
         if (!result.bestMove.IsNull()) {
             iteration_bestMove = result.bestMove;
             iteration_bestEval = result.eval;
         }
 
         bestMove = result.bestMove.IsNull() ? iteration_bestMove : result.bestMove;
+        pv_line = result.best_line.line.empty() ? pv_line : result.best_line.line;
 
-        if (depth % 2 == 0 && depth >= 6 && !iteration_bestMove.IsNull()) {
-            opp_it_bestMove = iteration_bestMove;
-        }
-
-        if (submit_opp_iteration_best_move && depth >= 6 && !opp_it_bestMove.IsNull()) {
-            bestMove = opp_it_bestMove;
-        }
-
-        pvMove = result.best_line.empty() ? first_moves[0] : result.best_line[0];
-
+        // check time & log
+        auto now = std::chrono::steady_clock::now();
+        auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
         logSearchDepthInfo(depth, Searcher::max_q_depth, bestMove, 
-                           result.best_line, result.best_q_line, 
-                           iteration_bestEval, elapsed_ms);
+                           result.best_line.line, iteration_bestEval, elapsed_ms);
 
+        // re-enter?
         if (std::abs(iteration_bestEval) >= MATE_SCORE - 10) break;
         depth++;
-        Searcher::max_q_depth = 0;
     }
 }
 
@@ -260,7 +285,6 @@ void Engine::sendBestMove(Move best, Move ponder) {
 void Engine::logSearchDepthInfo(
     int depth, int q_depth, Move _bestMove,
     const std::vector<Move>& best_line,
-    const std::vector<Move>& best_q_line,
     int eval, long long elapsed_ms,
     const std::string& file_path) 
 {
@@ -273,8 +297,6 @@ void Engine::logSearchDepthInfo(
     file << "Best move: " << _bestMove.uci() << "\n";
     file << "Eval: " << eval << "\nBest line: ";
     for (auto& mv : best_line) file << mv.uci() << " ";
-    file << "\nQ line: ";
-    for (auto& mv : best_q_line) file << mv.uci() << " ";
     file << "\nTime: " << elapsed_ms << " ms\n";
     file << "Nodes searched: " << Searcher::nodesSearched << "\n";
     file << "-----------------------------\n";
