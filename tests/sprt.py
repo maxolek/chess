@@ -7,7 +7,7 @@ import book  # your book.py
 
 # ---- Engine Paths ----
 ENGINE_A = r"C:\Users\maxol\code\chess\tomahawk\tomahawk.exe"  # candidate
-ENGINE_B = r"C:\Users\maxol\code\chess\version_history\v5_phoenix.exe"  # baseline
+ENGINE_B = r"C:\Users\maxol\code\chess\version_history\v5.2_rootOrdering.exe"  # baseline
 
 # ---- SPRT Settings ----
 elo0 = 0        # null hypothesis: no improvement
@@ -15,7 +15,7 @@ elo1 = 50       # alt hypothesis: at least +50 Elo
 alpha = 0.05    # type I error rate
 beta = 0.05     # type II error rate
 max_games = 1000
-TIME_LIMIT = .05      # seconds per move
+TIME_LIMIT = .5      # seconds per move
 BOOK_MAX_DEPTH = 8  # number of book moves to play
 
 # ---- PGN Output ----

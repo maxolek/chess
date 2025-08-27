@@ -240,7 +240,7 @@ void Engine::iterativeDeepening() {
         }
 
         // search
-        SearchResult result = Searcher::search(search_board, *movegen, evaluator, first_moves, count, depth, limits);
+        SearchResult result = Searcher::search(search_board, *movegen, evaluator, first_moves, count, depth, limits, last_result.best_line.line);
         last_result = result;
 
         //

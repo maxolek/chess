@@ -63,24 +63,25 @@ bool Searcher::shouldPrune(Board& board, Move& move, Evaluator& evaluator, int s
 // ============================================================================
 
 // Assign a heuristic score to each move
-// - PV move highest priority
+// - previous iteration PV move highest priority
 // - TT move is strong candidate
 // - Captures scored by SEE
 // - Promotions weighted by piece type
 // - Killer moves preferred if they caused cutoffs earlier
 // - Quiet moves fall back to history heuristic
 int Searcher::moveScore(const Evaluator& evaluator, const Move& move, const Board& board,
-                        int depth, const Move& ttMove, PV& pv) {
-    constexpr int PV_BASE       = 10'000'000;
-    constexpr int TT_BASE       = 9'000'000;
+                        int ply, const Move& ttMove, std::vector<Move> previousPV) {
+    constexpr int TT_BASE       = 10'000'000;
+    constexpr int PV_BASE       = 9'000'000;
+    constexpr int PROMO_BASE    = 8'500'000;
     constexpr int GOOD_CAP_BASE = 8'000'000;
-    constexpr int PROMO_BASE    = 7'500'000;
     constexpr int KILLER_BASE   = 7'000'000;
     constexpr int QUIET_BASE    = 0;
     constexpr int BAD_CAP_BASE  = -1'000'000;
 
-    if (depth < pv.line.size() && Move::SameMove(m, pv.line[ply])) return PV_BASE;
+    // TT + PV
     if (Move::SameMove(ttMove, move)) return TT_BASE;
+    if (ply < previousPV.size() && Move::SameMove(move, previousPV[ply])) return PV_BASE;
 
     // Promotions (scaled by piece value)
     if (move.IsPromotion()) {
@@ -108,19 +109,19 @@ int Searcher::moveScore(const Evaluator& evaluator, const Move& move, const Boar
     }
 
     // Killer moves
-    if (Move::SameMove(killerMoves[depth][0], move)) return KILLER_BASE;
-    if (Move::SameMove(killerMoves[depth][1], move)) return KILLER_BASE - 1;
+    if (Move::SameMove(killerMoves[ply][0], move)) return KILLER_BASE;
+    if (Move::SameMove(killerMoves[ply][1], move)) return KILLER_BASE - 1;
 
     // Quiet moves (history heuristic)
     int piece = board.getMovedPiece(move.StartSquare());
     int sidePiece = board.is_white_move ? piece : piece + 6;
 
-    return QUIET_BASE + historyHeuristic[sidePiece][move.TargetSquare()];
+    return QUIET_BASE + historyHeuristic[sidePiece][move.TargetSquare()] / 16;
 }
 
 // Score + sort moves in descending order
 void Searcher::orderedMoves(const Evaluator& evaluator, Move moves[MAX_MOVES], size_t count,
-                            const Board& board, int depth, PV& pv) {
+                            const Board& board, int ply, std::vector<Move> previousPV) {
     U64 hash = board.zobrist_hash;
 
     // transposition table
@@ -141,7 +142,7 @@ void Searcher::orderedMoves(const Evaluator& evaluator, Move moves[MAX_MOVES], s
 
     // score
     for (size_t i = 0; i < count; ++i) {
-        scored.emplace_back(moveScore(evaluator, moves[i], board, depth, ttMove, pv), moves[i]);
+        scored.emplace_back(moveScore(evaluator, moves[i], board, ply, ttMove, previousPV), moves[i]);
     }
 
     // sort
@@ -155,13 +156,13 @@ void Searcher::orderedMoves(const Evaluator& evaluator, Move moves[MAX_MOVES], s
 
 // Generate full move list, then order it
 int Searcher::generateAndOrderMoves(Board& board, MoveGenerator& movegen, const Evaluator& evaluator,
-                                    Move moves[MAX_MOVES], int depth, PV& pv) {
+                                    Move moves[MAX_MOVES], int ply, std::vector<Move> previousPV) {
     
     movegen.generateMoves(board, false);
     int count = std::min(MAX_MOVES, movegen.count);
 
     std::copy_n(movegen.moves, count, moves);
-    orderedMoves(evaluator, moves, static_cast<size_t>(count), board, depth, pv);
+    orderedMoves(evaluator, moves, static_cast<size_t>(count), board, ply, previousPV);
     
     return count;
 }
@@ -233,7 +234,7 @@ int Searcher::quiescence(Board& board, Evaluator& evaluator, MoveGenerator& move
 // ============================================================================
 
 int Searcher::negamax(Board& board, MoveGenerator& movegen, Evaluator& evaluator,
-                      int depth, int alpha, int beta, PV& pv,
+                      int depth, int alpha, int beta, PV& pv, std::vector<Move> previousPV,
                       SearchLimits& limits, int ply, bool use_quiescence) {
     nodesSearched++;
     if (limits.out_of_time()) return alpha;
@@ -254,6 +255,7 @@ int Searcher::negamax(Board& board, MoveGenerator& movegen, Evaluator& evaluator
     int alphaOrig = alpha;
     TTEntry* ttEntry = tt.probe(board.zobrist_hash);
 
+    // require TT_depth > curr_depth  so that we only use TT with more info than current search would give
     if (ttEntry && ttEntry->key == board.zobrist_hash && ttEntry->depth >= depth) {
         int ttScore = ttEntry->eval;
 
@@ -270,7 +272,7 @@ int Searcher::negamax(Board& board, MoveGenerator& movegen, Evaluator& evaluator
 
     // Generate and order moves
     Move moves[MAX_MOVES]; 
-    int count = generateAndOrderMoves(board, movegen, evaluator, moves, depth, pv);
+    int count = generateAndOrderMoves(board, movegen, evaluator, moves, ply, previousPV);
     if (count == 0) return board.is_in_check ? -(MATE_SCORE - ply) : 0;
 
     int bestEval = -MATE_SCORE; int score;
@@ -285,7 +287,7 @@ int Searcher::negamax(Board& board, MoveGenerator& movegen, Evaluator& evaluator
         // Recursive negamax (sign flip)
         PV childPV;
         score = -negamax(board, movegen, evaluator, depth - 1,
-                            -beta, -alpha, childPV,
+                            -beta, -alpha, childPV, previousPV,
                             limits, ply + 1, use_quiescence);
 
         board.UnmakeMove(m);
@@ -332,7 +334,7 @@ int Searcher::negamax(Board& board, MoveGenerator& movegen, Evaluator& evaluator
 
 SearchResult Searcher::search(Board& board, MoveGenerator& movegen, Evaluator& evaluator,
                              Move legal_moves[MAX_MOVES], int count, int depth, 
-                             SearchLimits& limits) {
+                             SearchLimits& limits, std::vector<Move> previousPV) {
     nodesSearched = 0;
     SearchResult result = SearchResult();
 
@@ -345,16 +347,16 @@ SearchResult Searcher::search(Board& board, MoveGenerator& movegen, Evaluator& e
         board.MakeMove(m);
         PV childPV;
         int eval = -negamax(board, movegen, evaluator, depth - 1,
-                            -MATE_SCORE, MATE_SCORE, childPV,
-                            limits, board.plyCount, true);
+                            -MATE_SCORE, MATE_SCORE, childPV, previousPV,
+                            limits, 0, true);
         board.UnmakeMove(m);
+
+        if (limits.out_of_time()) break;
 
         // update root evals
         result.root_moves[i] = m;
         result.root_evals[i] = eval;
         result.root_count++;
-
-        if (limits.out_of_time()) break;
 
         // update best result
         if (i == 0 || eval > result.eval) {
@@ -386,7 +388,8 @@ int Searcher::verboseSearch(Board& board, Evaluator& evaluator, MoveGenerator& m
 
     // Generate moves
     Move moves[MAX_MOVES];
-    int count = generateAndOrderMoves(board, movegen, evaluator, moves, 0, {});
+    std::vector<Move> fakePV;
+    int count = generateAndOrderMoves(board, movegen, evaluator, moves, 0, fakePV);
     if (count == 0) {
         if (board.is_in_check) { exitDepth(); return -MATE_SCORE + ply; }
         exitDepth();

@@ -121,7 +121,8 @@ public:
         Move potential_moves[MAX_MOVES], // sorted from prev_it_evals in engine.cpp
         int move_count, // Only first `move_count` moves are valid
         int depth,
-        SearchLimits& limits
+        SearchLimits& limits,
+        std::vector<Move> previousPV // from last it_deep depth, used for move ordering
     );
 
     // -------------------------------
@@ -131,12 +132,13 @@ public:
         Board& board,
         MoveGenerator& movegen,
         Evaluator& evaluator,
-        int depth,
+        int depth, // distance from end of search
         int alpha,
         int beta,
         PV& pv,  // PV line
+        std::vector<Move> previousPV, // not updated so not using PV struct
         SearchLimits& limits,
-        int ply,
+        int ply,// distance from root
         bool quiesence
     );
 
@@ -162,9 +164,9 @@ public:
         const Evaluator& evaluator,
         const Move& move,
         const Board& board,
-        int depth,
+        int ply,
         const Move& ttMove,
-        PV& pv
+        std::vector<Move> previousPV
     );
 
     static void orderedMoves(
@@ -172,8 +174,8 @@ public:
         Move moves[MAX_MOVES],
         size_t count,
         const Board& board,
-        int depth,
-        PV& pv
+        int ply,
+        std::vector<Move> previousPV
     );
 
     static int generateAndOrderMoves( // called in negamax/quiescence
@@ -181,8 +183,8 @@ public:
         MoveGenerator& movegen,
         const Evaluator& evaluator,
         Move moves[MAX_MOVES],
-        int depth,
-        PV& pv
+        int ply,
+        std::vector<Move> previousPV
     );
 
     // -------------------------------
