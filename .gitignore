@@ -13,12 +13,7 @@ settings.json
 
 # Ignore log files
 *.log
-*.txt
 *.pgn
-
-# ignore helper files
-*.bin
-*.profdata
 
 # ignore object files
 *.o
