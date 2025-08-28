@@ -45,6 +45,16 @@ Tomahawk is a high-performance chess engine written in C++ with a Python-based t
 
 ## Usage
 
+Compile is optimized for the following CPU with the compile flag -march=native
+
+Name                                      NumberOfCores  NumberOfLogicalProcessors
+Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz  4              8
+
+Full compile flags: -pthread -O3 -ffast-math -march=native -flto
+
+Optionally: -fprofile-use
+Which utilizes the profile build generated
+
 ### Compile Engine
 
 bash
