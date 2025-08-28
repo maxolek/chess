@@ -125,6 +125,19 @@ public:
         std::vector<Move> previousPV // from last it_deep depth, used for move ordering
     );
 
+    // aspiration window search with given alpha-beta values
+    static SearchResult searchAspiration(
+        Board& board,
+        MoveGenerator& movegen,
+        Evaluator& evaluator,
+        Move potential_moves[MAX_MOVES], // sorted from prev_it_evals in engine.cpp
+        int move_count, // Only first `move_count` moves are valid
+        int depth,
+        SearchLimits& limits,
+        std::vector<Move> previousPV, // from last it_deep depth, used for move ordering
+        int alpha, int beta
+    );
+
     // -------------------------------
     // Minimax / Negamax search
     // -------------------------------

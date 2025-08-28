@@ -370,6 +370,47 @@ SearchResult Searcher::search(Board& board, MoveGenerator& movegen, Evaluator& e
     return result;
 }
 
+// aspiration windows
+SearchResult Searcher::searchAspiration(Board& board, MoveGenerator& movegen, Evaluator& evaluator,
+                             Move legal_moves[MAX_MOVES], int count, int depth, 
+                             SearchLimits& limits, std::vector<Move> previousPV,
+                            int alpha, int beta) {
+    nodesSearched = 0;
+    SearchResult result = SearchResult();
+
+    for (int i = 0; i < count; ++i) {
+        if (limits.out_of_time()) break;
+
+        Move m = legal_moves[i];
+        if (Move::SameMove(m, Move::NullMove())) continue;
+
+        board.MakeMove(m);
+        PV childPV;
+        int eval = -negamax(board, movegen, evaluator, depth - 1,
+                            -beta, -alpha, childPV, previousPV,
+                            limits, 0, true);
+        board.UnmakeMove(m);
+
+        // if (eval > alpha) alpha = eval;    // best-so-far alpha updates
+
+        if (limits.out_of_time() && i > 0) break;
+
+        // update root evals
+        result.root_moves[i] = m;
+        result.root_evals[i] = eval;
+        result.root_count++;
+
+        // update best result
+        if (i == 0 || eval > result.eval) {
+            result.eval = eval;
+            result.bestMove = m;
+            result.best_line.set(m, childPV);
+        }
+    }
+
+    return result;
+}
+
 
 // ============================================================================
 // DEBUGGING TOOLS

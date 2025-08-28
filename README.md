@@ -9,6 +9,7 @@ Tomahawk is a high-performance chess engine written in C++ with a Python-based t
 - **Negamax Search**: Efficient minimax implementation for zero-sum game evaluation.
 - **Alpha-Beta Pruning**: Cuts off unnecessary branches to improve search speed.
 - **Quiescence Search**: Extends search at tactical positions to avoid horizon effect.
+- **Aspiration Windows**: Dyanmic alpha-beta values based on previous iteration, with dynamic scaling.
 - **Move Ordering Heuristics**: Includes TT move, SEE, MVA-LVA, killer moves, history heuristics, and PV moves.
 - **Tapered Evaluation**: Weights evaluation based on game phase.
 - **Evaluation Function**:

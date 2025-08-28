@@ -203,11 +203,9 @@ void Engine::iterativeDeepening() {
     auto start_time = std::chrono::steady_clock::now();
     limits.max_depth = std::min(limits.max_depth, 30); // limit depth to 30 (e.g. in rook v nothing endgame it can hit depth 837)
 
-    // updating best move
-    Move iteration_bestMove = Move::NullMove();
-    int iteration_bestEval = 0;
     // previous result for last it_deep iteration
     SearchResult last_result;
+    SearchResult result; // current result
 
     // generate first moves once
     Move first_moves[MAX_MOVES]; int count = 0;
@@ -216,12 +214,20 @@ void Engine::iterativeDeepening() {
     std::copy_n(movegen->moves, movegen->count, first_moves);
     count = movegen->count;
 
+    // aspiration window (centipawn)
+    int aspiration_start_depth = 6; // sprt success against 5.4 was seen with start_depth = 5 at 5s/move
+    int delta = 50;
+    int alpha = -MATE_SCORE;
+    int beta = MATE_SCORE;
 
+
+    // search loop
     // limits include time / depth
     int depth = 1;
     while (!limits.should_stop(depth)) {
 
         // --- sort by previous iteration evals (descending) ---
+        // set alpha-beta from aspiration window
         if (depth > 1) {
             // sort first_moves by previous iteration’s evals
             std::sort(first_moves, first_moves + count,
@@ -237,33 +243,48 @@ void Engine::iterativeDeepening() {
                         }
                         return eval_a > eval_b; // higher eval first
                     });
-        } else {
+
+            // set alpha-beta from previous iteration eval
+            if (depth >= aspiration_start_depth) {
+                delta = 50 + depth * 10; // widen window as depth grows
+                alpha = last_result.eval - delta;
+                beta = last_result.eval + delta;
+            }
+            
+        } else { // else use hieristics
             Searcher::orderedMoves(evaluator, first_moves, count, *game_board, 0, {});
         }
 
-        // search
-        SearchResult result = Searcher::search(search_board, *movegen, evaluator, first_moves, count, depth, limits, last_result.best_line.line);
-        last_result = result;
-
+        // search ... aspiration at d >= 5 (search begins to stabalize)
+        if (depth < aspiration_start_depth) result = Searcher::search(search_board, *movegen, evaluator, first_moves, count, depth, limits, last_result.best_line.line);
+        else {
+            // aspiration loop with gradual widening on re-searches
+            while (true) {
+                result = Searcher::searchAspiration(search_board, *movegen, evaluator, first_moves, count, depth, limits, last_result.best_line.line, alpha, beta);
+                if (result.eval <= alpha) {
+                    alpha -= delta;
+                } else if (result.eval >= beta) {
+                    beta += delta;
+                } else break;
+                delta *= 2; // widen progressively
+            }
+        }
+        
         //
         //  Best Move Handling
         //
-        if (!result.bestMove.IsNull()) {
-            iteration_bestMove = result.bestMove;
-            iteration_bestEval = result.eval;
-        }
-
-        bestMove = result.bestMove.IsNull() ? iteration_bestMove : result.bestMove;
+        if (!Move::SameMove(result.bestMove, Move::NullMove())) last_result = result;
+        bestMove = result.bestMove.IsNull() ? last_result.bestMove : result.bestMove;
         pv_line = result.best_line.line.empty() ? pv_line : result.best_line.line;
 
         // check time & log
         auto now = std::chrono::steady_clock::now();
         auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
         logSearchDepthInfo(depth, Searcher::max_q_depth, bestMove, 
-                           result.best_line.line, iteration_bestEval, elapsed_ms);
+                           result.best_line.line, result.eval, elapsed_ms);
 
         // re-enter?
-        if (std::abs(iteration_bestEval) >= MATE_SCORE - 10) break;
+        if (std::abs(result.eval) >= MATE_SCORE - 10) break;
         depth++;
     }
 }

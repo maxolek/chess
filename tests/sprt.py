@@ -19,7 +19,7 @@ elo1 = 50
 alpha = 0.05
 beta = 0.05
 max_games = 1000
-TIME_LIMIT = 0.1
+TIME_LIMIT = 5
 BOOK_MAX_DEPTH = 8
 
 # ---- PGN Output ----
