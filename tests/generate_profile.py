@@ -1,65 +1,59 @@
 import os
+import random
 import chess
 import chess.engine
-from random import choice, random
 
+# ---- Engine path (compiled with -fprofile-generate) ----
 ENGINE_PATH = r"C:\Users\maxol\code\chess\tomahawk\tomahawk.exe"
-PROFILE_DIR = "./pgo_profile"
-os.makedirs(PROFILE_DIR, exist_ok=True)
 
-GAMES_PER_FEN = 100
+# ---- Profile settings ----
+NUM_FENS = 200       # Total unique positions
+PLIES_PER_FEN = 40   # Random moves to play from start to create FEN
+MOVES_PER_FEN = 5    # Engine plays this many moves from each FEN
+TIME_PER_MOVE = 0.5 # seconds
 
-# Example FENs to cover common tactical motifs and edge cases
-FENS = [
-    chess.STARTING_FEN,
-    "r2q1rk1/pp1nbppp/2n1p3/3p4/3P4/2NBPN2/PP3PPP/R1BQ1RK1 w - - 0 1",
-    "4r1k1/5ppp/8/3b4/3P4/2N5/PPP2PPP/R3R1K1 w - - 0 1",
-    "8/P7/8/8/8/8/7p/7K w - - 0 1",
-    "8/8/8/8/2k5/8/3K4/8 w - - 0 1",
-]
+def generate_random_fens(num_fens, plies_per_fen):
+    fens = []
+    for _ in range(num_fens):
+        board = chess.Board()
+        for _ in range(random.randint(1, plies_per_fen)):
+            if board.is_game_over():
+                break
+            move = random.choice(list(board.legal_moves))
+            board.push(move)
+        fens.append(board.fen())
+    return fens
 
-def choose_time_and_length():
-    """Mix shallow, medium, and deeper workloads."""
-    r = random()
-    if r < 0.6:   # 60%: shallow fast games
-        return 0.01, 40
-    elif r < 0.9: # 30%: medium games
-        return 0.1, 80
-    else:         # 10%: deeper games
-        return 1, 120
-
-def play_profile_game(fen, game_idx):
-    board = chess.Board(fen)
+def run_profile():
     try:
         engine = chess.engine.SimpleEngine.popen_uci(ENGINE_PATH)
     except Exception as e:
         print(f"Failed to start engine: {e}")
         return
 
-    TIME_LIMIT, MOVES_PER_GAME = choose_time_and_length()
-    moves_played = []
+    fens = generate_random_fens(NUM_FENS, PLIES_PER_FEN)
 
-    for _ in range(MOVES_PER_GAME):
-        if board.is_game_over():
-            break
-        result = engine.play(board, chess.engine.Limit(time=TIME_LIMIT))
-        if result.move is None:
-            break
-        board.push(result.move)
-        moves_played.append(result.move.uci())
+    for i, fen in enumerate(fens, 1):
+        board = chess.Board(fen)
+        print(f"[{i}/{NUM_FENS}] FEN: {fen}")
+
+        for _ in range(MOVES_PER_FEN):
+            if board.is_game_over():
+                break
+            try:
+                result = engine.play(board, chess.engine.Limit(time=TIME_PER_MOVE))
+            except chess.engine.EngineTerminatedError:
+                print("Engine crashed!")
+                break
+
+            move = result.move
+            if move not in board.legal_moves:
+                print(f"Illegal move {move} at {board.fen()}")
+                break
+            board.push(move)
 
     engine.quit()
-
-    # optional logging
-    fname = os.path.join(PROFILE_DIR, f"fen{FENS.index(fen)}_game{game_idx}.pgn")
-    with open(fname, "w") as f:
-        f.write(" ".join(moves_played) + "\n")
-
-def main():
-    for fen in FENS:
-        for game_idx in range(GAMES_PER_FEN):
-            play_profile_game(fen, game_idx)
-            print(f"FEN {FENS.index(fen)} Game {game_idx} done")
+    print("PGO profile run complete! Now compile with -fprofile-use.")
 
 if __name__ == "__main__":
-    main()
+    run_profile()

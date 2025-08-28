@@ -351,7 +351,8 @@ SearchResult Searcher::search(Board& board, MoveGenerator& movegen, Evaluator& e
                             limits, 0, true);
         board.UnmakeMove(m);
 
-        if (limits.out_of_time()) break;
+
+        if (limits.out_of_time() && i > 0) break;
 
         // update root evals
         result.root_moves[i] = m;

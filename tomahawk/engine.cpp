@@ -237,6 +237,8 @@ void Engine::iterativeDeepening() {
                         }
                         return eval_a > eval_b; // higher eval first
                     });
+        } else {
+            Searcher::orderedMoves(evaluator, first_moves, count, *game_board, 0, {});
         }
 
         // search

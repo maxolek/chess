@@ -12,7 +12,7 @@ ASAN_FLAGS = -fsanitize=address -fno-omit-frame-pointer
 UBSAN_FLAGS = -fsanitize=undefined -fno-sanitize-recover=undefined
 
 EXTRA = -g -fno-optimize-sibling-calls
-PROD = -O3 -ffast-math -march=native -flto #-fprofile-generate
+PROD = -O3 -ffast-math -march=native -flto #-fprofile-use=engine.profdata
 
 # -------------------
 # Source Files
