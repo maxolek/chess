@@ -14,6 +14,8 @@ settings.json
 # Ignore log files
 *.log
 *.pgn
+search_depth_eval.txt
+uci_interactions.txt
 
 # ignore object files
 *.o

@@ -8,6 +8,7 @@
 #include "searcher.h"
 #include "evaluator.h"
 
+
 // ---------------------
 // -- Engine Settings --
 // ---------------------
@@ -52,6 +53,13 @@ private:
     int increment[2] = {0, 0};          // [white, black] increment
     SearchLimits limits;
     UCIOptions options;
+
+    // iteration-local eval table
+    static constexpr int INVALID = MATE_SCORE + 10000;
+    int last_eval_table[1 << 16];   // keyed by Move.Value()
+    // book keeping
+    void store_last_result(const SearchResult& res);
+    int get_prev_eval(Move m) const;
 
 public:
     explicit Engine(Board* _board);

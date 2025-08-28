@@ -130,6 +130,25 @@ void Engine::playMovesStrings(const std::vector<std::string>& moves) {
     }
 }
 
+// ------------------------
+// -- Local Eval Storage --
+// ------------------------
+
+void Engine::store_last_result(const SearchResult& res) {
+    // clear table
+    std::fill(std::begin(last_eval_table), std::end(last_eval_table), INVALID);
+
+    // write moves/evals from last depth
+    for (int i = 0; i < res.root_count; ++i) {
+        last_eval_table[res.root_moves[i].move.Value()] = res.root_moves[i].eval;
+    }
+}
+
+inline int Engine::get_prev_eval(Move m) const {
+    int v = last_eval_table[m.Value()];
+    return (v == INVALID) ? -MATE_SCORE : v;
+}
+
 // --------------------
 // -- Search Control --
 // --------------------
@@ -220,6 +239,8 @@ void Engine::iterativeDeepening() {
     int alpha = -MATE_SCORE;
     int beta = MATE_SCORE;
 
+    // clear eval table before first depth
+    std::fill(std::begin(last_eval_table), std::end(last_eval_table), INVALID);
 
     // search loop
     // limits include time / depth
@@ -227,37 +248,32 @@ void Engine::iterativeDeepening() {
     while (!limits.should_stop(depth)) {
 
         // --- sort by previous iteration evals (descending) ---
-        // set alpha-beta from aspiration window
         if (depth > 1) {
-            // sort first_moves by previous iteration’s evals
             std::sort(first_moves, first_moves + count,
-                    [&](Move a, Move b) {
-                        int eval_a = -MATE_SCORE, eval_b = -MATE_SCORE;
+                [&](Move a, Move b) {
+                    return get_prev_eval(a) > get_prev_eval(b);
+                });
 
-                        // look up evals from last result
-                        for (int i = 0; i < last_result.root_count; ++i) {
-                            if (Move::SameMove(a, last_result.root_moves[i]))
-                                eval_a = last_result.root_evals[i];
-                            if (Move::SameMove(b, last_result.root_moves[i]))
-                                eval_b = last_result.root_evals[i];
-                        }
-                        return eval_a > eval_b; // higher eval first
-                    });
-
-            // set alpha-beta from previous iteration eval
-            if (depth >= aspiration_start_depth) {
-                delta = 50 + depth * 10; // widen window as depth grows
+            // aspiration setup
+            if (depth > aspiration_start_depth) { 
+                delta = std::max(delta, 50 + depth * 10);
                 alpha = last_result.eval - delta;
-                beta = last_result.eval + delta;
+                beta  = last_result.eval + delta;
+            } else if (depth == aspiration_start_depth) {
+                delta += depth * 10;
+                alpha = last_result.eval - delta;
+                beta  = last_result.eval + delta;
             }
-            
-        } else { // else use hieristics
+        } else {
+            // initial ordering
             Searcher::orderedMoves(evaluator, first_moves, count, *game_board, 0, {});
         }
 
+
         // search ... aspiration at d >= 5 (search begins to stabalize)
-        if (depth < aspiration_start_depth) result = Searcher::search(search_board, *movegen, evaluator, first_moves, count, depth, limits, last_result.best_line.line);
-        else {
+        if (depth < aspiration_start_depth) {
+            result = Searcher::search(search_board, *movegen, evaluator, first_moves, count, depth, limits, last_result.best_line.line);
+        } else {
             // aspiration loop with gradual widening on re-searches
             while (true) {
                 result = Searcher::searchAspiration(search_board, *movegen, evaluator, first_moves, count, depth, limits, last_result.best_line.line, alpha, beta);
@@ -270,12 +286,16 @@ void Engine::iterativeDeepening() {
             }
         }
         
-        //
-        //  Best Move Handling
-        //
-        if (!Move::SameMove(result.bestMove, Move::NullMove())) last_result = result;
+        // --- store results for next iteration ---
+        if (!Move::SameMove(result.bestMove, Move::NullMove())) {
+            last_result = result;
+            store_last_result(result);   // <<<<< key integration
+        }
+
+        // update best move + PV
         bestMove = result.bestMove.IsNull() ? last_result.bestMove : result.bestMove;
-        pv_line = result.best_line.line.empty() ? pv_line : result.best_line.line;
+        if (!result.best_line.line.empty())
+            pv_line = result.best_line.line;
 
         // check time & log
         auto now = std::chrono::steady_clock::now();

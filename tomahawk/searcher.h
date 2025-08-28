@@ -6,6 +6,16 @@
 #include "tt.h"
 
 
+// -----------------------
+// -- Root Move Tracking --
+// ------------------------
+
+struct RootMove {
+    Move move;
+    int eval;
+};
+
+
 /**
  * Struct for tracking principal variation
  */
@@ -32,8 +42,7 @@ struct SearchResult {
     EvalReport eval_report;             // Breakdown of evaluation components
     PV best_line;                        // Principal variation (with normal_len)
     // full root moves
-    Move root_moves[MAX_MOVES];
-    int root_evals[MAX_MOVES];
+    RootMove root_moves[MAX_MOVES];
     int root_count = 0;
 
     // Convenience to copy PV from a child

@@ -11,7 +11,7 @@ import book  # your book.py
 
 # ---- Engine Paths ----
 ENGINE_A = r"C:\Users\maxol\code\chess\tomahawk\tomahawk.exe"  # candidate
-ENGINE_B = r"C:\Users\maxol\code\chess\version_history\v5.4_kingSafety.exe"  # baseline
+ENGINE_B = r"C:\Users\maxol\code\chess\version_history\v5.5_aspiration.exe"  # baseline
 
 # ---- SPRT Settings ----
 elo0 = 0
@@ -19,7 +19,7 @@ elo1 = 50
 alpha = 0.05
 beta = 0.05
 max_games = 1000
-TIME_LIMIT = 5
+TIME_LIMIT = 1
 BOOK_MAX_DEPTH = 8
 
 # ---- PGN Output ----

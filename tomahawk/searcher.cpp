@@ -355,8 +355,8 @@ SearchResult Searcher::search(Board& board, MoveGenerator& movegen, Evaluator& e
         if (limits.out_of_time() && i > 0) break;
 
         // update root evals
-        result.root_moves[i] = m;
-        result.root_evals[i] = eval;
+        result.root_moves[i].move = m;
+        result.root_moves[i].eval = eval;
         result.root_count++;
 
         // update best result
@@ -396,8 +396,8 @@ SearchResult Searcher::searchAspiration(Board& board, MoveGenerator& movegen, Ev
         if (limits.out_of_time() && i > 0) break;
 
         // update root evals
-        result.root_moves[i] = m;
-        result.root_evals[i] = eval;
+        result.root_moves[i].move = m;
+        result.root_moves[i].eval = eval;
         result.root_count++;
 
         // update best result
