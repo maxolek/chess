@@ -2,7 +2,8 @@
 .vscode/
 # and lichess-bot repo
 lichess-bot/
-tests/logs/
+# ignore other engines
+stockfish-windows-x86-64-avx2
 
 # Ignore JSON configuration files
 launch.json
@@ -14,8 +15,7 @@ settings.json
 # Ignore log files
 *.log
 *.pgn
-search_depth_eval.txt
-uci_interactions.txt
+tests/logs/
 
 # ignore object files
 *.o
@@ -24,3 +24,4 @@ uci_interactions.txt
 *.mak
 *.exe
 *.dll
+

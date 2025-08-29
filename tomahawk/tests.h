@@ -536,8 +536,6 @@ public:
         log.close();
     }
 
-
-
     void testMoveOrdering(std::string fen, Move _pvMove) {
         // reset board to the given FEN
         setBoard(fen);
@@ -764,3 +762,171 @@ public:
 };
 
 #endif
+
+
+
+
+// ############## VERBOSE SEARCHES (DEPRECIATED)
+
+/*
+    int verboseSearch(Board& board, Evaluator& evaluator, MoveGenerator& movegen,
+                            int alpha, int beta, std::vector<Move>& pv,
+                            SearchLimits& limits, int ply, bool use_quiescence, std::ostream& log) {
+        nodesSearched++;
+        enterDepth();
+        max_q_depth = std::max(max_q_depth, quiesence_depth);
+
+        int standPat = evaluator.taperedEval(board);
+        int bestEval = standPat;
+
+        std::string indent(static_cast<size_t>(ply) * 2, ' ');
+
+        // Generate moves
+        Move moves[MAX_MOVES];
+        std::vector<Move> fakePV;
+        int count = generateAndOrderMoves(board, movegen, evaluator, moves, 0, fakePV);
+        if (count == 0) {
+            if (board.is_in_check) { exitDepth(); return -MATE_SCORE + ply; }
+            exitDepth();
+            return standPat;
+        }
+
+        // Sort moves by SEE descending
+        std::sort(moves, moves + count, [&](Move a, Move b) { return evaluator.SEE(board, a) > evaluator.SEE(board, b); });
+
+        std::vector<Move> childPV;
+
+        for (int i = 0; i < count; ++i) {
+            if (limits.out_of_time()) break;
+
+            Move m = moves[i];
+
+            // Log move info
+            log << indent << "Depth " << ply
+                << " | Move: " << m.uci()
+                << " | StandPat: " << standPat
+                << " | Alpha: " << alpha
+                << " | Beta: " << beta;
+
+            bool pruned = false;
+            if (shouldPrune(board, m, evaluator, standPat, alpha)) {
+                pruned = true;
+                log << " | Pruned by SEE/delta | SEE: " << evaluator.SEE(board, m);
+            }
+            log << "\n";
+
+            if (pruned) continue;
+
+            board.MakeMove(m);
+            childPV.clear();
+
+            int score;
+            if (use_quiescence && !board.is_in_check) {
+                score = -quiescenceVerbose(board, evaluator, movegen, -beta, -alpha, childPV, limits, ply + 1, log);
+            } else {
+                score = -verboseSearch(board, evaluator, movegen, -beta, -alpha, childPV, limits, ply + 1, use_quiescence, log);
+            }
+
+            board.UnmakeMove(m);
+
+            // Log returned score
+            log << indent << "Depth " << ply
+                << " | Move: " << m.uci()
+                << " | Returned score: " << score;
+
+            if (score >= beta) {
+                log << " | Alpha-Beta cutoff!\n";
+                exitDepth();
+                return beta;
+            } else {
+                log << "\n";
+            }
+
+            if (score > bestEval) {
+                bestEval = score;
+                alpha = std::max(alpha, score);
+                updatePV(pv, m, childPV);
+                best_quiescence_line = pv;
+            }
+        }
+
+        exitDepth();
+        return bestEval;
+    }
+
+
+    int quiescenceVerbose(Board& board, Evaluator& evaluator, MoveGenerator& movegen,
+                                    int alpha, int beta, std::vector<Move>& pv,
+                                    SearchLimits& limits, int ply, std::ostream& log) {
+        nodesSearched++;
+        enterDepth();
+        max_q_depth = std::max(max_q_depth, quiesence_depth);
+
+        int standPat = evaluator.taperedEval(board);
+        int bestEval = standPat;
+
+        std::string indent(static_cast<size_t>(ply) * 2, ' ');
+
+        movegen.generateMoves(board, true); // captures, promotions, evasions
+        int count = movegen.count;
+        if (count == 0) {
+            if (board.is_in_check) { exitDepth(); return -MATE_SCORE + ply; }
+            exitDepth();
+            return standPat;
+        }
+
+        Move moves[MAX_MOVES];
+        std::copy_n(movegen.moves, count, moves);
+
+        // Sort moves by SEE descending
+        std::sort(moves, moves + count, [&](Move a, Move b) { return evaluator.SEE(board, a) > evaluator.SEE(board, b); });
+
+        std::vector<Move> childPV;
+
+        for (int i = 0; i < count; ++i) {
+            if (limits.out_of_time()) break;
+
+            Move m = moves[i];
+
+            log << indent << "Depth " << ply
+                << " | Move: " << m.uci()
+                << " | StandPat: " << standPat
+                << " | Alpha: " << alpha
+                << " | Beta: " << beta << "\n";
+
+            if (shouldPrune(board, m, evaluator, standPat, alpha)) {
+                log << indent << "  Skipped by SEE/delta pruning\n";
+                continue;
+            }
+
+            board.MakeMove(m);
+            childPV.clear();
+
+            int score = -quiescenceVerbose(board, evaluator, movegen, -beta, -alpha, childPV, limits, ply + 1, log);
+
+            board.UnmakeMove(m);
+
+            log << indent << "Depth " << ply
+                << " | Move: " << m.uci()
+                << " | Returned score: " << score;
+
+            if (score >= beta) {
+                log << " | Alpha-Beta cutoff!\n";
+                exitDepth();
+                return beta;
+            } else {
+                log << "\n";
+            }
+
+            if (score > bestEval) {
+                bestEval = score;
+                alpha = std::max(alpha, score);
+                updatePV(pv, m, childPV);
+                best_quiescence_line = pv;
+            }
+        }
+
+        exitDepth();
+        return bestEval;
+    }
+*/

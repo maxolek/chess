@@ -6,13 +6,14 @@ import chess.engine
 import random
 from datetime import datetime
 import book  # your book.py
+import utils
 
 # ---- Engine Paths ----
-CANDIDATE = r"C:\Users\maxol\code\chess\tomahawk\tomahawk.exe"
-STOCKFISH = r"C:\Users\maxol\stockfish-windows-x86-64-avx2\stockfish\stockfish-windows-x86-64-avx2"
+CANDIDATE = r"..\tomahawk\tomahawk.exe"
+STOCKFISH = r"..\stockfish-windows-x86-64-avx2\stockfish\stockfish-windows-x86-64-avx2"
 
 # ---- Time & Skill Settings ----
-TIME_LIMIT = 1             # seconds per move
+TIME_LIMIT = .1             # seconds per move
 BOOK_MAX_DEPTH = 8         # opening book moves
 GAMES_TO_PLAY = 20         # total games
 STOCKFISH_SKILL_LEVEL = 5  # approx 1800 Elo

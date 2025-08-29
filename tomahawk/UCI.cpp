@@ -31,10 +31,13 @@ void UCI::handleCommand(const std::string& line) {
     if (token == "uci") {
             std::cout << "id name tomahawk\n";
             std::cout << "id author maxolek\n";
+            // engine options
             std::cout << "option name Move Overhead type spin default 30 min 0 max 1000\n";
             std::cout << "option name Hash type spin default 16 min 1 max 1024\n";
             std::cout << "option name Threads type spin default 4 min 1 max 128\n";
             std::cout << "option name Ponder type check default false\n";
+            // stats tracking
+            std::cout << "option name ShowStats type check default false\n";
             // Required for lichess
             std::cout << "option name UCI_ShowWDL type check default false" << std::endl;
             std::cout << "uciok\n";
@@ -73,30 +76,29 @@ void UCI::handleCommand(const std::string& line) {
     // else ignore unknown commands or add more handlers
 }
 
+// --- handle "setoption" ---
 void UCI::handleSetOption(std::istringstream& iss) {
     std::string token;
     std::string name;
     std::string value;
 
-    // Read tokens until "value" or end
     // First token should be "name"
     iss >> token;
     if (token != "name") {
-        // Invalid command format, ignore or handle error
-        return;
+        return; // invalid format
     }
 
-    // Read option name until "value" or end of stream
+    // Read option name until "value" or end
     while (iss >> token) {
         if (token == "value") {
-            // Now read the rest as value
+            // Everything after "value" is the value string
             std::getline(iss, value);
-            // Trim leading spaces from value
+            // Trim leading whitespace
             size_t first = value.find_first_not_of(" \t");
             if (first != std::string::npos) {
                 value = value.substr(first);
             } else {
-                value.clear(); // no value after "value"
+                value.clear();
             }
             break;
         } else {
@@ -105,9 +107,7 @@ void UCI::handleSetOption(std::istringstream& iss) {
         }
     }
 
-    // If no "value" token, value remains empty string
-
-    // Now pass to your engine's option setter
+    // Pass parsed option to engine
     engine->setOption(name, value);
 }
 
@@ -160,8 +160,12 @@ void UCI::handleGo(std::istringstream& iss) {
     int nodes = -1;
     bool infinite = false;
 
+    SearchSettings settings;
+    bool eval_test = false;
+
     while (iss >> token) {
-        if (token == "wtime") iss >> wtime;
+        if (token == "eval_test") eval_test = true;
+        else if (token == "wtime") iss >> wtime;
         else if (token == "btime") iss >> btime;
         else if (token == "winc") iss >> winc;
         else if (token == "binc") iss >> binc;
@@ -172,7 +176,6 @@ void UCI::handleGo(std::istringstream& iss) {
         else if (token == "infinite") infinite = true;
     }
 
-    SearchSettings settings;
     settings.wtime = wtime;
     settings.btime = btime;
     settings.winc = winc;
@@ -183,6 +186,6 @@ void UCI::handleGo(std::istringstream& iss) {
     settings.movetime = movetime;
     settings.infinite = infinite;
 
-    engine->startSearch(settings);
-
+    if (eval_test) {engine->evaluate_position(settings);}
+    else {engine->startSearch(settings);}
 }

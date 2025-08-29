@@ -6,19 +6,14 @@ import os
 from datetime import datetime
 import concurrent.futures
 import threading
-
+import utils
 import book  # your book.py
 
 # ---- Engine Configuration ----
 ENGINES = {
-    #"v4.2_evenDepth": r"C:\Users\maxol\code\chess\version_history\v4.2_evenDepth.exe",
-    #"v5_phoenix": r"C:\Users\maxol\code\chess\version_history\v5_phoenix.exe",
-    #"v5.1_tt": r"C:\Users\maxol\code\chess\version_history\v5.1_tt.exe",
-    #"v5.2_rootOrdering": r"C:\Users\maxol\code\chess\version_history\v5.2_rootOrdering.exe",
-    #"v5.3_pvOrdering": r"C:\Users\maxol\code\chess\version_history\v5.3_pvOrdering.exe",
-    "v5.4_kingSafety": r"C:\Users\maxol\code\chess\version_history\v5.4_kingSafety.exe",
-    "v5.5_aspiration": r"C:\Users\maxol\code\chess\version_history\v5.5_aspiration.exe",
-    "vTEST": r"C:\Users\maxol\code\chess\tomahawk\tomahawk.exe"
+    "v5.4_kingSafety": r"..\version_history\v5.4_kingSafety.exe",
+    "v5.5_aspiration": r"..\version_history\v5.5_aspiration.exe",
+    "vTEST": r"..\tomahawk\tomahawk.exe"
 }
 
 GAMES_PER_PAIR = 16

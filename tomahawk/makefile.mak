@@ -22,10 +22,6 @@ PROD_SRCS = board.cpp gamestate.cpp helpers.cpp moveGenerator.cpp \
             magics.cpp PrecomputedMoveData.cpp UCI.cpp \
             searcher.cpp evaluator.cpp engine.cpp tomahawk.cpp
 
-TEST_SRCS = board.cpp gamestate.cpp helpers.cpp moveGenerator.cpp \
-            magics.cpp PrecomputedMoveData.cpp UCI.cpp \
-            searcher.cpp evaluator.cpp engine.cpp testing.cpp
-
 # -------------------
 # Build Configuration
 # -------------------
@@ -34,14 +30,6 @@ ifeq ($(DEBUG_OPT),1) # prod testing
     CXXFLAGS = $(CXXSTD) -O0 $(EXTRA) $(COMMON_WARN) $(COMMON_LINK) -DDEBUG $(ASAN_FLAGS)
     TARGET = debug_opt_sanitize.exe
     SRCS = $(PROD_SRCS)
-else ifeq ($(DEBUG),1) # test testing
-    CXXFLAGS = $(CXXSTD) -O0 $(EXTRA) $(COMMON_WARN) $(COMMON_LINK) -DDEBUG $(ASAN_FLAGS)
-    TARGET = debug_noopt_sanitize.exe
-    SRCS = $(TEST_SRCS)
-else ifeq ($(TEST),1)
-    CXXFLAGS = $(CXXSTD) $(PROD) $(COMMON_WARN) $(COMMON_LINK)
-    TARGET = testing.exe
-    SRCS = $(TEST_SRCS)
 else ifeq ($(PROFILE),1)
     CXXFLAGS = $(CXXSTD) -O1 -g $(COMMON_WARN) $(COMMON_LINK)
     TARGET = tomahawk_profile.exe

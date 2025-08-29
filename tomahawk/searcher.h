@@ -4,6 +4,7 @@
 #include "evaluator.h"
 #include "helpers.h"
 #include "tt.h"
+#include "stats.h"
 
 
 // -----------------------
@@ -104,8 +105,9 @@ public:
     inline static bool stop = false; // Set externally to abort search
 
     // Search stats
+    static inline SearchStats stats;
+    static inline bool trackStats = false;
     static int nodesSearched;
-    static TranspositionTable tt;
 
     // Quiescence tracking
     static int quiesence_depth; // Current depth inside quiescence
@@ -119,6 +121,9 @@ public:
     // Principal variation storage
     static std::vector<Move> best_line;             // PV line tracker
     static std::vector<Move> best_quiescence_line;  // PV built in quiescence
+
+    // transpositions
+    static TranspositionTable tt;
 
     // -------------------------------
     // Main search entry
@@ -235,16 +240,13 @@ public:
     static void enterDepth();
     static void exitDepth();
 
+    // -------------------------------
+    // Stats Tracking
+    // -------------------------------
+    static void enableStats(bool enable) {trackStats = enable;};
+    static void resetStats();
 
-    // -------------------------------
-    // Debugging
-    // -------------------------------
-    static int quiescenceVerbose(Board& board, Evaluator& evaluator, MoveGenerator& movegen,
-                                int alpha, int beta, std::vector<Move>& pv,
-                                SearchLimits& limits, int ply, std::ostream& log);
-    static int verboseSearch(Board& board, Evaluator& evaluator, MoveGenerator& movegen,
-                            int alpha, int beta, std::vector<Move>& pv,
-                            SearchLimits& limits, int ply, bool use_quiescence, std::ostream& log);
+
 };
 
 #endif // SEARCHER_H

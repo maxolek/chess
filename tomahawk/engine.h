@@ -7,6 +7,7 @@
 #include "moveGenerator.h"
 #include "searcher.h"
 #include "evaluator.h"
+#include "stats.h"
 
 
 // ---------------------
@@ -23,6 +24,7 @@ struct UCIOptions {
     int skillLevel = 20;
     int contempt = 0;
     bool uciShowWDL = false;
+    bool showStats = false;
 };
 
 struct SearchSettings {
@@ -72,11 +74,14 @@ public:
     Move legal_moves[MAX_MOVES];
     // output
     Move bestMove = Move::NullMove();
+    int bestEval = -MATE_SCORE;
     std::vector<Move> pv_line;
 
     bool pondering = false;
 
     Evaluator evaluator;                // preload PST tables, eval
+
+    SearchStats stats;
 
     // --- State ---
     void clearState();
@@ -92,20 +97,15 @@ public:
     void startSearch(const SearchSettings& settings);
     void stopSearch();
 
+    // --- Search ---
     void computeSearchTime(const SearchSettings& settings);
     void iterativeDeepening();
     Move getBestMove(Board* board); // returns best move
+    void evaluate_position(SearchSettings settings); // for testing
 
     // --- Communication ---
     void sendBestMove(Move bestMove, Move ponder = Move::NullMove());
-
-    // --- Logging ---
-    void logSearchDepthInfo(
-        int depth, int quiescence_depth, Move _bestMove,
-        const std::vector<Move>& best_line,
-        int eval, long long elapsed_ms,
-        const std::string& file_path = "C:/Users/maxol/code/chess/search_depth_eval.txt"
-    );
+    void logStats(const std::string& fen) const;
 };
 
 #endif // ENGINE_H

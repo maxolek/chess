@@ -8,10 +8,11 @@ import tkinter as tk
 from tkinter import Tk, Canvas, PhotoImage
 from PIL import Image, ImageTk
 import book  # your book.py
+import utils
 
 # ---- Engine Paths ----
-ENGINE_A = r"C:\Users\maxol\code\chess\tomahawk\tomahawk.exe"  # candidate
-ENGINE_B = r"C:\Users\maxol\code\chess\version_history\v5.5_aspiration.exe"  # baseline
+ENGINE_A = r"..\tomahawk\tomahawk.exe"  # candidate
+ENGINE_B = r"..\version_history\v5.5_aspiration.exe"  # baseline
 
 # ---- SPRT Settings ----
 elo0 = 0
@@ -19,7 +20,7 @@ elo1 = 50
 alpha = 0.05
 beta = 0.05
 max_games = 1000
-TIME_LIMIT = 1
+TIME_LIMIT = 30
 BOOK_MAX_DEPTH = 8
 
 # ---- PGN Output ----
@@ -275,7 +276,7 @@ def run_sprt():
     upper = math.log((1 - beta) / alpha)
     game_num = 0
 
-    book_games = book.load_book("book.pgn")
+    book_games = book.load_book("bin/book.pgn")
 
     root = Tk()
     root.title("Live SPRT Board")

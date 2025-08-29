@@ -19,6 +19,7 @@ Engine::Engine(Board* _board) {
     clearState();
     movegen->generateMoves(search_board, false);
     legal_move_count = movegen->count;
+    stats = SearchStats();
 }
 
 // ------------------
@@ -34,6 +35,7 @@ void Engine::clearState() {
     increment[0] = increment[1] = 0;
     limits = SearchLimits(); // reset time control
     evaluator = Evaluator(&precomp);
+    stats = SearchStats();
 }
 
 // -------------------
@@ -65,10 +67,16 @@ void Engine::setOption(const std::string& name, const std::string& value) {
     else if (name == "UCI_ShowWDL") {
         options.uciShowWDL = (value == "true" || value == "1");
         std::cout << "info string set UCI_ShowWDL = " << (options.uciShowWDL ? "true" : "false") << std::endl;
-    } 
+    } else if (name == "ShowStats") {
+        options.showStats = (value == "true" || value == "True" || value == "1");
+        Searcher::enableStats(options.showStats);
+        std::cout << "info string set ShowStats - " << (options.showStats ? "true" : "false") << std::endl;
+    }
     else {
         std::cout << "info string ignoring unknown option: " << name << std::endl;
     }
+
+    std::cout.flush();
 }
 
 void Engine::setPosition(const std::string& fen, const std::vector<Move>& moves) {
@@ -169,7 +177,7 @@ void Engine::computeSearchTime(const SearchSettings& settings) {
 
     // compute function
     double aggressiveness = 1;
-    int timeBudget = static_cast<int>((static_cast<double>(myTime) / movesToGo + myInc) * aggressiveness);
+    int timeBudget = static_cast<int>((static_cast<double>(myTime) / movesToGo + myInc/2) * aggressiveness);
     timeBudget = std::max(10, timeBudget - options.moveOverhead);
 
     limits = SearchLimits(timeBudget);
@@ -218,95 +226,136 @@ Move Engine::getBestMove(Board* board) {
 // ------ principle move ordering
 
 void Engine::iterativeDeepening() {
-    // constraints
     auto start_time = std::chrono::steady_clock::now();
-    limits.max_depth = std::min(limits.max_depth, 30); // limit depth to 30 (e.g. in rook v nothing endgame it can hit depth 837)
+    limits.max_depth = std::min(limits.max_depth, 30);
 
-    // previous result for last it_deep iteration
+    if (Searcher::trackStats) {
+        stats = SearchStats();           // reset engine-level stats
+        Searcher::stats = SearchStats(); // reset global stats
+    }
+
     SearchResult last_result;
-    SearchResult result; // current result
+    SearchResult result;
 
     // generate first moves once
-    Move first_moves[MAX_MOVES]; int count = 0;
+    Move first_moves[MAX_MOVES];
     movegen->generateMoves(*game_board, false);
-    // copy
-    std::copy_n(movegen->moves, movegen->count, first_moves);
-    count = movegen->count;
+    int count = std::min(movegen->count, MAX_MOVES);
+    std::copy_n(movegen->moves, count, first_moves);
 
-    // aspiration window (centipawn)
-    int aspiration_start_depth = 6; // sprt success against 5.4 was seen with start_depth = 5 at 5s/move
+    int aspiration_start_depth = 6;
     int delta = 50;
     int alpha = -MATE_SCORE;
     int beta = MATE_SCORE;
 
-    // clear eval table before first depth
     std::fill(std::begin(last_eval_table), std::end(last_eval_table), INVALID);
 
-    // search loop
-    // limits include time / depth
     int depth = 1;
-    while (!limits.should_stop(depth)) {
+    Move prevBest = Move::NullMove();
 
-        // --- sort by previous iteration evals (descending) ---
+    while (!limits.should_stop(depth)) {
+        // --- initialize per-depth stats ---
+        if (Searcher::trackStats) {
+            STATS_DEPTH_INIT(depth);
+            if ((int)Searcher::stats.depthTTHits.size() <= depth) Searcher::stats.depthTTHits.push_back(0);
+            if ((int)Searcher::stats.depthTTStores.size() <= depth) Searcher::stats.depthTTStores.push_back(0);
+            if ((int)Searcher::stats.aspirationResearches.size() <= depth) Searcher::stats.aspirationResearches.push_back({});
+        }
+
+        // --- move ordering ---
         if (depth > 1) {
             std::sort(first_moves, first_moves + count,
-                [&](Move a, Move b) {
-                    return get_prev_eval(a) > get_prev_eval(b);
-                });
+                [&](Move a, Move b) { return get_prev_eval(a) > get_prev_eval(b); });
 
-            // aspiration setup
-            if (depth > aspiration_start_depth) { 
+            if (depth >= aspiration_start_depth) {
                 delta = std::max(delta, 50 + depth * 10);
                 alpha = last_result.eval - delta;
                 beta  = last_result.eval + delta;
-            } else if (depth == aspiration_start_depth) {
-                delta += depth * 10;
-                alpha = last_result.eval - delta;
-                beta  = last_result.eval + delta;
             }
         } else {
-            // initial ordering
             Searcher::orderedMoves(evaluator, first_moves, count, *game_board, 0, {});
         }
 
-
-        // search ... aspiration at d >= 5 (search begins to stabalize)
+        // --- search ---
         if (depth < aspiration_start_depth) {
-            result = Searcher::search(search_board, *movegen, evaluator, first_moves, count, depth, limits, last_result.best_line.line);
+            result = Searcher::search(search_board, *movegen, evaluator,
+                                      first_moves, count, depth, limits,
+                                      last_result.best_line.line);
         } else {
-            // aspiration loop with gradual widening on re-searches
             while (true) {
-                result = Searcher::searchAspiration(search_board, *movegen, evaluator, first_moves, count, depth, limits, last_result.best_line.line, alpha, beta);
-                if (result.eval <= alpha) {
-                    alpha -= delta;
-                } else if (result.eval >= beta) {
-                    beta += delta;
-                } else break;
-                delta *= 2; // widen progressively
+                result = Searcher::searchAspiration(search_board, *movegen, evaluator,
+                                                    first_moves, count, depth, limits,
+                                                    last_result.best_line.line,
+                                                    alpha, beta);
+
+                if (Searcher::trackStats) {
+                    auto &asp = Searcher::stats.aspirationResearches[depth];
+                    if (result.eval <= alpha) asp.push_back(-1);
+                    else if (result.eval >= beta) asp.push_back(+1);
+                }
+
+                if (result.eval <= alpha) alpha -= delta;
+                else if (result.eval >= beta) beta += delta;
+                else break;
+
+                delta *= 2;
             }
         }
-        
-        // --- store results for next iteration ---
+
+        // --- store results ---
         if (!Move::SameMove(result.bestMove, Move::NullMove())) {
             last_result = result;
-            store_last_result(result);   // <<<<< key integration
+            store_last_result(result);
         }
 
-        // update best move + PV
         bestMove = result.bestMove.IsNull() ? last_result.bestMove : result.bestMove;
-        if (!result.best_line.line.empty())
-            pv_line = result.best_line.line;
+        bestEval = result.bestMove.IsNull() ? last_result.eval : result.eval;
+        if (!result.best_line.line.empty()) pv_line = result.best_line.line;
 
-        // check time & log
-        auto now = std::chrono::steady_clock::now();
-        auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
-        logSearchDepthInfo(depth, Searcher::max_q_depth, bestMove, 
-                           result.best_line.line, result.eval, elapsed_ms);
+        // --- update per-depth stats ---
+        if (Searcher::trackStats) {
+            Searcher::stats.maxDepth = depth;
+            Searcher::stats.evalPerDepth.push_back(result.eval);
+            if (Move::SameMove(bestMove, prevBest)) Searcher::stats.bestmoveStable++;
+        }
 
-        // re-enter?
+        prevBest = bestMove;
         if (std::abs(result.eval) >= MATE_SCORE - 10) break;
         depth++;
     }
+
+    // --- finalize cumulative stats ---
+    if (Searcher::trackStats) {
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                           std::chrono::steady_clock::now() - start_time).count();
+        Searcher::stats.timeMs = elapsed;
+        Searcher::stats.nps = elapsed > 0 ? (1000.0 * Searcher::stats.nodes / elapsed) : 0.0;
+        Searcher::stats.rootEval = last_result.eval;
+        Searcher::stats.bestMove = last_result.bestMove;
+
+        stats = Searcher::stats;
+        stats.ebf = pow(double(stats.nodes) / 1.0, 1.0 / stats.maxDepth); // roughly
+        stats.qratio = double(stats.qnodes) / stats.nodes;
+
+        logStats(game_board->getBoardFEN());  // JSON written once at end
+    }
+}
+
+void Engine::evaluate_position(SearchSettings settings) {
+    search_board = *game_board;
+
+    search_depth = settings.depth;
+    time_left[0] = settings.wtime;
+    time_left[1] = settings.btime;
+    increment[0] = settings.winc;
+    increment[1] = settings.binc;
+    pondering = settings.infinite;
+
+    computeSearchTime(settings);
+    iterativeDeepening();
+
+    std::cout << "eval " << bestEval << " bestmove " << bestMove.uci() << std::endl;
+    std::cout.flush();
 }
 
 // -------------------
@@ -321,28 +370,72 @@ void Engine::sendBestMove(Move best, Move ponder) {
     std::cout << std::endl;
 }
 
-// -------------------
-// -- Logging Utils --
-// -------------------
+void Engine::logStats(const std::string& fen) const {
+    if (!options.showStats) return;
 
-void Engine::logSearchDepthInfo(
-    int depth, int q_depth, Move _bestMove,
-    const std::vector<Move>& best_line,
-    int eval, long long elapsed_ms,
-    const std::string& file_path) 
-{
-    std::ofstream file(file_path, std::ios::app);
+    static std::ofstream statsFile("../tests/logs/search_stats.log", std::ios::app);
+    if (!statsFile.is_open()) return;
 
-    file << "-----------------------------\n";
-    file << "FEN: " << search_board.getBoardFEN() << "\n";
-    file << "Depth: " << depth << "\n";
-    file << "Max Q Depth: " << q_depth << "\n";
-    file << "Best move: " << _bestMove.uci() << "\n";
-    file << "Eval: " << eval << "\nBest line: ";
-    for (auto& mv : best_line) file << mv.uci() << " ";
-    file << "\nTime: " << elapsed_ms << " ms\n";
-    file << "Nodes searched: " << Searcher::nodesSearched << "\n";
-    file << "-----------------------------\n";
+    std::ostringstream out;
+    out << "{"
+        << "\"fen\":\"" << fen << "\","
+        << "\"nodes\":" << stats.nodes << ","
+        << "\"qnodes\":" << stats.qnodes << ","
+        << "\"tt_hits\":" << stats.ttHits << ","
+        << "\"tt_stores\":" << stats.ttStores << ","
+        << "\"fail_highs\":" << stats.failHighs << ","
+        << "\"fail_high_first\":" << stats.fail_high_first << ","
+        << "\"fail_lows\":" << stats.failLows << ","
+        << "\"ebf\":" << stats.ebf << ","
+        << "\"qratio\":" << stats.qratio << ","
+        << "\"max_depth\":" << stats.maxDepth << ","
+        << "\"time_ms\":" << stats.timeMs << ","
+        << "\"nps\":" << stats.nps << ","
+        << "\"root_eval\":" << stats.rootEval << ","
+        << "\"best_move\":" << stats.bestMove.uci() << ","
+        << "\"bestmove_stable\":" << stats.bestmoveStable << ",";
 
-    if (depth == 1) evaluator.writeEvalDebug(search_board, file_path);
+    // --- helper for flat vectors ---
+    auto vec_to_json = [](const auto& v) {
+        std::ostringstream oss;
+        oss << "[";
+        for (size_t i = 0; i < v.size(); ++i) {
+            if (i > 0) oss << ",";
+            oss << v[i];
+        }
+        oss << "]";
+        return oss.str();
+    };
+
+    // --- helper for vector<vector<int>> ---
+    auto nested_vec_to_json = [](const auto& vv) {
+        std::ostringstream oss;
+        oss << "[";
+        for (size_t i = 0; i < vv.size(); ++i) {
+            if (i > 0) oss << ",";
+            oss << "[";
+            for (size_t j = 0; j < vv[i].size(); ++j) {
+                if (j > 0) oss << ",";
+                oss << vv[i][j];
+            }
+            oss << "]";
+        }
+        oss << "]";
+        return oss.str();
+    };
+
+    // --- per-depth stats ---
+    out << "\"depthNodes\":" << vec_to_json(stats.depthNodes) << ","
+        << "\"depthQNodes\":" << vec_to_json(stats.depthQNodes) << ","
+        << "\"depthFailHighs\":" << vec_to_json(stats.depthFailHighs) << ","
+        << "\"depthFailLows\":" << vec_to_json(stats.depthFailLows) << ","
+        << "\"depthTTHits\":" << vec_to_json(stats.depthTTHits) << ","
+        << "\"depthTTStores\":" << vec_to_json(stats.depthTTStores) << ","
+        << "\"depthAspirationResearches\":" << nested_vec_to_json(stats.aspirationResearches) << ","
+        << "\"evalPerDepth\":" << vec_to_json(stats.evalPerDepth)
+        << "}\n";
+
+    statsFile << out.str();
+    statsFile.flush();
 }
+

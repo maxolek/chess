@@ -13,14 +13,14 @@ int Evaluator::mvvLvaTable[6][6];
 
 // =================== Constructors ===================
 Evaluator::Evaluator() {
-    loadPST("C:/Users/maxol/code/chess/bin/pst_opening.txt", PST_opening);
-    loadPST("C:/Users/maxol/code/chess/bin/pst_endgame.txt", PST_endgame);
+    loadPST("../bin/pst_opening.txt", PST_opening);
+    loadPST("../bin/pst_endgame.txt", PST_endgame);
     initMVVLVA();
 }
 
 Evaluator::Evaluator(const PrecomputedMoveData* _precomp) {
-    loadPST("C:/Users/maxol/code/chess/bin/pst_opening.txt", PST_opening);
-    loadPST("C:/Users/maxol/code/chess/bin/pst_endgame.txt", PST_endgame);
+    loadPST("../bin/pst_opening.txt", PST_opening);
+    loadPST("../bin/pst_endgame.txt", PST_endgame);
     precomp = _precomp;
     initMVVLVA();
 }

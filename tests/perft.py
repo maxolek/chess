@@ -2,9 +2,10 @@ import subprocess
 import time
 import re
 import chess
+import utils
 #from stockfish import Stockfish
 
-STOCKFISH_PATH = r"C:\Users\maxol\stockfish-windows-x86-64-avx2\stockfish\stockfish-windows-x86-64-avx2"
+STOCKFISH_PATH = r"..\stockfish-windows-x86-64-avx2\stockfish\stockfish-windows-x86-64-avx2"
 ENGINE_PATH = r"C:\Users\maxol\code\chess\tomahawk\testing.exe"
 LOG_FILE_PATH = r"C:\Users\maxol\code\chess\perft_log.txt"
 
