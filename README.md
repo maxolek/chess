@@ -2,6 +2,8 @@
 
 Tomahawk is a high-performance chess engine written in C++ with a Python-based testing and visualization framework. It combines modern search algorithms, efficient move generation, and a rich evaluation function to deliver competitive gameplay and easy experimentation.
 
+Play at https://lichess.org/@/tomahawkBOT
+
 ## Features
 
 ### Engine Core
