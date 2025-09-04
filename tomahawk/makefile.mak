@@ -20,7 +20,7 @@ PROD = -O3 -ffast-math -march=native -flto #-fprofile-use=engine.profdata
 
 PROD_SRCS = board.cpp gamestate.cpp helpers.cpp moveGenerator.cpp \
             magics.cpp PrecomputedMoveData.cpp UCI.cpp \
-            searcher.cpp evaluator.cpp engine.cpp tomahawk.cpp
+            searcher.cpp NNUE.cpp evaluator.cpp engine.cpp tomahawk.cpp
 
 # -------------------
 # Build Configuration

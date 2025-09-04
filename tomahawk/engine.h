@@ -8,6 +8,7 @@
 #include "searcher.h"
 #include "evaluator.h"
 #include "stats.h"
+#include "NNUE.h"
 
 
 // ---------------------
@@ -65,6 +66,7 @@ private:
 
 public:
     explicit Engine(Board* _board);
+    NNUE nnue = NNUE();
 
     std::unique_ptr<MoveGenerator> movegen;
     Board* game_board;        // main game board
@@ -100,7 +102,6 @@ public:
     // --- Search ---
     void computeSearchTime(const SearchSettings& settings);
     void iterativeDeepening();
-    Move getBestMove(Board* board); // returns best move
     void evaluate_position(SearchSettings settings); // for testing
 
     // --- Communication ---

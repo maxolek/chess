@@ -2,6 +2,8 @@
 .vscode/
 # and lichess-bot repo
 lichess-bot/
+Ethereal/
+bin/nnue-pytorch/
 # ignore other engines
 stockfish-windows-x86-64-avx2
 

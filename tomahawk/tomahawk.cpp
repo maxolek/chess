@@ -1,5 +1,6 @@
 #include "UCI.h"
 #include "engine.h"
+#include "board.h"
 #include <iostream>
 #include <atomic>
 #include <thread>
@@ -27,6 +28,8 @@ int main() {
     Board board = Board();
     Engine engine = Engine(&board);
     UCI uci(engine);
+
+    //board.setNNUE(&engine.nnue);
 
     std::thread listener([&uci](){
         uci.loop(); // loop internally

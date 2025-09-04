@@ -11,34 +11,6 @@
 // ------------------------------------------------------------
 // Constructors
 // ------------------------------------------------------------
-Board::Board() {
-    // Initialize empty state
-    currentGameState = GameState();
-
-    // Initialize piece bitboards
-    colorBitboards[0] = Bits::initWhite;
-    colorBitboards[1] = Bits::initBlack;
-
-    pieceBitboards[0] = Bits::initPawns;
-    pieceBitboards[1] = Bits::initKnights;
-    pieceBitboards[2] = Bits::initBishops;
-    pieceBitboards[3] = Bits::initRooks;
-    pieceBitboards[4] = Bits::initQueens;
-    pieceBitboards[5] = Bits::initKings;
-
-    is_white_move = true;
-    move_color = 0;
-    is_in_check = false;
-    plyCount = 0;
-    allGameMoves.clear();
-    gameStateHistory.push_back(currentGameState);
-
-    // Initialize Zobrist hashing
-    initZobristKeys();
-    std::fill(std::begin(sqToPiece), std::end(sqToPiece), -1);
-    zobrist_hash = computeZobristHash();
-    hash_history[zobrist_hash] = 1;
-}
 
 Board::Board(std::string _fen) {
     setFromFEN(_fen);
@@ -60,6 +32,9 @@ void Board::MakeMove(Move move) {
     int moved_piece = getMovedPiece(start_square);
     int captured_piece = is_enpassant ? 0 : getCapturedPiece(target_square);
     int promotion_piece = move.PromotionPieceType();
+
+    //if (nnue) nnue->update(*this, move, moved_piece + (is_white_move ? 0 : 6), captured_piece > -1 ? (captured_piece + (is_white_move ? 6 : 0)) : -1);
+
 
     MovePiece(moved_piece, start_square, target_square);
 
@@ -151,6 +126,8 @@ void Board::UnmakeMove(Move move) {
     int moved_piece = (move.IsPromotion() || move_flag==Move::enPassantCaptureFlag || move_flag==Move::pawnTwoUpFlag) ? pawn : getMovedPiece(moved_to);
     int captured_piece = currentGameState.capturedPieceType;
     int promotion_piece = move.PromotionPieceType();
+
+    //if (nnue) nnue->update(*this, move, moved_piece + (is_white_move ? 0 : 6), captured_piece > -1 ? (captured_piece + (is_white_move ? 6 : 0)) : -1);
 
     MovePiece(moved_piece, moved_to, moved_from);
 
@@ -359,6 +336,7 @@ void Board::setFromFEN(std::string _fen) {
             pieceBitboards[piece] |= (1ULL << (row*8+col));
             if (islower(square)) { colorBitboards[1] |= (1ULL << (row*8+col)); putPiece(piece+6,row*8+col);}
             else { colorBitboards[0] |= (1ULL << (row*8+col)); putPiece(piece,row*8+col);}
+            sqToPiece[row*8+col] = piece + (islower(square) ? 6 : 0);
             col++;
         }
     }
@@ -549,3 +527,10 @@ void Board::debugZobristDifference(uint64_t old_hash, uint64_t new_hash) {
                     std::cout << "- " << (color==0?"White":"Black") << " "
                               << piece_label(piece) << " toggled on square " << square << "\n";
 }
+
+// ------------------------------------------------------------
+// NNUE functions
+// ------------------------------------------------------------
+//void Board::setNNUE(NNUE* nnue_ptr) {
+//    nnue = nnue_ptr;
+//}

@@ -20,6 +20,7 @@ Engine::Engine(Board* _board) {
     movegen->generateMoves(search_board, false);
     legal_move_count = movegen->count;
     stats = SearchStats();
+    nnue_init(&nnue,"../bin/nn-46832cfbead3.nnue");
 }
 
 // ------------------
@@ -36,6 +37,7 @@ void Engine::clearState() {
     limits = SearchLimits(); // reset time control
     evaluator = Evaluator(&precomp);
     stats = SearchStats();
+    nnue_init(&nnue,"../bin/nn-46832cfbead3.nnue");
 }
 
 // -------------------
@@ -185,6 +187,7 @@ void Engine::computeSearchTime(const SearchSettings& settings) {
 
 void Engine::startSearch(const SearchSettings& settings) {
     search_board = *game_board;
+    //nnue.refresh(search_board);
 
     search_depth = settings.depth;
     time_left[0] = settings.wtime;
@@ -205,14 +208,6 @@ void Engine::stopSearch() {
 
 void Engine::ponderHit() {
     pondering = false;
-}
-
-Move Engine::getBestMove(Board* board) {
-    game_board = board;
-    search_board = *game_board;
-    SearchSettings defaults;
-    iterativeDeepening();
-    return bestMove;
 }
 
 
@@ -273,17 +268,17 @@ void Engine::iterativeDeepening() {
                 beta  = last_result.eval + delta;
             }
         } else {
-            Searcher::orderedMoves(evaluator, first_moves, count, *game_board, 0, {});
+            Searcher::orderedMoves(first_moves, count, *game_board, 0, {});
         }
 
         // --- search ---
         if (depth < aspiration_start_depth) {
-            result = Searcher::search(search_board, *movegen, evaluator,
+            result = Searcher::search(search_board, *movegen, nnue,
                                       first_moves, count, depth, limits,
                                       last_result.best_line.line);
         } else {
             while (true) {
-                result = Searcher::searchAspiration(search_board, *movegen, evaluator,
+                result = Searcher::searchAspiration(search_board, *movegen, nnue,
                                                     first_moves, count, depth, limits,
                                                     last_result.best_line.line,
                                                     alpha, beta);
@@ -343,6 +338,7 @@ void Engine::iterativeDeepening() {
 
 void Engine::evaluate_position(SearchSettings settings) {
     search_board = *game_board;
+    //nnue.refresh(search_board);
 
     search_depth = settings.depth;
     time_left[0] = settings.wtime;

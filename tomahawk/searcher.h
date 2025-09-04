@@ -5,6 +5,7 @@
 #include "helpers.h"
 #include "tt.h"
 #include "stats.h"
+#include "NNUE.h"
 
 
 // -----------------------
@@ -131,7 +132,7 @@ public:
     static SearchResult search(
         Board& board,
         MoveGenerator& movegen,
-        Evaluator& evaluator,
+        NNUE& nnue, //Evaluator& evaluator,
         Move potential_moves[MAX_MOVES], // sorted from prev_it_evals in engine.cpp
         int move_count, // Only first `move_count` moves are valid
         int depth,
@@ -143,7 +144,7 @@ public:
     static SearchResult searchAspiration(
         Board& board,
         MoveGenerator& movegen,
-        Evaluator& evaluator,
+        NNUE& nnue, 
         Move potential_moves[MAX_MOVES], // sorted from prev_it_evals in engine.cpp
         int move_count, // Only first `move_count` moves are valid
         int depth,
@@ -158,7 +159,7 @@ public:
     static int negamax(
         Board& board,
         MoveGenerator& movegen,
-        Evaluator& evaluator,
+        NNUE& nnue, //Evaluator& evaluator,
         int depth, // distance from end of search
         int alpha,
         int beta,
@@ -174,7 +175,7 @@ public:
     // -------------------------------
     static int quiescence(
         Board& board,
-        Evaluator& evaluator,
+        NNUE& nnue, //Evaluator& evaluator,
         MoveGenerator& movegen,
         int alpha,
         int beta,
@@ -188,7 +189,7 @@ public:
     // Move ordering and scoring
     // -------------------------------
     static int moveScore(
-        const Evaluator& evaluator,
+        //const Evaluator& evaluator,
         const Move& move,
         const Board& board,
         int ply,
@@ -197,7 +198,7 @@ public:
     );
 
     static void orderedMoves(
-        const Evaluator& evaluator,
+        //const Evaluator& evaluator,
         Move moves[MAX_MOVES],
         size_t count,
         const Board& board,
@@ -208,7 +209,7 @@ public:
     static int generateAndOrderMoves( // called in negamax/quiescence
         Board& board,
         MoveGenerator& movegen,
-        const Evaluator& evaluator,
+        //const Evaluator& evaluator,
         Move moves[MAX_MOVES],
         int ply,
         std::vector<Move> previousPV
@@ -229,7 +230,7 @@ public:
     static bool shouldPrune(
         Board& board,
         Move& move,
-        Evaluator& evaluator,
+        //Evaluator& evaluator,
         int standPat,
         int alpha
     );
