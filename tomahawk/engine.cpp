@@ -14,13 +14,19 @@ Engine::Engine(Board* _board) {
     game_board = _board;
     search_board = *game_board;
     movegen = std::make_unique<MoveGenerator>(search_board);
-    evaluator = Evaluator(&precomp);
+    //evaluator = Evaluator(&precomp);
+    nnue.load("../bin/12x64_0.0.bin");
     Magics::initMagics();
     clearState();
     movegen->generateMoves(search_board, false);
+
+    // Inject references into searcher
+    searcher.board = &search_board;
+    searcher.movegen = movegen.get();
+    searcher.nnue = &nnue;
+
     legal_move_count = movegen->count;
     stats = SearchStats();
-    nnue_init(&nnue,"../bin/nn-46832cfbead3.nnue");
 }
 
 // ------------------
@@ -35,9 +41,8 @@ void Engine::clearState() {
     time_left[0] = time_left[1] = 0;
     increment[0] = increment[1] = 0;
     limits = SearchLimits(); // reset time control
-    evaluator = Evaluator(&precomp);
+    //evaluator = Evaluator(&precomp);
     stats = SearchStats();
-    nnue_init(&nnue,"../bin/nn-46832cfbead3.nnue");
 }
 
 // -------------------
@@ -71,7 +76,7 @@ void Engine::setOption(const std::string& name, const std::string& value) {
         std::cout << "info string set UCI_ShowWDL = " << (options.uciShowWDL ? "true" : "false") << std::endl;
     } else if (name == "ShowStats") {
         options.showStats = (value == "true" || value == "True" || value == "1");
-        Searcher::enableStats(options.showStats);
+        //Searcher::enableStats(options.showStats);
         std::cout << "info string set ShowStats - " << (options.showStats ? "true" : "false") << std::endl;
     }
     else {
@@ -187,7 +192,7 @@ void Engine::computeSearchTime(const SearchSettings& settings) {
 
 void Engine::startSearch(const SearchSettings& settings) {
     search_board = *game_board;
-    //nnue.refresh(search_board);
+    nnue.build_accumulators(search_board);
 
     search_depth = settings.depth;
     time_left[0] = settings.wtime;
@@ -224,10 +229,10 @@ void Engine::iterativeDeepening() {
     auto start_time = std::chrono::steady_clock::now();
     limits.max_depth = std::min(limits.max_depth, 30);
 
-    if (Searcher::trackStats) {
-        stats = SearchStats();           // reset engine-level stats
-        Searcher::stats = SearchStats(); // reset global stats
-    }
+    //if (Searcher::trackStats) {
+    //    stats = SearchStats();           // reset engine-level stats
+    //    Searcher::stats = SearchStats(); // reset global stats
+    //}
 
     SearchResult last_result;
     SearchResult result;
@@ -250,12 +255,12 @@ void Engine::iterativeDeepening() {
 
     while (!limits.should_stop(depth)) {
         // --- initialize per-depth stats ---
-        if (Searcher::trackStats) {
-            STATS_DEPTH_INIT(depth);
-            if ((int)Searcher::stats.depthTTHits.size() <= depth) Searcher::stats.depthTTHits.push_back(0);
-            if ((int)Searcher::stats.depthTTStores.size() <= depth) Searcher::stats.depthTTStores.push_back(0);
-            if ((int)Searcher::stats.aspirationResearches.size() <= depth) Searcher::stats.aspirationResearches.push_back({});
-        }
+        //if (Searcher::trackStats) {
+        //    STATS_DEPTH_INIT(depth);
+        //    if ((int)Searcher::stats.depthTTHits.size() <= depth) Searcher::stats.depthTTHits.push_back(0);
+        //   if ((int)Searcher::stats.depthTTStores.size() <= depth) Searcher::stats.depthTTStores.push_back(0);
+        //    if ((int)Searcher::stats.aspirationResearches.size() <= depth) Searcher::stats.aspirationResearches.push_back({});
+        //}
 
         // --- move ordering ---
         if (depth > 1) {
@@ -268,26 +273,24 @@ void Engine::iterativeDeepening() {
                 beta  = last_result.eval + delta;
             }
         } else {
-            Searcher::orderedMoves(first_moves, count, *game_board, 0, {});
+            searcher.orderedMoves(first_moves, count, *game_board, 0, {});
         }
 
         // --- search ---
         if (depth < aspiration_start_depth) {
-            result = Searcher::search(search_board, *movegen, nnue,
-                                      first_moves, count, depth, limits,
+            result = searcher.search(first_moves, count, depth, limits,
                                       last_result.best_line.line);
         } else {
             while (true) {
-                result = Searcher::searchAspiration(search_board, *movegen, nnue,
-                                                    first_moves, count, depth, limits,
+                result = searcher.searchAspiration(first_moves, count, depth, limits,
                                                     last_result.best_line.line,
                                                     alpha, beta);
 
-                if (Searcher::trackStats) {
-                    auto &asp = Searcher::stats.aspirationResearches[depth];
-                    if (result.eval <= alpha) asp.push_back(-1);
-                    else if (result.eval >= beta) asp.push_back(+1);
-                }
+                //if (Searcher::trackStats) {
+                //    auto &asp = Searcher::stats.aspirationResearches[depth];
+                //    if (result.eval <= alpha) asp.push_back(-1);
+                //    else if (result.eval >= beta) asp.push_back(+1);
+                //}
 
                 if (result.eval <= alpha) alpha -= delta;
                 else if (result.eval >= beta) beta += delta;
@@ -308,11 +311,11 @@ void Engine::iterativeDeepening() {
         if (!result.best_line.line.empty()) pv_line = result.best_line.line;
 
         // --- update per-depth stats ---
-        if (Searcher::trackStats) {
-            Searcher::stats.maxDepth = depth;
-            Searcher::stats.evalPerDepth.push_back(result.eval);
-            if (Move::SameMove(bestMove, prevBest)) Searcher::stats.bestmoveStable++;
-        }
+        //if (Searcher::trackStats) {
+        //    Searcher::stats.maxDepth = depth;
+        //    Searcher::stats.evalPerDepth.push_back(result.eval);
+        //    if (Move::SameMove(bestMove, prevBest)) Searcher::stats.bestmoveStable++;
+        //}
 
         prevBest = bestMove;
         if (std::abs(result.eval) >= MATE_SCORE - 10) break;
@@ -320,7 +323,7 @@ void Engine::iterativeDeepening() {
     }
 
     // --- finalize cumulative stats ---
-    if (Searcher::trackStats) {
+    /*if (Searcher::trackStats) {
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
                            std::chrono::steady_clock::now() - start_time).count();
         Searcher::stats.timeMs = elapsed;
@@ -333,7 +336,7 @@ void Engine::iterativeDeepening() {
         stats.qratio = double(stats.qnodes) / stats.nodes;
 
         logStats(game_board->getBoardFEN());  // JSON written once at end
-    }
+    }*/
 }
 
 void Engine::evaluate_position(SearchSettings settings) {

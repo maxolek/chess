@@ -66,23 +66,25 @@ private:
 
 public:
     explicit Engine(Board* _board);
-    NNUE nnue = NNUE();
 
+    Searcher searcher;
+    NNUE nnue = NNUE();
+    //Evaluator evaluator;                // preload PST tables, eval
     std::unique_ptr<MoveGenerator> movegen;
     Board* game_board;        // main game board
     Board search_board;       // modifable copy of game board
+
     // movegen for current move
     int legal_move_count = 0;
     Move legal_moves[MAX_MOVES];
+
     // output
     Move bestMove = Move::NullMove();
     int bestEval = -MATE_SCORE;
     std::vector<Move> pv_line;
 
     bool pondering = false;
-
-    Evaluator evaluator;                // preload PST tables, eval
-
+    
     SearchStats stats;
 
     // --- State ---

@@ -1,96 +1,95 @@
 #pragma once
-
 #include <vector>
 #include <cstdint>
 #include <string>
-
-// Forward declarations from your engine
-class Board;
-struct Move;
-
+#include "board.h"
+#include "move.h"
 
 // ============================================================
-// Constants
+// Network Dimensions
 // ============================================================
 
-// HalfKP: king square × (piece × square)
-constexpr int NUM_PIECE_TYPES   = 6;    // pawn..king
-constexpr int NUM_COLORS        = 2;    // white, black
-constexpr int NUM_SQUARES       = 64;
-constexpr int NUM_PIECE_SQ      = NUM_PIECE_TYPES * NUM_COLORS * NUM_SQUARES; // 768
-constexpr int INPUT_DIM         = NUM_SQUARES * NUM_PIECE_SQ;                 // 49152
+constexpr int INPUT_SIZE  = 768;   // Chess768 features 64*12 -- sq*piece*color + sq
+constexpr int HIDDEN_SIZE = 128;   // Your chosen hidden dim
 
-// Hidden layer size (tune this to your net, e.g. 256 or 512)
-constexpr int HIDDEN_DIM        = 256;
-constexpr int MID_DIM           = 32;
+// Quantisation factors used in training
+constexpr int QA = 255;
+constexpr int QB = 64;
+constexpr int SCALE = 400;
 
 // ============================================================
-// Helper: Feature Indexing
-// ============================================================
-
-inline int feature_index(int king_sq, int piece, int sq, int color) {
-    // piece ∈ {0..5}, color ∈ {0,1}, sq ∈ {0..63}, king_sq ∈ {0..63}
-    int piece_index    = color * NUM_PIECE_TYPES + piece;        // 0..11
-    int piece_sq_index = piece_index * NUM_SQUARES + sq;         // 0..767
-    return king_sq * NUM_PIECE_SQ + piece_sq_index;              // 0..49151
-}
-
-// ============================================================
-// Accumulator: stores hidden layer pre-activations
+// Accumulator: holds hidden activations BEFORE SCReLU
 // ============================================================
 
 struct Accumulator {
-    std::vector<int32_t> hidden; // pre-activation values (HIDDEN_DIM)
+    int16_t vals[HIDDEN_SIZE];   // i16 pre-activations
 
-    Accumulator();
+    // Initialize with bias
+    void init_bias(const int16_t* bias) {
+        memcpy(vals, bias, HIDDEN_SIZE * sizeof(int16_t));
+    }
 
-    // Recompute fully from board state
-    void build(const Board& board, int king_sq, const std::vector<int16_t>& weights, const std::vector<int32_t>& biases);
+    // Add feature column: vals[i] += W[f][i]
+    inline void add_feature(int feature_idx, const int16_t W[][HIDDEN_SIZE]) {
+        const int16_t* col = W[feature_idx];
+        for (int i = 0; i < HIDDEN_SIZE; i++)
+            vals[i] += col[i];
+    }
 
-    // Incremental update for a single piece move
-    void update(int king_sq,
-                int piece, int from_sq, int to_sq, int color,
-                const std::vector<int16_t>& weights);
+    inline void remove_feature(int feature_idx, const int16_t W[][HIDDEN_SIZE]) {
+        const int16_t* col = W[feature_idx];
+        for (int i = 0; i < HIDDEN_SIZE; i++)
+            vals[i] -= col[i];
+    }
 };
 
 // ============================================================
-// NNUE class
+// Network
 // ============================================================
 
 class NNUE {
+private:
 public:
-    NNUE();
+    NNUE() {};
+    NNUE(const std::string& path) {load(path);};
 
-    // Load weights from a binary file
+    // Load quantised.bin
     bool load(const std::string& path);
 
-    // Evaluate a position
-    int evaluate(const Board& board);
+    // Compute final output from accumulators
+    int evaluate() const;
+    // Evaluate full position (non-incremental)
+    int full_eval(const Board& b);
 
-    // Incremental update when making a move
-    void on_make_move(const Board& board, const Move& move);
+    // Incremental updates for search
+    void on_make_move(const Board& board, const Move& mv);
+    void on_unmake_move(const Board& board, const Move& mv); 
 
-    // Incremental update when unmaking a move (for search)
-    void on_unmake_move(const Board& board, const Move& move);
+    // ========== L0: 768 → 128 ==========
+    // Stored column-major: W0[feature][hidden]
+    int16_t l0w[INPUT_SIZE][HIDDEN_SIZE];
+    int16_t l0b[HIDDEN_SIZE];
 
-private:
-    // Network weights
-    // l1: input → hidden
-    std::vector<int16_t> W1; // size: INPUT_DIM * HIDDEN_DIM
-    std::vector<int32_t> B1; // size: HIDDEN_DIM
+    // ========== L1: 256 → 1 ==========
+    int16_t l1w[2 * HIDDEN_SIZE]; // (stm_hidden, ntm_hidden)
+    int16_t l1b;
 
-    // l2: hidden → mid
-    std::vector<int16_t> W2; // size: HIDDEN_DIM * MID_DIM
-    std::vector<int32_t> B2; // size: MID_DIM
+    // Cached accumulators
+    Accumulator acc_white;
+    Accumulator acc_black;
 
-    // l3: mid → output
-    std::vector<int16_t> W3; // size: MID_DIM * 1
-    int32_t B3;
+    // ========================================================
+    // Helpers
+    // ========================================================
 
-    // Cached accumulator for current board
-    Accumulator acc;
+    // Square-clipped ReLU: screlu(x) = clamp(x, 0, QA)²
+    inline int32_t screlu(int16_t x) const {
+        int32_t y = x;
+        y = std::clamp(y, 0, QA);
+        return y * y;  // produces a number in 0..QA²
+    }
 
-    // Internal helpers
-    int32_t forward_hidden(const Accumulator& acc) const;
+    // Build full accumulators from board
+    void build_accumulators(const Board& b);
 };
 

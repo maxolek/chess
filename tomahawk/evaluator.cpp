@@ -5,6 +5,14 @@
 #include <iostream>
 #include <algorithm>
 
+//////////////////////////////////////
+//////////////////////////////////////
+//
+//      out dated (static)
+//
+//////////////////////////////////////
+//////////////////////////////////////
+
 // =================== Static Member Definitions ===================
 int Evaluator::PST_endgame[6][64];
 int Evaluator::PST_opening[6][64];
