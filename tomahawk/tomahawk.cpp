@@ -25,8 +25,7 @@ void listenLoop(UCI& uci) {
 }
 
 int main() {
-    Board board = Board();
-    Engine engine = Engine(&board);
+    Engine engine = Engine();
     UCI uci(engine);
 
     //board.setNNUE(&engine.nnue);

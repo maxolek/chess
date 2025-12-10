@@ -132,7 +132,8 @@ int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int 
         return 0;
 
     // Use incremental NNUE output (accumulators must be kept in sync)
-    int standPat = nnue->evaluate();
+    //board->allGameMoves.back().PrintMove();
+    int standPat = nnue->evaluate(board->is_white_move);
     if (standPat >= beta) return beta;
     if (standPat > alpha) alpha = standPat;
 
@@ -197,7 +198,7 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
         return 0;
 
     if (depth == 0) {
-        return use_quiescence ? quiescence(alpha, beta, pv, limits, ply) : nnue->evaluate();
+        return use_quiescence ? quiescence(alpha, beta, pv, limits, ply) : nnue->evaluate(board->is_white_move);
     }
 
     int alphaOrig = alpha;
@@ -289,15 +290,21 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
         Move m = legal_moves[i];
         if (Move::SameMove(m, Move::NullMove())) continue;
 
+        //nnue->debug_check_incr_vs_full_after_make(*board, m, *nnue);
         nnue->on_make_move(*board, m);
         board->MakeMove(m);
+
+        //std::cout << "------" << std::endl; m.PrintMove(); std::cout << "------" << std::endl;
 
         PV childPV;
         int eval = -negamax(depth - 1, -MATE_SCORE, MATE_SCORE, childPV, previousPV, limits, 0, true);
 
         // Undo
+        //nnue->debug_check_incr_vs_full_after_unmake(*board, m, *nnue);
         nnue->on_unmake_move(*board, m);
         board->UnmakeMove(m);
+
+        //exit(0);
 
         if (limits.out_of_time() && i > 0) break;
 
@@ -309,6 +316,7 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
             result.eval = eval;
             result.bestMove = m;
             result.best_line.set(m, childPV);
+            //std::cout << "depth: " << depth << "\n"; m.PrintMove(); std::cout<<eval<<std::endl;
         }
     }
 

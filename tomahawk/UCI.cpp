@@ -43,7 +43,7 @@ void UCI::handleCommand(const std::string& line) {
             std::cout << "uciok\n";
     }
     else if (token == "print_board") {
-        engine->game_board->print_board();
+        engine->game_board.print_board();
     }
     else if (token == "isready") {
         std::cout << "readyok\n";

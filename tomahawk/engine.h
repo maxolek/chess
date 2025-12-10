@@ -65,14 +65,14 @@ private:
     int get_prev_eval(Move m) const;
 
 public:
-    explicit Engine(Board* _board);
+    explicit Engine();
 
     Searcher searcher;
     NNUE nnue = NNUE();
     //Evaluator evaluator;                // preload PST tables, eval
     std::unique_ptr<MoveGenerator> movegen;
-    Board* game_board;        // main game board
-    Board search_board;       // modifable copy of game board
+    Board game_board;        // main game board
+    Board search_board;       // modifable copy of game board for searcher
 
     // movegen for current move
     int legal_move_count = 0;

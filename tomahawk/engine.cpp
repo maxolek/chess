@@ -10,22 +10,19 @@
 // -- Constructors --
 // ------------------
 
-Engine::Engine(Board* _board) {
-    game_board = _board;
-    search_board = *game_board;
+Engine::Engine() {
+    game_board = Board();
+    search_board = game_board;
+
     movegen = std::make_unique<MoveGenerator>(search_board);
-    //evaluator = Evaluator(&precomp);
+
     nnue.load("../bin/12x64_0.0.bin");
     Magics::initMagics();
-    clearState();
-    movegen->generateMoves(search_board, false);
 
-    // Inject references into searcher
     searcher.board = &search_board;
     searcher.movegen = movegen.get();
     searcher.nnue = &nnue;
 
-    legal_move_count = movegen->count;
     stats = SearchStats();
 }
 
@@ -88,16 +85,17 @@ void Engine::setOption(const std::string& name, const std::string& value) {
 
 void Engine::setPosition(const std::string& fen, const std::vector<Move>& moves) {
     if (fen == "startpos") {
-        game_board->setFromFEN(STARTPOS_FEN);
+        game_board.setFromFEN(STARTPOS_FEN);
     } else {
-        game_board->setFromFEN(fen);
+        game_board.setFromFEN(fen);
     }
     playMoves(moves);
 }
 
 void Engine::playMoves(const std::vector<Move>& moves) {
     for (const auto& move : moves) {
-        game_board->MakeMove(move);
+        //nnue.on_make_move(game_board, move);
+        game_board.MakeMove(move);
     }
 }
 
@@ -108,13 +106,13 @@ void Engine::playMovesStrings(const std::vector<std::string>& moves) {
         int target = algebraic_to_square(moveStr.substr(2, 2));
         int flag = Move::noFlag;
 
-        int movedPiece = game_board->getMovedPiece(start);
+        int movedPiece = game_board.getMovedPiece(start);
         bool isPawn = (movedPiece == pawn);
 
         // En passant
-        if (isPawn && game_board->currentGameState.enPassantFile != -1) {
-            int epRank = game_board->is_white_move ? 5 : 2;
-            int epSquare = game_board->currentGameState.enPassantFile + epRank * 8;
+        if (isPawn && game_board.currentGameState.enPassantFile != -1) {
+            int epRank = game_board.is_white_move ? 5 : 2;
+            int epSquare = game_board.currentGameState.enPassantFile + epRank * 8;
             if (target == epSquare) flag = Move::enPassantCaptureFlag;
         }
 
@@ -141,7 +139,9 @@ void Engine::playMovesStrings(const std::vector<std::string>& moves) {
             flag = Move::castleFlag;
         }
 
-        game_board->MakeMove(Move(start, target, flag));
+        //Move m = Move(start, target, flag);
+        //nnue.on_make_move(game_board, m);
+        game_board.MakeMove( Move(start, target, flag));
     }
 }
 
@@ -178,7 +178,7 @@ void Engine::computeSearchTime(const SearchSettings& settings) {
     }
        
     // game clock
-    int side = game_board->is_white_move ? 0 : 1;
+    int side = game_board.is_white_move ? 0 : 1;
     int myTime = (side == 0 ? settings.wtime : settings.btime);
     int myInc  = (side == 0 ? settings.winc  : settings.binc);
 
@@ -191,7 +191,7 @@ void Engine::computeSearchTime(const SearchSettings& settings) {
 }
 
 void Engine::startSearch(const SearchSettings& settings) {
-    search_board = *game_board;
+    search_board = game_board;
     nnue.build_accumulators(search_board);
 
     search_depth = settings.depth;
@@ -239,7 +239,7 @@ void Engine::iterativeDeepening() {
 
     // generate first moves once
     Move first_moves[MAX_MOVES];
-    movegen->generateMoves(*game_board, false);
+    movegen->generateMoves(game_board, false);
     int count = std::min(movegen->count, MAX_MOVES);
     std::copy_n(movegen->moves, count, first_moves);
 
@@ -273,7 +273,7 @@ void Engine::iterativeDeepening() {
                 beta  = last_result.eval + delta;
             }
         } else {
-            searcher.orderedMoves(first_moves, count, *game_board, 0, {});
+            searcher.orderedMoves(first_moves, count, game_board, 0, {});
         }
 
         // --- search ---
@@ -335,12 +335,12 @@ void Engine::iterativeDeepening() {
         stats.ebf = pow(double(stats.nodes) / 1.0, 1.0 / stats.maxDepth); // roughly
         stats.qratio = double(stats.qnodes) / stats.nodes;
 
-        logStats(game_board->getBoardFEN());  // JSON written once at end
+        logStats(game_board.getBoardFEN());  // JSON written once at end
     }*/
 }
 
 void Engine::evaluate_position(SearchSettings settings) {
-    search_board = *game_board;
+    search_board = game_board;
     //nnue.refresh(search_board);
 
     search_depth = settings.depth;
