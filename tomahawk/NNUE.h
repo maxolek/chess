@@ -96,6 +96,12 @@ public:
     //int evaluate_debug(bool is_white_move) const;
     void debug_check_incr_vs_full_after_make(const Board& before, const Move& mv, NNUE& nnue);
     void debug_check_incr_vs_full_after_unmake(const Board& board_with_move, const Move& mv, NNUE& nnue);
+    void debug_replay_feature_changes(const Board& before,
+                                        const Move& mv,
+                                        const Board& after);
+    void debug_expected_changes(const Board &before,
+                            const Move &m,
+                            const Board &after);
 
     // Build full accumulators from board
     void build_accumulators(const Board& b);

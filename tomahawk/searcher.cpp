@@ -290,7 +290,7 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
         Move m = legal_moves[i];
         if (Move::SameMove(m, Move::NullMove())) continue;
 
-        //nnue->debug_check_incr_vs_full_after_make(*board, m, *nnue);
+        nnue->debug_check_incr_vs_full_after_make(*board, m, *nnue);
         nnue->on_make_move(*board, m);
         board->MakeMove(m);
 
