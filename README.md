@@ -13,13 +13,13 @@ Play at https://lichess.org/@/tomahawkBOT
 - **Quiescence Search**: Extends search at tactical positions to avoid horizon effect.
 - **Aspiration Windows**: Dyanmic alpha-beta values based on previous iteration, with dynamic scaling.
 - **Move Ordering Heuristics**: Includes TT move, SEE, MVA-LVA, killer moves, history heuristics, and PV moves.
-- **Tapered Evaluation**: Weights evaluation based on game phase.
 - **Evaluation Function**:
-  - King safety (pawn shields, tropism)
-  - Pawn structure and passed pawns
-  - Piece-square tables (optimized PST)
-  - Static Exchange Evaluation (SEE) for tactical accuracy
-  - Center control metrics
+  768-128x2 NNUE
+  - incremental dual-perspective accumulators
+  - trained on T60T70wIsRightFarseer
+  - dynamic lr, wdl+eval based target function
+  - quantization for faster forward pass
+  - **Tapered Evaluation**: training of larger nets and the use of different evaluations based on game phase in progress
 - **Magic Bitboards**: Fast sliding piece move generation.
 - **Transposition Table (TT)**: Caches evaluated positions for faster search.
 - **UCI Interface**: Full Universal Chess Interface support.
