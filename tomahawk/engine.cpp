@@ -16,7 +16,7 @@ Engine::Engine() {
 
     movegen = std::make_unique<MoveGenerator>(search_board);
 
-    nnue.load("../bin/12x64_0.0.bin");
+    nnue.load("../bin/12x64_256.bin");
     Magics::initMagics();
 
     searcher.board = &search_board;

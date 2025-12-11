@@ -1,9 +1,12 @@
 # Ignore VS Code settings
 .vscode/
+.vs/
 # and lichess-bot repo
 lichess-bot/
 Ethereal/
 bin/nnue-pytorch/
+bullet/
+logs/
 # ignore other engines
 stockfish-windows-x86-64-avx2
 

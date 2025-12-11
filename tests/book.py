@@ -27,7 +27,7 @@ def get_random_opening(games, max_depth=8):
 def random_starting_position(games=None, max_depth=8):
     """Return a board set to a random book opening"""
     if games is None:
-        games = load_book("book.pgn")
+        games = load_book("../bin/kasparov.pgn")
     opening_moves = get_random_opening(games, max_depth)
     board = chess.Board()
     for move in opening_moves:

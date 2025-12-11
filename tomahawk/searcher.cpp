@@ -137,6 +137,8 @@ int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int 
     if (standPat >= beta) return beta;
     if (standPat > alpha) alpha = standPat;
 
+    //return standPat;
+
     STATS_QNODE(ply); // macro unchanged
 
     // generate only captures/promotions if your movegen supports that flag
@@ -290,7 +292,7 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
         Move m = legal_moves[i];
         if (Move::SameMove(m, Move::NullMove())) continue;
 
-        nnue->debug_check_incr_vs_full_after_make(*board, m, *nnue);
+        //nnue->debug_check_incr_vs_full_after_make(*board, m, *nnue);
         nnue->on_make_move(*board, m);
         board->MakeMove(m);
 
@@ -304,6 +306,9 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
         nnue->on_unmake_move(*board, m);
         board->UnmakeMove(m);
 
+        //std::cout << "after unmake - should be init position" << std::endl;
+        //board->print_board();
+        //nnue->evaluate(board->is_white_move);
         //exit(0);
 
         if (limits.out_of_time() && i > 0) break;
@@ -319,6 +324,8 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
             //std::cout << "depth: " << depth << "\n"; m.PrintMove(); std::cout<<eval<<std::endl;
         }
     }
+
+    //std::cout << "depth: " << depth << "\tbestmove: " << result.bestMove.uci() << "\teval: " << result.eval << std::endl;
 
     return result;
 }

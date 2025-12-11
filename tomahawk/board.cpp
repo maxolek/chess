@@ -107,6 +107,7 @@ void Board::MakeMove(Move move) {
     is_white_move = !is_white_move;
     move_color = 1 - move_color;
     zobrist_hash ^= zobrist_side_to_move;
+    hash_history[zobrist_hash]++;
 }
 
 void Board::UnmakeMove(Move move) {
