@@ -5,6 +5,7 @@
 #ifndef MOVEGENERATOR_H
 #define MOVEGENERATOR_H
 
+#include "helpers.h"
 #include "magics.h"
 #include "PrecomputedMoveData.h"
 #include "move.h"

@@ -2,7 +2,7 @@
 # Compiler & Flags
 # -------------------
 
-CXX = clang++
+CXX = g++
 CXXSTD = -std=c++17
 COMMON_WARN = -Wall -Wextra -Wshadow -Wuninitialized -Wconversion -Wpedantic
 COMMON_LINK = -pthread
@@ -19,8 +19,8 @@ PROD = -O3 -ffast-math -march=native -flto #-fprofile-use=engine.profdata
 # -------------------
 
 PROD_SRCS = board.cpp gamestate.cpp helpers.cpp moveGenerator.cpp \
-            magics.cpp PrecomputedMoveData.cpp UCI.cpp \
-            searcher.cpp evaluator.cpp engine.cpp tomahawk.cpp
+            magics.cpp PrecomputedMoveData.cpp UCI.cpp stats.cpp \
+            searcher.cpp NNUE.cpp evaluator.cpp engine.cpp tomahawk.cpp
 
 # -------------------
 # Build Configuration

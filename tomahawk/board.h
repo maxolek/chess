@@ -4,6 +4,7 @@
 #include "PrecomputedMoveData.h"
 #include "move.h"
 #include "gamestate.h"
+//#include "NNUE.h"
 
 /**
  * @class Board
@@ -44,9 +45,12 @@ public:
     U64 zobrist_castling[4];         ///< Castling rights keys: KQkq
     U64 zobrist_enpassant[8];        ///< En passant file keys: a-h
 
+    // ==================== NNUE ====================
+    //NNUE* nnue; // optional pointer ... allows incremental updates
+    //void setNNUE(NNUE* nnue_ptr);
+
     // ==================== Constructors ====================
-    Board();                 ///< Default starting position
-    Board(std::string _fen); ///< Initialize from FEN
+    Board(std::string _fen = STARTPOS_FEN); ///< Initialize from FEN
 
     // ==================== Move execution ====================
     void MakeMove(Move move = false);   ///< Apply a move and update board state

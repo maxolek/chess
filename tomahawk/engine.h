@@ -8,6 +8,7 @@
 #include "searcher.h"
 #include "evaluator.h"
 #include "stats.h"
+#include "NNUE.h"
 
 
 // ---------------------
@@ -64,23 +65,26 @@ private:
     int get_prev_eval(Move m) const;
 
 public:
-    explicit Engine(Board* _board);
+    explicit Engine();
 
+    Searcher searcher;
+    NNUE nnue = NNUE();
+    //Evaluator evaluator;                // preload PST tables, eval
     std::unique_ptr<MoveGenerator> movegen;
-    Board* game_board;        // main game board
-    Board search_board;       // modifable copy of game board
+    Board game_board;        // main game board
+    Board search_board;       // modifable copy of game board for searcher
+
     // movegen for current move
     int legal_move_count = 0;
     Move legal_moves[MAX_MOVES];
+
     // output
     Move bestMove = Move::NullMove();
     int bestEval = -MATE_SCORE;
     std::vector<Move> pv_line;
 
     bool pondering = false;
-
-    Evaluator evaluator;                // preload PST tables, eval
-
+    
     SearchStats stats;
 
     // --- State ---
@@ -100,7 +104,6 @@ public:
     // --- Search ---
     void computeSearchTime(const SearchSettings& settings);
     void iterativeDeepening();
-    Move getBestMove(Board* board); // returns best move
     void evaluate_position(SearchSettings settings); // for testing
 
     // --- Communication ---

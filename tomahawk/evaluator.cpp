@@ -5,6 +5,15 @@
 #include <iostream>
 #include <algorithm>
 
+//////////////////////////////////////
+//////////////////////////////////////
+//
+//      out dated
+//  static class needs to integrate to engine
+//
+//////////////////////////////////////
+//////////////////////////////////////
+
 // =================== Static Member Definitions ===================
 int Evaluator::PST_endgame[6][64];
 int Evaluator::PST_opening[6][64];
