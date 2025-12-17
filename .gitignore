@@ -1,6 +1,8 @@
 # Ignore VS Code settings
 .vscode/
 .vs/
+# profiling
+TomahawkChessEngine/
 # and lichess-bot repo
 lichess-bot/
 Ethereal/
@@ -22,6 +24,7 @@ settings.json
 *.pgn
 tests/logs/
 
+
 # ignore object files
 *.o
 
@@ -29,4 +32,4 @@ tests/logs/
 *.mak
 *.exe
 *.dll
-
+*.pyc

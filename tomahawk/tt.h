@@ -17,7 +17,7 @@ enum BoundType : uint8_t {
 struct TTEntry {
     U64 key = 0;           // Zobrist key
     int16_t eval = 0;      // Stored evaluation (centipawns)
-    int16_t depth = 0;     // Search depth
+    int16_t depth = 0;     // iterative_depth recorded
     int16_t horizon = 0;   // ply + depth
     uint16_t age = 0;      // Age counter
     BoundType flag = EXACT; 
@@ -40,12 +40,14 @@ public:
 
     // Probe TT for a given key
     inline TTEntry* probe(U64 key) {
+        ScopedTimer timer(T_TT_PROBE);
         return &table[key & (entriesCount - 1)]; // power-of-2 indexing
     }
 
     // Store an entry
     inline void store(U64 key, int depth, int ply, int score,
                       BoundType flag, Move bestMove) {
+        ScopedTimer timer(T_TT_STORE);
         TTEntry* entry = probe(key);
         int horizon = ply + depth;
 

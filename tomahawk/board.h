@@ -1,9 +1,11 @@
 #ifndef BOARD_H
 #define BOARD_H
 
-#include "PrecomputedMoveData.h"
 #include "move.h"
 #include "gamestate.h"
+#include "zobrist.h"
+#include "stats.h"
+#include "timer.h"
 //#include "NNUE.h"
 
 /**
@@ -28,11 +30,13 @@ public:
     bool is_white_move;                  ///< True if white to move
     int move_color;                      ///< 0=white, 1=black
     bool is_in_check;                    ///< True if the side to move is in check
+    bool is_audit_mode = true;
 
     // ==================== Move & position history ====================
     std::vector<Move> allGameMoves;            ///< All moves played
     std::vector<GameState> gameStateHistory;  ///< Game state history for unmaking moves
     std::unordered_map<U64,int> hash_history; ///< Zobrist hash occurrences for repetition detection
+    
 
     // ==================== Castling trackers ====================
     bool white_castled = false; ///< True if white has castled
@@ -41,6 +45,8 @@ public:
     // ==================== Zobrist hashing ====================
     U64 zobrist_hash;                ///< Current Zobrist hash
     U64 zobrist_table[12][64];       ///< Zobrist keys for 12 pieces x 64 squares
+    // piece is encoded as follows
+    // b-p = 0, w-p = 1, b-n = 2, w-n = 3, ... etc (black even, white odd .. incr val)
     U64 zobrist_side_to_move;        ///< Side to move key
     U64 zobrist_castling[4];         ///< Castling rights keys: KQkq
     U64 zobrist_enpassant[8];        ///< En passant file keys: a-h
@@ -86,8 +92,11 @@ public:
     U64 randomU64();                           ///< Generate random 64-bit number
     void initZobristKeys();                    ///< Initialize Zobrist keys
     U64 computeZobristHash();                  ///< Compute current Zobrist hash
+    U64 zobristPieceHash(int piece, int color); // color^1 + 2*piece
     U64 zobristCastlingHash(int castling_rights); ///< Hash from castling rights
     void debugZobristDifference(uint64_t old_hash, uint64_t new_hash);
+    bool canEPCapture(); // check if ep is legal when possible - zobrist 
+    bool isEpHashable(int epFile, bool stmIsWhite) const; // incremental version
 
     // ==================== Debug ====================
     void print_board() const; ///< Pretty-print board with FEN and additional info

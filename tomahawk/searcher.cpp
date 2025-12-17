@@ -1,4 +1,5 @@
 #include "searcher.h"
+#include "engine.h"
 #include <limits>
 #include <cstring>
 #include <cassert>
@@ -13,26 +14,24 @@ static constexpr int INF = 30000;
 // Construction / small helpers
 // ============================================================================
 
-void Searcher::enterDepth() { quiesence_depth++; max_q_depth = std::max(max_q_depth, quiesence_depth); }
-void Searcher::exitDepth()  { if (quiesence_depth > 0) quiesence_depth--; }
-
 void Searcher::updatePV(std::vector<Move>& pv, const Move& move, const std::vector<Move>& childPV) {
     pv.clear();
     pv.push_back(move);
     pv.insert(pv.end(), childPV.begin(), childPV.end());
 }
 
+// leaf node pruning
 bool Searcher::shouldPrune(Move& move, int standPat, int alpha) {
-    // NOTE: uses board member
-    int captured = board->getCapturedPiece(move.TargetSquare());
+    int captured = board.getCapturedPiece(move.TargetSquare());
 
-    // If capture exists and is bad according to SEE, prune (cheap heuristics)
-    if (captured != -1 && !move.IsPromotion() && !board->is_in_check) {
-        int seeGain = Evaluator::SEE(*board, move);
+    // see pruning (excl promo and checks)
+    if (captured != -1 && !move.IsPromotion() && !board.is_in_check) {
+        int seeGain = eval.SEE(board, move);
         if (seeGain < -50) return true;
     }
 
-    if (captured != -1 && !move.IsPromotion() && !board->is_in_check) {
+    // delta purning
+    if (captured != -1 && !move.IsPromotion() && !board.is_in_check) {
         if (standPat + MAX_DELTA < alpha)
             return true;
     }
@@ -67,7 +66,7 @@ int Searcher::moveScore(const Move& move, const Board& boardRef,
         }
         int captured = boardRef.getCapturedPiece(move.TargetSquare());
         if (captured != -1) {
-            int seeScore = Evaluator::SEE(boardRef, move);
+            int seeScore = eval.SEE(boardRef, move);
             return seeScore >= 0 ? GOOD_CAP_BASE + seeScore + promoBonus
                                  : BAD_CAP_BASE  + seeScore + promoBonus;
         }
@@ -76,7 +75,7 @@ int Searcher::moveScore(const Move& move, const Board& boardRef,
 
     int captured = boardRef.getCapturedPiece(move.TargetSquare());
     if (captured != -1) {
-        int seeScore = Evaluator::SEE(boardRef, move);
+        int seeScore = eval.SEE(boardRef, move);
         return seeScore >= 0 ? GOOD_CAP_BASE + seeScore : BAD_CAP_BASE + seeScore;
     }
 
@@ -91,10 +90,12 @@ int Searcher::moveScore(const Move& move, const Board& boardRef,
 
 void Searcher::orderedMoves(Move moves[MAX_MOVES], size_t count,
                             const Board& boardRef, int ply, const std::vector<Move>& previousPV) {
+    
+    ScopedTimer timer(T_SCORE_ORDER);
     U64 hash = boardRef.zobrist_hash;
 
     Move ttMove = Move::NullMove();
-    TTEntry* entry = tt.probe(hash);
+    TTEntry* entry = engine.tt.probe(hash);
     if (entry && entry->key == hash && !Move::SameMove(Move::NullMove(), entry->bestMove)) {
         for (size_t i = 0; i < count; ++i)
             if (Move::SameMove(moves[i], entry->bestMove)) ttMove = entry->bestMove;
@@ -111,12 +112,12 @@ void Searcher::orderedMoves(Move moves[MAX_MOVES], size_t count,
 }
 
 int Searcher::generateAndOrderMoves(Move moves[MAX_MOVES], int ply, const std::vector<Move>& previousPV) {
-    // NOTE: adapt to your MoveGenerator API. This assumes movegen is a pointer member
-    if (!movegen) return 0;
-    movegen->generateMoves(*board, false); // the bool flag for captures-only or not — adapt if signature differs
-    int count = std::min(MAX_MOVES, movegen->count);
-    std::copy_n(movegen->moves, count, moves);
-    orderedMoves(moves, static_cast<size_t>(count), *board, ply, previousPV);
+   if (!engine.movegen) return 0;
+
+    int count = engine.movegen->generateMoves(board, false); // the bool flag for captures-only or not — adapt if signature differs
+    std::copy_n(engine.movegen->moves, count, moves);
+
+    orderedMoves(moves, static_cast<size_t>(count), board, ply, previousPV);
     return count;
 }
 
@@ -125,15 +126,18 @@ int Searcher::generateAndOrderMoves(Move moves[MAX_MOVES], int ply, const std::v
 // ============================================================================
 
 int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int ply) {
-    nodesSearched++;
+    ScopedTimer timer(T_QSEARCH);
+    
     if (limits.out_of_time()) return alpha;
 
-    if (board->hash_history[board->zobrist_hash] >= 3 || board->currentGameState.fiftyMoveCounter >= 50)
+    if (board.hash_history[board.zobrist_hash] >= 3 || board.currentGameState.fiftyMoveCounter >= 50) {
+        
         return 0;
+    }
 
     // Use incremental NNUE output (accumulators must be kept in sync)
-    //board->allGameMoves.back().PrintMove();
-    int standPat = nnue->evaluate(board->is_white_move);
+    //boardallGameMoves.back().PrintMove();
+    int standPat = nnue.evaluate(board.is_white_move);
     if (standPat >= beta) return beta;
     if (standPat > alpha) alpha = standPat;
 
@@ -142,15 +146,13 @@ int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int 
     STATS_QNODE(ply); // macro unchanged
 
     // generate only captures/promotions if your movegen supports that flag
-    movegen->generateMoves(*board, true);
-    int count = movegen->count;
+    int count = engine.movegen->generateMoves(board, true);
     Move moves[MAX_MOVES];
     if (count == 0) {
-        if (board->is_in_check) { exitDepth(); return -MATE_SCORE + ply; }
-        exitDepth();
+        if (board.is_in_check) { return -MATE_SCORE + ply; }
         return standPat;
     }
-    std::copy_n(movegen->moves, count, moves);
+    std::copy_n(engine.movegen->moves, count, moves);
 
     int bestEval = standPat;
 
@@ -161,17 +163,15 @@ int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int 
         if (shouldPrune(m, standPat, alpha)) continue;
 
         // Apply NNUE incremental update then board move
-        nnue->on_make_move(*board, m);
-        board->MakeMove(m);
+        nnue.on_make_move(board, m);
+        board.MakeMove(m);
 
-        enterDepth();
         PV childPV;
         int score = -quiescence(-beta, -alpha, childPV, limits, ply+1);
-        exitDepth();
 
         // Undo board & NNUE (capture before must be reconstructed from states)
-        nnue->on_unmake_move(*board, m);
-        board->UnmakeMove(m);
+        nnue.on_unmake_move(board, m);
+        board.UnmakeMove(m);
 
         if (limits.out_of_time()) break;
 
@@ -193,20 +193,21 @@ int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int 
 int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
                       std::vector<Move>& previousPV, SearchLimits& limits, int ply, bool use_quiescence) {
     STATS_ENTER(ply); // track node per depth
-    nodesSearched++;
+    ScopedTimer timer(T_SEARCH);
     if (limits.out_of_time()) return alpha;
 
-    if (board->hash_history[board->zobrist_hash] >= 3 || board->currentGameState.fiftyMoveCounter >= 50)
+    if (board.hash_history[board.zobrist_hash] >= 3 || board.currentGameState.fiftyMoveCounter >= 50) {
         return 0;
+    }
 
     if (depth == 0) {
-        return use_quiescence ? quiescence(alpha, beta, pv, limits, ply) : nnue->evaluate(board->is_white_move);
+        return use_quiescence ? quiescence(alpha, beta, pv, limits, ply) : nnue.evaluate(board.is_white_move);
     }
 
     int alphaOrig = alpha;
-    TTEntry* ttEntry = tt.probe(board->zobrist_hash);
+    TTEntry* ttEntry = engine.tt.probe(board.zobrist_hash);
 
-    if (ttEntry && ttEntry->key == board->zobrist_hash && ttEntry->depth >= depth) {
+    if (ttEntry && ttEntry->key == board.zobrist_hash && ttEntry->depth >= depth) {
         STATS_TT_HIT(ply);
         int ttScore = ttEntry->eval;
         if (ttScore > MATE_SCORE - 1000) ttScore -= ply;
@@ -221,7 +222,7 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
 
     Move moves[MAX_MOVES];
     int count = generateAndOrderMoves(moves, ply, previousPV);
-    if (count == 0) return board->is_in_check ? -(MATE_SCORE - ply) : 0;
+    if (count == 0) return board.is_in_check ? -(MATE_SCORE - ply) : 0;
 
     int bestEval = -MATE_SCORE;
     Move bestMove = Move::NullMove();
@@ -232,15 +233,15 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
         Move m = moves[i];
 
         // Apply NNUE/update & board
-        nnue->on_make_move(*board, m);
-        board->MakeMove(m);
+        nnue.on_make_move(board, m);
+        board.MakeMove(m);
 
         PV childPV;
         int score = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply + 1, use_quiescence);
 
         // Undo
-        nnue->on_unmake_move(*board, m);
-        board->UnmakeMove(m);
+        nnue.on_unmake_move(board, m);
+        board.UnmakeMove(m);
 
         if (limits.out_of_time()) break;
 
@@ -256,12 +257,12 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
             if (i == 0) STATS_INC(fail_high_first);
 
             if (!Move::SameMove(killerMoves[depth][0], m) && !m.IsPromotion() &&
-                !(1ULL << m.TargetSquare() & board->colorBitboards[1 - board->move_color])) {
+                !(1ULL << m.TargetSquare() & board.colorBitboards[1 - board.move_color])) {
                 killerMoves[depth][1] = killerMoves[depth][0];
                 killerMoves[depth][0] = m;
             }
-            int piece = board->getMovedPiece(m.StartSquare());
-            historyHeuristic[board->is_white_move ? piece : piece + 6][m.TargetSquare()] += depth * depth;
+            int piece = board.getMovedPiece(m.StartSquare());
+            historyHeuristic[board.is_white_move ? piece : piece + 6][m.TargetSquare()] += depth * depth;
             break;
         }
     }
@@ -270,7 +271,7 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
     if (bestEval <= alphaOrig) { flag = UPPERBOUND; STATS_FAILLOW(ply); }
     else if (bestEval >= beta) { flag = LOWERBOUND; }
 
-    tt.store(board->zobrist_hash, depth, ply, bestEval, flag, bestMove);
+    engine.tt.store(board.zobrist_hash, depth, ply, bestEval, flag, bestMove);
     STATS_TT_STORE(depth);
 
     return bestEval;
@@ -281,20 +282,19 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
 // ============================================================================
 
 SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth, SearchLimits& limits, std::vector<Move>& previousPV) {
-    nodesSearched = 0;
     SearchResult result;
 
     // Build NNUE accumulators for root position
-    nnue->build_accumulators(*board);
+    nnue.build_accumulators(board);
 
     for (int i = 0; i < count; ++i) {
         if (limits.out_of_time()) break;
         Move m = legal_moves[i];
         if (Move::SameMove(m, Move::NullMove())) continue;
 
-        //nnue->debug_check_incr_vs_full_after_make(*board, m, *nnue);
-        nnue->on_make_move(*board, m);
-        board->MakeMove(m);
+        //nnue->debug_check_incr_vs_full_after_make(board, m, *nnue);
+        nnue.on_make_move(board, m);
+        board.MakeMove(m);
 
         //std::cout << "------" << std::endl; m.PrintMove(); std::cout << "------" << std::endl;
 
@@ -302,13 +302,13 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
         int eval = -negamax(depth - 1, -MATE_SCORE, MATE_SCORE, childPV, previousPV, limits, 0, true);
 
         // Undo
-        //nnue->debug_check_incr_vs_full_after_unmake(*board, m, *nnue);
-        nnue->on_unmake_move(*board, m);
-        board->UnmakeMove(m);
+        //nnue->debug_check_incr_vs_full_after_unmake(board, m, *nnue);
+        nnue.on_unmake_move(board, m);
+        board.UnmakeMove(m);
 
         //std::cout << "after unmake - should be init position" << std::endl;
-        //board->print_board();
-        //nnue->evaluate(board->is_white_move);
+        //boardprint_board();
+        //nnue->evaluate(boardis_white_move);
         //exit(0);
 
         if (limits.out_of_time() && i > 0) break;
@@ -330,28 +330,28 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
     return result;
 }
 
+// same as ^^search as the only diff with aspirtation is the alpha_beta args
 SearchResult Searcher::searchAspiration(Move legal_moves[MAX_MOVES], int count, int depth, SearchLimits& limits, std::vector<Move>& previousPV, int alpha, int beta) {
     // Simple wrapper using existing negamax with given alpha/beta window
-    nodesSearched = 0;
     SearchResult result;
 
     // Build NNUE accumulators for root position
-    nnue->build_accumulators(*board);
+    nnue.build_accumulators(board);
 
     for (int i = 0; i < count; ++i) {
         if (limits.out_of_time()) break;
         Move m = legal_moves[i];
         if (Move::SameMove(m, Move::NullMove())) continue;
 
-        nnue->on_make_move(*board, m);
-        board->MakeMove(m);
+        nnue.on_make_move(board, m);
+        board.MakeMove(m);
 
         PV childPV;
         STATS_ENTER(depth);
         int eval = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, 0, true);
 
-        nnue->on_unmake_move(*board, m);
-        board->UnmakeMove(m);
+        nnue.on_unmake_move(board, m);
+        board.UnmakeMove(m);
 
         if (limits.out_of_time() && i > 0) break;
 
@@ -369,25 +369,17 @@ SearchResult Searcher::searchAspiration(Move legal_moves[MAX_MOVES], int count, 
     return result;
 }
 
-// ============================================================================
-// DATA TRACKING
-// ============================================================================
-
-void Searcher::resetStats() {
-    if (trackStats) stats = SearchStats();
-}
-
 // -----------------------
 // make/undo move helpers
 // -----------------------
 
 void Searcher::do_move(const Move& move) {
-    nnue->on_make_move(*board, move);
-    board->MakeMove(move);
+    nnue.on_make_move(board, move);
+    board.MakeMove(move);
 }
 
 void Searcher::undo_move(const Move& move, const Board& before) {
     // board currently contains the position AFTER the move, so Unmake it then call on_unmake_move
-    nnue->on_unmake_move(*board, move);
-    board->UnmakeMove(move);
+    nnue.on_unmake_move(board, move);
+    board.UnmakeMove(move);
 }

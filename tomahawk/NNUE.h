@@ -5,6 +5,8 @@
 #include <unordered_set>
 #include "board.h"
 #include "move.h"
+#include "stats.h"
+#include "timer.h"
 
 // ============================================================
 // Network Dimensions

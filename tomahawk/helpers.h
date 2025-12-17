@@ -24,6 +24,8 @@
 #include <cstring>
 #include <algorithm>
 #include <cassert>
+#include <windows.h>
+#include <mutex>
 
 typedef uint64_t U64;
 typedef unsigned short ushort;
@@ -68,13 +70,52 @@ enum Result
     BlackIllegalMove
 };
 
+// LOGS CONTROL
+
+struct Logging {
+    static inline bool track_timers = false; 
+    static inline bool track_search_stats = true;
+    static inline bool track_game_log = true; 
+    static inline bool track_uci = true;
+    static inline std::string log_dir = "../logs";
+
+    static void toggleTimers() {track_timers = !track_timers;}
+    static void toggleSearchStats() {track_search_stats = !track_search_stats;}
+    static void toggleGameLog() {track_game_log = !track_game_log;}
+    static void toggleUCI() {track_uci = !track_uci;}
+    static void setLogDir(std::string path) {log_dir = path;}
+
+    static void disableAll() {
+        track_timers = false;
+        track_search_stats = false;
+        track_game_log = false;
+        track_uci = true;
+    }
+
+    static void enableAll() {
+        track_timers = true;
+        track_search_stats = true;
+        track_game_log = true;
+        track_uci = true;
+    }
+};
+
+inline void logEventRaw(const std::string& line) {
+    static std::mutex mtx;
+    static std::ofstream out("../logs/all_logs.jsonl", std::ios::app);
+
+    if (!out.is_open())
+        return;
+
+    std::lock_guard<std::mutex> lock(mtx);
+    out << line << '\n';
+    out.flush();
+}
+
 extern std::string file_char;
 extern std::string results_string[];
 
 // set/get/pop macros
-#include <iostream>
-#include <cstdlib>
-
 inline void set_bit(U64& bitboard, int square) {
     bitboard |= (1ULL << square);
 }
@@ -101,6 +142,11 @@ inline int isqrt(int x) {
 
 // function to print a biboard to the console
 void print_bitboard(U64 bitboard);
+
+// big-endianness reader
+uint64_t read_u64_be(std::ifstream &file);
+uint32_t read_u32_be(std::ifstream &file);
+uint16_t read_u16_be(std::ifstream &file);
 
 
 // function to get the cardinal direction from start_square -> target_square

@@ -2,28 +2,27 @@
 
 #include "PrecomputedMoveData.h"
 
-// Define static members
-U64 PrecomputedMoveData::blankPawnMoves[64][2];
-U64 PrecomputedMoveData::fullPawnAttacks[64][2];
-U64 PrecomputedMoveData::blankKnightAttacks[64];
-U64 PrecomputedMoveData::blankKingAttacks[64];
+// static member definitions
+U64 PrecomputedMoveData::blankPawnMoves[64][2] = {};
+U64 PrecomputedMoveData::fullPawnAttacks[64][2] = {};
+U64 PrecomputedMoveData::blankKnightAttacks[64] = {};
+U64 PrecomputedMoveData::blankKingAttacks[64] = {};
 
-// eval masks
-U64 PrecomputedMoveData::passedPawnMasks[64][2];
-int PrecomputedMoveData::king_move_distances[64][64];
+U64 PrecomputedMoveData::passedPawnMasks[64][2] = {};
+U64 PrecomputedMoveData::rayMasks[64][64] = {};
+U64 PrecomputedMoveData::alignMasks[64][64] = {};
 
-U64 PrecomputedMoveData::rayMasks[64][64];
-U64 PrecomputedMoveData::alignMasks[64][64];
-int PrecomputedMoveData::distToEdge[64][8];
+int PrecomputedMoveData::distToEdge[64][8] = {};
+int PrecomputedMoveData::kingMoveDistances[64][64] = {};
 
-PrecomputedMoveData::PrecomputedMoveData() {
+void PrecomputedMoveData::init() {
     generateFullPawnMoves();
     generateFullPawnAttacks();
     generateBlankKnightAttacks();
     generateBlankKingAttacks();
 
     generatePassedPawnsMasks();
-    generate_king_distances();
+    generateKingDistances();
 
     generateDistToEdge();
     generateAlignMasks();
@@ -176,7 +175,7 @@ void PrecomputedMoveData::generatePassedPawnsMasks() {
     }
 }
 
-void PrecomputedMoveData::generate_king_distances() {
+void PrecomputedMoveData::generateKingDistances() {
     int file1, file2, rank1, rank2;
     int rankDistance, fileDistance;
 
@@ -191,7 +190,7 @@ void PrecomputedMoveData::generate_king_distances() {
             rankDistance = abs(rank2 - rank1);
             fileDistance = abs(file2 - file1);
 
-            king_move_distances[sq1][sq2] = std::max(rankDistance, fileDistance);
+            kingMoveDistances[sq1][sq2] = std::max(rankDistance, fileDistance);
         }
     }
 }

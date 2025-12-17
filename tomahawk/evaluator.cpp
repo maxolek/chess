@@ -5,67 +5,13 @@
 #include <iostream>
 #include <algorithm>
 
-//////////////////////////////////////
-//////////////////////////////////////
-//
-//      out dated
-//  static class needs to integrate to engine
-//
-//////////////////////////////////////
-//////////////////////////////////////
-
-// =================== Static Member Definitions ===================
-int Evaluator::PST_endgame[6][64];
-int Evaluator::PST_opening[6][64];
-const PrecomputedMoveData* Evaluator::precomp;
-int Evaluator::mvvLvaTable[6][6];
 
 // =================== Constructors ===================
-Evaluator::Evaluator() {
-    loadPST("../bin/pst_opening.txt", PST_opening);
-    loadPST("../bin/pst_endgame.txt", PST_endgame);
-    initMVVLVA();
-}
+Evaluator::Evaluator() {}
 
-Evaluator::Evaluator(const PrecomputedMoveData* _precomp) {
-    loadPST("../bin/pst_opening.txt", PST_opening);
-    loadPST("../bin/pst_endgame.txt", PST_endgame);
-    precomp = _precomp;
-    initMVVLVA();
-}
-
-// =================== Debug Output ===================
-void Evaluator::writeEvalDebug(Board& board, const std::string& filename) {
-    std::ofstream file(filename, std::ios::app);
-    if (!file.is_open()) {
-        std::cerr << "Failed to open eval debug file: " << filename << std::endl;
-        return;
-    }
-
-    file << "FEN: " << board.getBoardFEN() << "\n";
-
-    EvalReport report;
-    report.add(MATERIAL, materialDifferences(board));
-    report.add(PAWN_STRUCTURE, pawnStructureDifferences(board));
-    report.add(PASSED_PAWNS, passedPawnDifferences(board));
-    report.add(CENTER_CONTROL, centerControlDifferences(board));
-    report.add(MOBILITY, 0); // optional
-    report.add(POSITION, positionDifferences(board, PST_opening));
-    report.add(KING_SAFETY, kingSafetyDifferences(board));
-
-    int phase = gamePhase(board);
-
-    file << std::fixed << std::setprecision(2);
-    report.print(file);
-    file << "Phase: " << phase << "\n";
-
-    file << "Total Eval (tapered): " << taperedEval(board) << "\n";
-    file << "-----------------------------------\n";
-    file.close();
-}
 
 // =================== PST Loading ===================
-bool Evaluator::loadPST(const std::string& filename, int pst[6][64]) {
+bool Evaluator::loadOpeningPST(const std::string& filename) {
     std::ifstream file(filename);
     if (!file.is_open()) {
         std::cerr << "Failed to open PST file: " << filename << std::endl;
@@ -96,7 +42,46 @@ bool Evaluator::loadPST(const std::string& filename, int pst[6][64]) {
             for (int fileIdx = 0; fileIdx < 8; ++fileIdx) {
                 int val;
                 if (!(iss >> val)) return false;
-                pst[piece][(7 - rank) * 8 + fileIdx] = val; // flip ranks
+                PST_opening[piece][(7 - rank) * 8 + fileIdx] = val; // flip ranks
+            }
+        }
+    }
+
+    return true;
+}
+
+bool Evaluator::loadEndgamePST(const std::string& filename) {
+        std::ifstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Failed to open PST file: " << filename << std::endl;
+        return false;
+    }
+
+    const std::unordered_map<std::string, int> pieceMap = {
+        {"Pawn", 0}, {"Knight", 1}, {"Bishop", 2},
+        {"Rook", 3}, {"Queen", 4}, {"King", 5}
+    };
+
+    std::string line;
+    while (std::getline(file, line)) {
+        if (line.empty()) continue;
+
+        std::istringstream header(line);
+        std::string pieceName, dash, phaseName;
+        header >> pieceName >> dash >> phaseName;
+
+        auto it = pieceMap.find(pieceName);
+        if (it == pieceMap.end()) return false;
+        int piece = it->second;
+
+        // Read 8 ranks for the piece
+        for (int rank = 0; rank < 8; ++rank) {
+            if (!std::getline(file, line)) return false;
+            std::istringstream iss(line);
+            for (int fileIdx = 0; fileIdx < 8; ++fileIdx) {
+                int val;
+                if (!(iss >> val)) return false;
+                PST_endgame[piece][(7 - rank) * 8 + fileIdx] = val; // flip ranks
             }
         }
     }
@@ -144,39 +129,84 @@ int Evaluator::gamePhase(const Board& board) {
 
 // =================== Tapered Eval ===================
 int Evaluator::taperedEval(const Board& board) {
+    ScopedTimer timer(T_EVAL);
 
-    int opening = openingEval(board).weightedTotal;
-    int endgame = endgameEval(board).weightedTotal;
+    // Compute opening and endgame reports
+    TaperedEvalReport openingReport = openingEval(board);
+    TaperedEvalReport endgameReport = endgameEval(board);
+
     int phase = gamePhase(board);
-    int eval = ((opening * (256 - phase)) + (endgame * phase)) / 256;
+
+    // Compute tapered values for each component and weighted totals
+    TaperedEvalReport taperedReport;
+    for (size_t i = 0; i < COMPONENT_COUNT; ++i) {
+        taperedReport.opening[i] = openingReport.tapered[i];   // will be updated by Evaluate
+        taperedReport.endgame[i] = endgameReport.tapered[i];   // will be updated by Evaluate
+    }
+
+    // Use a combined report to compute tapered per-component and weighted totals
+    TaperedEvalReport combinedReport;
+    combinedReport.opening = openingReport.opening;
+    combinedReport.endgame = endgameReport.endgame;
+    combinedReport.computeTapered(phase, evalWeights);
+
+    int eval = combinedReport.taperedTotal;
 
     return board.is_white_move ? eval : -eval; // negamax
 }
 
-// will be expanded for better integration with biases (e.g. has_castling +40 lasts all game)
-EvalReport Evaluator::openingEval(const Board& board) {
-    return Evaluate(board, PST_opening);
-}
+// Opening evaluation
+TaperedEvalReport Evaluator::openingEval(const Board& board) {
+    TaperedEvalReport report;
 
-EvalReport Evaluator::endgameEval(const Board& board) {
-    return Evaluate(board, PST_endgame);
-}
+    report.opening[MATERIAL]       = materialDifferences(board);
+    report.opening[PAWN_STRUCTURE] = pawnStructureDifferences(board);
+    report.opening[PASSED_PAWNS]   = passedPawnDifferences(board);
+    report.opening[POSITION]       = positionDifferences(board, PST_opening);
+    report.opening[CENTER_CONTROL] = centerControlDifferences(board);
+    report.opening[KING_SAFETY]    = kingSafetyDifferences(board);
+    report.opening[MOBILITY]       = 0; // optional
 
-// =================== Evaluate Components ===================
-EvalReport Evaluator::Evaluate(const Board& board, int pst[6][64]) {
-    EvalReport report;
-
-    report.add(MATERIAL, materialDifferences(board));
-    report.add(PAWN_STRUCTURE, pawnStructureDifferences(board));
-    report.add(PASSED_PAWNS, passedPawnDifferences(board));
-    report.add(POSITION, positionDifferences(board, pst));
-    report.add(CENTER_CONTROL, centerControlDifferences(board));
-    report.add(KING_SAFETY, kingSafetyDifferences(board));
-    report.add(MOBILITY, 0); // optional
-
-    report.computeWeighted(evalWeights);
+    report.endgame = report.opening; // default, will be updated in endgameEval
     return report;
 }
+
+// Endgame evaluation
+TaperedEvalReport Evaluator::endgameEval(const Board& board) {
+    TaperedEvalReport report;
+
+    report.endgame[MATERIAL]       = materialDifferences(board);
+    report.endgame[PAWN_STRUCTURE] = pawnStructureDifferences(board);
+    report.endgame[PASSED_PAWNS]   = passedPawnDifferences(board);
+    report.endgame[POSITION]       = positionDifferences(board, PST_endgame);
+    report.endgame[CENTER_CONTROL] = centerControlDifferences(board);
+    report.endgame[KING_SAFETY]    = kingSafetyDifferences(board);
+    report.endgame[MOBILITY]       = 0; // optional
+
+    report.opening = report.endgame; // default, will be updated in openingEval
+    return report;
+}
+
+// Evaluate function that returns a TaperedEvalReport
+TaperedEvalReport Evaluator::Evaluate(const Board& board, int pst[6][64]) {
+    TaperedEvalReport report;
+
+    report.opening[MATERIAL]       = materialDifferences(board);
+    report.opening[PAWN_STRUCTURE] = pawnStructureDifferences(board);
+    report.opening[PASSED_PAWNS]   = passedPawnDifferences(board);
+    report.opening[POSITION]       = positionDifferences(board, pst);
+    report.opening[CENTER_CONTROL] = centerControlDifferences(board);
+    report.opening[KING_SAFETY]    = kingSafetyDifferences(board);
+    report.opening[MOBILITY]       = 0; // optional
+
+    report.endgame = report.opening; // copy for endgame by default
+
+    int phase = gamePhase(board);
+    report.computeTapered(phase, evalWeights);
+
+    return report;
+}
+
 
 /*
 
@@ -321,10 +351,10 @@ int Evaluator::centerControlDifferences(const Board& board) {
 
                 switch (pt) {
                     case pawn:
-                        attacks = precomp->fullPawnAttacks[sq][color];
+                        attacks = PrecomputedMoveData::fullPawnAttacks[sq][color];
                         break;
                     case knight:
-                        attacks = precomp->blankKnightAttacks[sq];
+                        attacks = PrecomputedMoveData::blankKnightAttacks[sq];
                         break;
                     case bishop:
                         attacks = Magics::bishopAttacks(sq, 0);
@@ -354,7 +384,7 @@ int Evaluator::centerControlDifferences(const Board& board) {
 
 /** Check if a pawn is passed */
 bool Evaluator::isPassedPawn(bool white, int sq, U64 oppPawns) {
-    U64 mask = precomp->passedPawnMasks[sq][white ? 0 : 1];
+    U64 mask = PrecomputedMoveData::passedPawnMasks[sq][white ? 0 : 1];
     return (oppPawns & mask) == 0;
 }
 
@@ -376,10 +406,10 @@ int Evaluator::passedPawnDifferences(const Board& board) {
         if (isPassedPawn(true, sq, black_pawns)) {
             int rank = sq / 8;
             pp_white += passedBonus[rank];
-            if (white_pawns & precomp->fullPawnAttacks[sq][1]) pp_white += 20;
+            if (white_pawns & PrecomputedMoveData::fullPawnAttacks[sq][1]) pp_white += 20;
 
-            int own_dist = precomp->king_move_distances[sq][white_king_sq];
-            int opp_dist = precomp->king_move_distances[sq][black_king_sq];
+            int own_dist = PrecomputedMoveData::kingMoveDistances[sq][white_king_sq];
+            int opp_dist = PrecomputedMoveData::kingMoveDistances[sq][black_king_sq];
             pp_white += std::max(0, 30 - 5 * own_dist);
             pp_white -= (opp_dist <= (7 - rank)) ? 20 : 0;
         }
@@ -396,10 +426,10 @@ int Evaluator::passedPawnDifferences(const Board& board) {
         if (isPassedPawn(false, sq, white_pawns)) {
             int rank = sq / 8;
             pp_black += passedBonus[7 - rank];
-            if (black_pawns & precomp->fullPawnAttacks[sq][0]) pp_black += 20;
+            if (black_pawns & PrecomputedMoveData::fullPawnAttacks[sq][0]) pp_black += 20;
 
-            int own_dist = precomp->king_move_distances[sq][black_king_sq];
-            int opp_dist = precomp->king_move_distances[sq][white_king_sq];
+            int own_dist = PrecomputedMoveData::kingMoveDistances[sq][black_king_sq];
+            int opp_dist = PrecomputedMoveData::kingMoveDistances[sq][white_king_sq];
             pp_black += std::max(0, 30 - 5 * own_dist);
             pp_black -= (opp_dist <= rank) ? 20 : 0;
         }
@@ -506,7 +536,7 @@ int Evaluator::tropism(const Board& board, bool usWhite) {
         int sq = getLSB(opp_pieces);
         opp_pieces &= opp_pieces - 1;
 
-        int dist = precomp->king_move_distances[sq][king_sq];
+        int dist = PrecomputedMoveData::kingMoveDistances[sq][king_sq];
         int val = 0;
         switch (board.getMovedPiece(sq)) {
             case 1: val = dist <= 3 ? 8 : 0; break;
@@ -554,6 +584,8 @@ int Evaluator::attackerMaterial(const Board& board, int opp_side) {
 // Returns net material gain for the side that STARTS with 'move' (capture).
 // If non-capture, return 0 (neutral).
 int Evaluator::SEE(const Board& board, const Move& move) {
+    ScopedTimer timer(T_SEE);
+
     int sq = move.TargetSquare();
     int from = move.StartSquare();
 

@@ -28,22 +28,55 @@ void UCI::handleCommand(const std::string& line) {
     std::string token;
     iss >> token;
 
+    if (Logging::track_uci) {
+        static std::ofstream logFile("../logs/uci_log.log", std::ios::app);
+        if (!logFile.is_open()) return;
+        logFile << line << "\n";
+        logFile.flush();
+    }
+
+    // standard commands
     if (token == "uci") {
             std::cout << "id name tomahawk\n";
-            std::cout << "id author maxolek\n";
+            std::cout << "id version " << ENGINE_ID << "\n";
+            std::cout << "id author max oleksa\n";
+
             // engine options
             std::cout << "option name Move Overhead type spin default 30 min 0 max 1000\n";
-            std::cout << "option name Hash type spin default 16 min 1 max 1024\n";
-            std::cout << "option name Threads type spin default 4 min 1 max 128\n";
+            std::cout << "option name Threads type spin default 1 min 1 max 1\n";
+            std::cout << "option name Hash type spin default 512 min 1 max 1024\n";
             std::cout << "option name Ponder type check default false\n";
             // stats tracking
             std::cout << "option name ShowStats type check default false\n";
             // Required for lichess
-            std::cout << "option name UCI_ShowWDL type check default false" << std::endl;
+            std::cout << "option name UCI_ShowWDL type check default false\n";
+            /*
+            // -------- customization --------
+            std::cout << "option name MagicBitboards type check default true\n";
+            std::cout << "option name NNUE type check default true\n";
+            // search
+            std::cout << "option name quiescence type check default true\n";
+            std::cout << "option name aspiration type check default true\n";
+            // move ordering
+            std::cout << "option name moveordering type check default true\n";
+            std::cout << "option name mvvlva_ordering type check default false\n";
+            std::cout << "option name see_ordering type check default true\n";
+            // pruning
+            std::cout << "option name delta_pruning type check default true\n";
+            std::cout << "option name see_pruning type check default true\n";
+            // books
+            std::cout << "option name nnue_weight_file type string default 768_128x2\n";
+            */
+            std::cout << "option name opening_book type string default Titans\n";
+            std::cout << "option name syzygy type string default <empty>\n";
+            // logging
+            /*
+            std::cout << "option name timer_logging type check default false\n";
+            std::cout << "option name stats_logging type check default true\n";
+            std::cout << "option name game_logging type check default true\n";
+            */
+
             std::cout << "uciok\n";
-    }
-    else if (token == "print_board") {
-        engine->game_board.print_board();
     }
     else if (token == "isready") {
         std::cout << "readyok\n";
@@ -52,10 +85,9 @@ void UCI::handleCommand(const std::string& line) {
         handleSetOption(iss);
     }
     else if (token == "ucinewgame") {
-        engine->clearState();
-        //game->startUCI(engine);
+        engine->newGame();
     }
-    else if (token == "position") {
+    else if (token == "position") { // start all search/tests/everything after set_position
         handlePosition(iss);
     }
     else if (token == "go") {
@@ -66,12 +98,59 @@ void UCI::handleCommand(const std::string& line) {
         std::string best = engine->bestMove.uci();
         std::cout << "bestmove " << best << "\n";
     }
-    //else if (token == "ponderhit") {
-    //    engine->ponderHit();
-    //}
     else if (token == "quit") {
         engine->stopSearch();
-        exit(0);
+    }
+    else if (token == "ponderhit") {
+        //
+    }
+    // custom commands
+    else if (token == "static_eval") {
+        // static or tapered evaluation test
+        engine->staticEvalTest();
+    }
+    else if (token == "nnue_eval") {
+        engine->nnueEvalTest();
+    }
+    else if (token == "perft") {
+        int depth = 0;
+        if (iss >> depth) {
+            engine->perftPrint(depth);
+        }
+    }
+    else if (token == "see") {
+        std::string target_sq;
+        if (iss >> target_sq) {
+            engine->SEETest(algebraic_to_square(target_sq));
+        }
+    }
+    else if (token == "dumpzobrist") {
+        std::cout << "\nCurrent Hash: " << std::hex << engine->game_board.zobrist_hash << "\n";
+        std::cout << "\n--- Hash History ---\n";
+        for (const auto& entry : engine->game_board.hash_history) {
+            uint64_t hash = entry.first;
+            int count = entry.second;
+            std::cout << "Hash: 0x" << std::hex << hash 
+                    << "  Count: " << std::dec << count << "\n";
+        }
+        std::cout << "--- End of Hash History ---\n";
+    }
+    else if (token == "dumpstats") {
+        //engine->dumpStats(); // you implement
+    }
+    else if (token == "bench") {
+        //engine->bench(depth);  // implement bench mode
+    }
+    else if (token == "speedtest") {
+        //engine->speedTest(); // implement speed test
+    }
+    else if (token == "flip") {
+        engine->search_board.is_white_move = !engine->search_board.is_white_move;
+    }
+    else if (token == "print") {
+        engine->print_info();
+    } else if (token == "print_board") {
+        engine->game_board.print_board();
     }
     // else ignore unknown commands or add more handlers
 }
@@ -112,44 +191,38 @@ void UCI::handleSetOption(std::istringstream& iss) {
 }
 
 
-void UCI::handlePosition(std::istringstream& iss) {
-    std::string posType;
-    iss >> posType;
+void UCI::handlePosition(std::istringstream& iss)
+{
+    std::string token;
+    iss >> token;
 
-    if (posType == "startpos") {
-        engine->setPosition("startpos",{});
-        std::string nextWord;
-        iss >> nextWord;
-        if (nextWord == "moves") {
-            std::vector<std::string> moves;
-            std::string moveStr;
-            while (iss >> moveStr) moves.push_back(moveStr);
-            engine->playMovesStrings(moves);
-        }
+    std::string fen;
+    std::vector<std::string> moves;
+
+    if (token == "startpos") {
+        fen = "startpos";
     }
-    else if (posType == "fen") {
-        std::string fen;
+    else if (token == "fen") {
         std::string part;
         for (int i = 0; i < 6; ++i) {
             iss >> part;
             fen += part + " ";
         }
         fen.pop_back();
-        engine->setPosition(fen,{});
-
-        std::string nextWord;
-        iss >> nextWord;
-        if (nextWord == "moves") {
-            std::vector<std::string> moves;
-            std::string moveStr;
-            while (iss >> moveStr) moves.push_back(moveStr);
-            engine->playMovesStrings(moves);
-        }
     }
+
+    if (iss >> token && token == "moves") {
+        std::string m;
+        while (iss >> m)
+            moves.push_back(m);
+    }
+
+    engine->setPosition(fen, moves);
 }
 
 void UCI::handleGo(std::istringstream& iss) {
-    // Reset to defaults
+    // Reset defaults
+    sendEval = false;
     wtime = btime = 0;
     winc = binc = 0;
     movetime = -1;
@@ -160,11 +233,10 @@ void UCI::handleGo(std::istringstream& iss) {
     int nodes = -1;
     bool infinite = false;
 
-    SearchSettings settings;
-    bool eval_test = false;
-
     while (iss >> token) {
-        if (token == "eval_test") eval_test = true;
+        if (token == "eval") {
+            sendEval = true;            // mark that we want evaluation only
+        }
         else if (token == "wtime") iss >> wtime;
         else if (token == "btime") iss >> btime;
         else if (token == "winc") iss >> winc;
@@ -176,16 +248,24 @@ void UCI::handleGo(std::istringstream& iss) {
         else if (token == "infinite") infinite = true;
     }
 
-    settings.wtime = wtime;
-    settings.btime = btime;
-    settings.winc = winc;
-    settings.binc = binc;
-    settings.movestogo = movestogo;
-    settings.depth = depth;
-    settings.nodes = nodes;
-    settings.movetime = movetime;
-    settings.infinite = infinite;
+    // Apply settings to engine
+    engine->settings.wtime = wtime;
+    engine->settings.btime = btime;
+    engine->settings.winc = winc;
+    engine->settings.binc = binc;
+    engine->settings.movestogo = movestogo;
+    engine->settings.depth = depth;
+    engine->settings.nodes = nodes;
+    engine->settings.movetime = movetime;
+    engine->settings.infinite = infinite;
 
-    if (eval_test) {engine->evaluate_position(settings);}
-    else {engine->startSearch(settings);}
+    if (sendEval) {
+        engine->evaluate_position();   // just evaluate the current position
+        return;
+    }
+
+    // Otherwise start a normal search
+    engine->trackGame();
+    engine->startSearch();
 }
+

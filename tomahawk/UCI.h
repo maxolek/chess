@@ -3,6 +3,7 @@
 #define UCI_H
 
 #include "engine.h"
+#include "session.h"
 #include <string>
 #include <sstream>
 #include <iostream>
@@ -20,6 +21,7 @@ public:
 private:
     Engine* engine;
 
+    bool sendEval = false;
     int wtime = 0, btime = 0, winc = 0, binc = 0, movetime = -1, depth = -1;
 };
 

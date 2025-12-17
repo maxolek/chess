@@ -112,4 +112,14 @@ public:
 
 };
 
+// generalized printing method
+inline std::ostream& operator<<(std::ostream& os, const Move& m) {
+    if (m.IsNull()) {
+        os << "null";
+    } else {
+        os << m.uci(); // or you could do start->target if you want
+    }
+    return os;
+}
+
 #endif

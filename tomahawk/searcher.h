@@ -1,11 +1,16 @@
 #ifndef SEARCHER_H
 #define SEARCHER_H
 
-#include "evaluator.h"
+#include "engine.h"
+#include "search_limits.h"
 #include "helpers.h"
-#include "tt.h"
 #include "stats.h"
+#include "timer.h"
 #include "NNUE.h"
+
+class Engine;
+class Evaluator;
+class NNUE;
 
 struct RootMove {
     Move move;
@@ -26,7 +31,7 @@ struct PV {
 struct SearchResult {
     Move bestMove = Move::NullMove();
     int eval = -MATE_SCORE;
-    EvalReport eval_report;
+    //TaperedEvalReport eval_report;
     PV best_line;
     
     RootMove root_moves[MAX_MOVES];
@@ -37,53 +42,18 @@ struct SearchResult {
     }
 };
 
-struct SearchLimits {
-    std::chrono::steady_clock::time_point start_time;
-    int time_limit_ms;
-    int max_depth;
-    bool stopped;
-
-    SearchLimits(int ms = 0, int depth = -1)
-        : start_time(std::chrono::steady_clock::now()),
-          time_limit_ms(ms), max_depth(depth), stopped(false) {}
-
-    inline bool out_of_time() {
-        if (stopped) return true;
-        auto now = std::chrono::steady_clock::now();
-        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
-        if (elapsed >= time_limit_ms && time_limit_ms > 0) {
-            stopped = true;
-            return true;
-        }
-        return false;
-    }
-
-    inline bool depth_reached(int current_depth) const {
-        return (max_depth >= 0 && current_depth > max_depth);
-    }
-
-    inline bool should_stop(int current_depth) {
-        return out_of_time() || depth_reached(current_depth);
-    }
-};
-
 class Searcher {
 public:
     static constexpr int KILL_SEARCH_RETURN = -5 * MATE_SCORE;
     static constexpr int MAX_DELTA = 1000;
 
     // Object-owned state
-    Board* board;
-    MoveGenerator* movegen;
-    NNUE* nnue;
-    TranspositionTable tt;
-    SearchStats stats;
+    Engine& engine;
+    Board& board; //= engine.search_board;
+    Evaluator& eval; // = engine.evaluator;
+    NNUE& nnue; // = engine.evaluator.nnue;
 
     bool stop = false;
-    bool trackStats = true;
-    int nodesSearched = 0;
-    int quiesence_depth = 0;
-    int max_q_depth = 0;
 
     Move killerMoves[MAX_DEPTH][2] = {};
     int historyHeuristic[12][64] = {};
@@ -91,9 +61,11 @@ public:
     std::vector<Move> best_line;
     std::vector<Move> best_quiescence_line;
 
-    Searcher() {};
-    Searcher(Board* b, MoveGenerator* mg, NNUE* nnue)
-    : board(b), movegen(mg), nnue(nnue) {}
+    Searcher(Engine& e, Board& b, Evaluator& ev, NNUE& nn) 
+        : engine(e), 
+          board(b), 
+          eval(ev), 
+          nnue(nn) {}
 
     // ------------------------------- Main Search -------------------------------
     SearchResult search(
@@ -164,10 +136,6 @@ public:
         int standPat,
         int alpha
     );
-
-    void enterDepth();
-    void exitDepth();
-    void resetStats();
 
     // ------------------------------- Make/unmake w/ NNUE -------------------------------
     void do_move(const Move& move);

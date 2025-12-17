@@ -1,49 +1,44 @@
 // Precomputed blank board attack masks for all the pieces
-
 #ifndef PRECOMPUTEDMOVEDATA_H
 #define PRECOMPUTEDMOVEDATA_H
 
 #include "bits.h"
+#include <cstdint>
 
 class PrecomputedMoveData {
-private:
 public:
-    static U64 blankPawnMoves[64][2];
-    static U64 fullPawnAttacks[64][2];
+    // ---------------- Static Bitboards ----------------
+    static U64 blankPawnMoves[64][2];    // [square][white=0/black=1]
+    static U64 fullPawnAttacks[64][2];   // [square][white=0/black=1]
     static U64 blankKnightAttacks[64];
     static U64 blankKingAttacks[64];
 
-    static U64 passedPawnMasks[64][2]; // sq, white/black
+    static U64 passedPawnMasks[64][2];   // [square][white/black]
 
-    static U64 rayMasks[64][64]; //             square_a --> square_b
-    static U64 alignMasks[64][64]; //       <-- square_a -- square_b  -->
-    static int distToEdge[64][8]; // square, direction (cardinal)
-    static int king_move_distances[64][64]; // chebyshev (max of rank/file)
+    static U64 rayMasks[64][64];         // line connecting square_a -> square_b
+    static U64 alignMasks[64][64];       // line including a & b
 
-    PrecomputedMoveData();
+    static int distToEdge[64][8];        // square, direction (N,NE,E,...)
+    static int kingMoveDistances[64][64]; // Chebyshev (king moves)
 
-    void generateFullPawnMoves();
-    void generateFullPawnAttacks();
+    // ---------------- Initialization -----------------
+    // Call once at program startup
+    static void init();
 
-    void generateBlankKnightAttacks();
-    void generateBlankKingAttacks();
-    // may be useful to have double array of bitboards with line connecting square a&b
-    //      useful for MoveGenerator::isPinned()
+private:
+    // Internal helpers to generate the arrays
+    static void generateFullPawnMoves();
+    static void generateFullPawnAttacks();
+    static void generateBlankKnightAttacks();
+    static void generateBlankKingAttacks();
+    static void generatePassedPawnsMasks();
+    static void generateKingDistances();
+    static void generateAlignMasks();
+    static void generateRayMasks();
+    static void generateDistToEdge();
 
-    // used for eval, looks are sqaures ahead of square for side to be used
-    // to see if void of enemy pawns
-    void generatePassedPawnsMasks();
-    // chebyshev distance (king moves)
-    void generate_king_distances();
-
-    // straight line mask that contains the entire line containing square a&b
-    // if squares are not connected by a straight line, empty bitboard
-    void generateAlignMasks();
-    // ray between 2 squares (if squares are not connected by straight line, empty bitboard)
-    void generateRayMasks();
-    // direction = N, NE, E, SE, S, SW, W, NW
-    void generateDistToEdge();
-
+    // Prevent instance creation
+    PrecomputedMoveData() = delete;
 };
 
 #endif

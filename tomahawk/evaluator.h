@@ -1,20 +1,14 @@
 #ifndef EVALUATOR_H
 #define EVALUATOR_H
 
+#include "NNUE.h"
 #include "board.h"
 #include "helpers.h"
-#include "moveGenerator.h"    // mobility
 #include "PrecomputedMoveData.h" // masks
+#include "magics.h"
+#include "stats.h"
 #include <array>
 #include <ostream>
-
-//////////////////////////////////////
-//////////////////////////////////////
-//
-//      out dated (static)
-//
-//////////////////////////////////////
-//////////////////////////////////////
 
 // =================== Eval Components ===================
 enum EvalComponent {
@@ -40,9 +34,9 @@ inline const char* EvalComponentNames[] = {
 
 
 // =================== Constants ===================
-static constexpr int pieceValues[6] = {100, 300, 330, 500, 900, 10000}; 
-static constexpr int passedBonus[8] = {0, 10, 20, 30, 50, 70, 100, 0}; // rank-based bonus
-static std::array<int, COMPONENT_COUNT> evalWeights = { 
+constexpr int pieceValues[6] = {100, 300, 330, 500, 900, 10000}; 
+constexpr int passedBonus[8] = {0, 10, 20, 30, 50, 70, 100, 0}; // rank-based bonus
+constexpr std::array<int, COMPONENT_COUNT> evalWeights = { 
     1,   // MATERIAL
     -20,  // PAWN_STRUCTURE
     1,  // PASSED_PAWNS
@@ -53,41 +47,51 @@ static std::array<int, COMPONENT_COUNT> evalWeights = {
 };
 
 
-// =================== Eval Report ===================
-struct EvalReport {
-    std::array<int, COMPONENT_COUNT> components{}; // raw component values
-    int weightedTotal = 0; // weighted sum
+// =================== Full Eval Report ===================
+struct TaperedEvalReport {
+    std::array<int, COMPONENT_COUNT> opening{};   // per-component opening eval
+    std::array<int, COMPONENT_COUNT> endgame{};   // per-component endgame eval
+    std::array<int, COMPONENT_COUNT> tapered{};   // per-component tapered eval
+    int openingTotal = 0;    // weighted sum for opening
+    int endgameTotal = 0;    // weighted sum for endgame
+    int taperedTotal = 0;    // weighted sum for tapered eval
 
-    void add(EvalComponent c, int val) { components[c] = val; }
+    // Compute tapered per-component values and weighted totals
+    void computeTapered(int phase, const std::array<int, COMPONENT_COUNT>& weights) {
+        taperedTotal = 0;
+        openingTotal = 0;
+        endgameTotal = 0;
 
-    int total() const { // raw sum
-        int sum = 0;
-        for (int val : components) sum += val;
-        return sum;
+        for (size_t i = 0; i < COMPONENT_COUNT; ++i) {
+            // Compute tapered value for each component
+            tapered[i] = ((opening[i] * (256 - phase)) + (endgame[i] * phase)) / 256;
+
+            // Compute weighted totals
+            openingTotal += opening[i] * weights[i];
+            endgameTotal += endgame[i] * weights[i];
+            taperedTotal += tapered[i] * weights[i];
+        }
     }
 
-    void computeWeighted(const std::array<int, COMPONENT_COUNT>& weights) {
-        weightedTotal = 0;
-        for (size_t i = 0; i < COMPONENT_COUNT; ++i)
-            weightedTotal += components[i] * weights[i];
+    // Print detailed per-component values with weights
+    void printDetailed(const std::array<int, COMPONENT_COUNT>& weights) const {
+        std::cout << "Component breakdown:\n";
+        for (size_t i = 0; i < COMPONENT_COUNT; ++i) {
+            int w = weights[i];
+            std::cout << EvalComponentNames[i]
+                      << ": opening=" << opening[i]
+                      << ", endgame=" << endgame[i]
+                      << ", tapered=" << tapered[i]
+                      << ", weight=" << w << "\n";
+        }
+        std::cout << "Opening weighted total: " << openingTotal 
+                  << ", Endgame weighted total: " << endgameTotal
+                  << ", Tapered weighted total: " << taperedTotal << "\n";
     }
 
-    void print(std::ostream& os, const std::array<int, COMPONENT_COUNT>* weights = nullptr) const {
-        for (size_t i = 0; i < COMPONENT_COUNT; ++i)
-            os << EvalComponentNames[i] << ": " << components[i] << "\n";
-
-        if (weights)
-            os << "Weighted Total: " << weightedTotal << "\n";
-        os << "Raw Total: " << total() << "\n";
-    }
-
-    void print(const std::array<int, COMPONENT_COUNT>* weights = nullptr) const {
-        for (size_t i = 0; i < COMPONENT_COUNT; ++i)
-            std::cout << EvalComponentNames[i] << ": " << components[i] << "\n";
-
-        if (weights)
-            std::cout << "Weighted Total: " << weightedTotal << "\n";
-        std::cout << "Raw Total: " << total() << "\n";
+    // Optionally, simple print with only tapered totals
+    void printSummary() const {
+        std::cout << "Tapered weighted total: " << taperedTotal << "\n";
     }
 };
 
@@ -95,63 +99,61 @@ struct EvalReport {
 // =================== Evaluator ===================
 class Evaluator {
 private:
-    static const PrecomputedMoveData* precomp;
-
 public:
     Evaluator();
-    Evaluator(const PrecomputedMoveData* _precomp);
 
-    // Debug output
-    static void writeEvalDebug(Board& board, const std::string& filename);
+    // nnue
+    NNUE nnue;
 
     // MVV-LVA
-    static int mvvLvaTable[6][6];
-    static void initMVVLVA();
+    int mvvLvaTable[6][6];
+    void initMVVLVA();
 
     // Piece-Square Tables
-    static bool loadPST(const std::string& filename, int pst[6][64]);
-    static int PST_opening[6][64];
-    static int PST_endgame[6][64];
+    bool loadOpeningPST(const std::string& filename);
+    bool loadEndgamePST(const std::string& filename);
+    int PST_opening[6][64];
+    int PST_endgame[6][64];
 
     // Main evaluation
-    static int gamePhase(const Board& board);
-    static int taperedEval(const Board& board); 
-    static EvalReport Evaluate(const Board& board, int pst[6][64]);
-    static EvalReport openingEval(const Board& board);
-    static EvalReport endgameEval(const Board& board);
+    int gamePhase(const Board& board);
+    int taperedEval(const Board& board); 
+    TaperedEvalReport Evaluate(const Board& board, int pst[6][64]);
+    TaperedEvalReport openingEval(const Board& board);
+    TaperedEvalReport endgameEval(const Board& board);
 
     // Components
-    static int materialDifferences(const Board& board);
-    static int pawnStructureDifferences(const Board& board);
-    static int passedPawnDifferences(const Board& board);
-    static int positionDifferences(const Board& board, int pst[6][64]);
-    static int centerControlDifferences(const Board& board);
-    static int kingSafetyDifferences(const Board& board);
+    int materialDifferences(const Board& board);
+    int pawnStructureDifferences(const Board& board);
+    int passedPawnDifferences(const Board& board);
+    int positionDifferences(const Board& board, int pst[6][64]);
+    int centerControlDifferences(const Board& board);
+    int kingSafetyDifferences(const Board& board);
 
     // Specialized heuristics
 
     // Exchange / hanging piece evaluation
-    static int SEE(const Board& board, const Move& move);
-    static U64 attackersTo(const Board& board, int sq, bool white, U64 occ);
+    int SEE(const Board& board, const Move& move);
+    U64 attackersTo(const Board& board, int sq, bool white, U64 occ);
 
     // Pawn helpers
-    static int countDoubledPawns(U64 pawns);
-    static int countIsolatedPawns(U64 pawns);
-    static bool isPassedPawn(bool white, int sq, U64 opp_pawns);
+    int countDoubledPawns(U64 pawns);
+    int countIsolatedPawns(U64 pawns);
+    bool isPassedPawn(bool white, int sq, U64 opp_pawns);
 
     // King safety helpers
-    static int kingSafety(const Board& board, bool usWhite);
-    static int castleBias(const Board& board);
-    static int kingShield(const Board& board, bool usWhite);
-    static int openFilesNearKing(const Board& board, bool usWhite);
-    static int tropism(const Board& board, bool usWhite);
+    int kingSafety(const Board& board, bool usWhite);
+    int castleBias(const Board& board);
+    int kingShield(const Board& board, bool usWhite);
+    int openFilesNearKing(const Board& board, bool usWhite);
+    int tropism(const Board& board, bool usWhite);
 
     // File helpers
-    static bool isOpenFile(const Board& board, int file);
-    static bool isSemiOpenFile(const Board& board, int file, bool usWhite);
+    bool isOpenFile(const Board& board, int file);
+    bool isSemiOpenFile(const Board& board, int file, bool usWhite);
 
     // Misc
-    static int attackerMaterial(const Board& board, int opp_side);
+    int attackerMaterial(const Board& board, int opp_side);
 };
 
 #endif

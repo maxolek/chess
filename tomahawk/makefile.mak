@@ -1,51 +1,57 @@
 # -------------------
+# Version
+# -------------------
+VERSION ?= dev
+VERSION_SET := $(filter-out dev,$(VERSION))
+BASE_TARGET = tomahawk
+
+ENGINE_DEF = -DENGINE_ID=\"$(VERSION)\"
+
+# -------------------
 # Compiler & Flags
 # -------------------
-
 CXX = g++
 CXXSTD = -std=c++17
 COMMON_WARN = -Wall -Wextra -Wshadow -Wuninitialized -Wconversion -Wpedantic
 COMMON_LINK = -pthread
 
-# Sanitizer flags
-ASAN_FLAGS = -fsanitize=address -fno-omit-frame-pointer
-UBSAN_FLAGS = -fsanitize=undefined -fno-sanitize-recover=undefined
-
 EXTRA = -g -fno-optimize-sibling-calls
-PROD = -O3 -ffast-math -march=native -flto #-fprofile-use=engine.profdata
+PROD = -O3 -ffast-math -march=native -flto
 
 # -------------------
-# Source Files
+# Source files
 # -------------------
+SRCS = board.cpp gamestate.cpp helpers.cpp moveGenerator.cpp \
+       magics.cpp PrecomputedMoveData.cpp UCI.cpp book.cpp \
+       searcher.cpp NNUE.cpp evaluator.cpp engine.cpp tomahawk.cpp
 
-PROD_SRCS = board.cpp gamestate.cpp helpers.cpp moveGenerator.cpp \
-            magics.cpp PrecomputedMoveData.cpp UCI.cpp stats.cpp \
-            searcher.cpp NNUE.cpp evaluator.cpp engine.cpp tomahawk.cpp
+# Object files (generated automatically)
+OBJS = $(SRCS:.cpp=.o)
 
 # -------------------
-# Build Configuration
+# Build configuration
 # -------------------
-
-ifeq ($(DEBUG_OPT),1) # prod testing
-    CXXFLAGS = $(CXXSTD) -O0 $(EXTRA) $(COMMON_WARN) $(COMMON_LINK) -DDEBUG $(ASAN_FLAGS)
-    TARGET = debug_opt_sanitize.exe
-    SRCS = $(PROD_SRCS)
+ifeq ($(DEBUG),1)
+    CXXFLAGS = $(CXXSTD) -O2 $(ENGINE_DEF) $(EXTRA) $(COMMON_WARN) $(COMMON_LINK) -DDEBUG
+    TARGET = debug.exe
 else ifeq ($(PROFILE),1)
-    CXXFLAGS = $(CXXSTD) -O1 -g $(COMMON_WARN) $(COMMON_LINK)
+    CXXFLAGS = $(CXXSTD) -O1 -g $(ENGINE_DEF) $(COMMON_WARN) $(COMMON_LINK)
     TARGET = tomahawk_profile.exe
-    SRCS = $(PROD_SRCS)
 else
-    CXXFLAGS = $(CXXSTD) $(PROD) $(COMMON_WARN) $(COMMON_LINK)
+    CXXFLAGS = $(CXXSTD) $(PROD) $(ENGINE_DEF) $(COMMON_WARN) $(COMMON_LINK)
     TARGET = tomahawk.exe
-    SRCS = $(PROD_SRCS)
 endif
 
-OBJS = $(SRCS:.cpp=.o)
+# Optional override if VERSION explicitly set (only affects release builds)
+ifneq ($(VERSION_SET),)
+    ifneq ($(DEBUG),1)
+        TARGET = $(VERSION).exe
+    endif
+endif
 
 # -------------------
 # Rules
 # -------------------
-
 all: $(TARGET)
 
 $(TARGET): $(OBJS)

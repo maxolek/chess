@@ -44,6 +44,37 @@ void print_bitboard(U64 bitboard) {
     std::cout << "\n\nBitboard:\t" << bitboard << std::endl;
 }
 
+// this engines encoding is in little endian
+// but in case we need to read big endian we create these readers
+uint64_t read_u64_be(std::ifstream &file) {
+    uint8_t b[8];
+    file.read(reinterpret_cast<char*>(b), 8);
+    return
+        (uint64_t(b[0]) << 56) |
+        (uint64_t(b[1]) << 48) |
+        (uint64_t(b[2]) << 40) |
+        (uint64_t(b[3]) << 32) |
+        (uint64_t(b[4]) << 24) |
+        (uint64_t(b[5]) << 16) |
+        (uint64_t(b[6]) << 8)  |
+        uint64_t(b[7]);
+}
+
+uint16_t read_u16_be(std::ifstream &file) {
+    uint8_t b[2];
+    file.read(reinterpret_cast<char*>(b), 2);
+    return (uint16_t(b[0]) << 8) | uint16_t(b[1]);
+}
+
+uint32_t read_u32_be(std::ifstream &file) {
+    uint8_t b[4];
+    file.read(reinterpret_cast<char*>(b), 4);
+    return (uint32_t(b[0]) << 24) |
+           (uint32_t(b[1]) << 16) |
+           (uint32_t(b[2]) << 8)  |
+           uint32_t(b[3]);
+}
+
 //                 N,   NE,    E,    SE,    S,     SW,     W,     NW
 // (rank,file) = (1,0) (1,1) (0,1) (-1,1) (-1,0) (-1,-1) (0,-1) (1,-1)
 int direction_index(int start_square, int target_square) {

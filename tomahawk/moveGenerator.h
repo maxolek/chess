@@ -38,7 +38,7 @@ public:
     // Public Move Generation
     // ------------------------
     // single pass full generation
-    void generateMoves(const Board& _board, bool _quiescence);
+    int generateMoves(const Board& _board, bool _quiescence);
     // quiescence limited generation (check-evasions, captures, promotions, limited quiet moves)
     // Check if side has any legal moves (accelerated generation)
     bool hasLegalMoves(const Board& _board);

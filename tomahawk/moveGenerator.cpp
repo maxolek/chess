@@ -23,7 +23,9 @@ MoveGenerator::MoveGenerator(const Board& _board) {
 // easier code might be to generate it on iteration and not in this bool stuff
 
 // fill in move info arrays
-void MoveGenerator::generateMoves(const Board& _board, bool _quiescence) {
+int MoveGenerator::generateMoves(const Board& _board, bool _quiescence) {
+    ScopedTimer timer(T_MOVEGEN);
+
     // load movegen at given state
     updateBitboards(_board);
     quiescence = _quiescence;
@@ -48,6 +50,8 @@ void MoveGenerator::generateMoves(const Board& _board, bool _quiescence) {
         generateSlidingMoves(true);
         generateKingMoves(true);
     }
+
+    return std::min(count, MAX_MOVES);
 }
 
 // accelerated return for quick check

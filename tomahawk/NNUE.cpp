@@ -82,6 +82,7 @@ void NNUE::build_accumulators(const Board& b) {
 // ============================================================
 
 int NNUE::evaluate(bool is_white_move) {
+    ScopedTimer timer(T_NNUE);
     int64_t out64 = 0;
 
     Accumulator* us = is_white_move ? &acc_stm : &acc_ntm;
