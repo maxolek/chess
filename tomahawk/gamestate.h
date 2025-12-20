@@ -13,7 +13,7 @@ public:
     int enPassantFile;
     int fiftyMoveCounter;
     int castlingRights;
-
+    
     // remove bits
     static constexpr int clearWhiteKingSideMask = 0b1110;
     static constexpr int clearWhiteQueenSideMask = 0b1101;

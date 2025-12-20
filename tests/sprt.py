@@ -11,8 +11,8 @@ import book  # your book.py
 import utils
 
 # ---- Engine Paths ----
-ENGINE_A = r"../tomahawk/v0_2_1_zobrist_history_fix.exe"  # candidate
-ENGINE_B = r"../engines/small_net.exe"  # baseline
+ENGINE_A = r"../tomahawk/v0_2_3_new_zobrist.exe"  # candidate
+ENGINE_B = r"../engines/small_net_stats.exe"  # baseline
 
 # ---- SPRT Settings ----
 elo0 = 0
@@ -20,7 +20,7 @@ elo1 = 50
 alpha = 0.05
 beta = 0.05
 max_games = 1000
-TIME_LIMIT = 2
+TIME_LIMIT = 1
 BOOK_MAX_DEPTH = 8
 
 # ---- PGN Output ----

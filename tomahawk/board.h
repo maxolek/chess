@@ -36,7 +36,7 @@ public:
     std::vector<Move> allGameMoves;            ///< All moves played
     std::vector<GameState> gameStateHistory;  ///< Game state history for unmaking moves
     std::unordered_map<U64,int> hash_history; ///< Zobrist hash occurrences for repetition detection
-    
+    std::vector<U64> zobrist_history;
 
     // ==================== Castling trackers ====================
     bool white_castled = false; ///< True if white has castled
@@ -51,12 +51,22 @@ public:
     U64 zobrist_castling[4];         ///< Castling rights keys: KQkq
     U64 zobrist_enpassant[8];        ///< En passant file keys: a-h
 
+    // -- polyglot book --
+    //U64 polyglot_hash;                ///< Current Zobrist hash
+    //U64 polyglot_table[12][64];       ///< Zobrist keys for 12 pieces x 64 squares
+    // piece is encoded as follows
+    // b-p = 0, w-p = 1, b-n = 2, w-n = 3, ... etc (black even, white odd .. incr val)
+    //U64 polyglot_side_to_move;        ///< Side to move key
+    //U64 polyglot_castling[4];         ///< Castling rights keys: KQkq
+    //U64 polyglot_enpassant[8];        ///< En passant file keys: a-h
+
     // ==================== NNUE ====================
     //NNUE* nnue; // optional pointer ... allows incremental updates
     //void setNNUE(NNUE* nnue_ptr);
 
     // ==================== Constructors ====================
     Board(std::string _fen = STARTPOS_FEN); ///< Initialize from FEN
+    Board(const Board& other); // deep copy search->game boards
 
     // ==================== Move execution ====================
     void MakeMove(Move move = false);   ///< Apply a move and update board state
@@ -79,6 +89,7 @@ public:
     // ==================== Special move checks ====================
     bool canEnpassantCapture(int epFile) const; ///< Checks if en-passant is possible
     void updateFiftyMoveCounter(int moved_piece, bool isCapture);
+    bool isThreefold();
 
     // ==================== Board state checks ====================
     bool inCheck(bool init); ///< True if the given side is in check
@@ -92,11 +103,17 @@ public:
     U64 randomU64();                           ///< Generate random 64-bit number
     void initZobristKeys();                    ///< Initialize Zobrist keys
     U64 computeZobristHash();                  ///< Compute current Zobrist hash
-    U64 zobristPieceHash(int piece, int color); // color^1 + 2*piece
     U64 zobristCastlingHash(int castling_rights); ///< Hash from castling rights
+    void auditZobrist(const Board &other, const std::string &label = "") const;
     void debugZobristDifference(uint64_t old_hash, uint64_t new_hash);
+    void print_zobrist_history(int ply, const std::string& move_str);
     bool canEPCapture(); // check if ep is legal when possible - zobrist 
     bool isEpHashable(int epFile, bool stmIsWhite) const; // incremental version
+    // polyglot
+    //void initPolyglotKeys();                    ///< Initialize Zobrist keys
+    //U64 computePolyglotHash();                  ///< Compute current Zobrist hash
+    //U64 polyglotPieceHash(int piece, int color); // color^1 + 2*piece
+    //U64 polyglotCastlingHash(int castling_rights); ///< Hash from castling rights
 
     // ==================== Debug ====================
     void print_board() const; ///< Pretty-print board with FEN and additional info

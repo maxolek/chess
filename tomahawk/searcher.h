@@ -102,7 +102,8 @@ public:
         int beta,
         PV& pv,
         SearchLimits& limits,
-        int ply
+        int ply,
+        int depth
     );
 
     // ------------------------------- Ordering & Scoring -------------------------------

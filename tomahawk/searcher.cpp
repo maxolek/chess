@@ -4,6 +4,7 @@
 #include <cstring>
 #include <cassert>
 #include <algorithm>
+#include <iostream>
 
 using namespace std;
 
@@ -125,14 +126,25 @@ int Searcher::generateAndOrderMoves(Move moves[MAX_MOVES], int ply, const std::v
 // QUIESCENCE SEARCH
 // ============================================================================
 
-int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int ply) {
+int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int ply, int depth) {
     ScopedTimer timer(T_QSEARCH);
     
     if (limits.out_of_time()) return alpha;
 
-    if (board.hash_history[board.zobrist_hash] >= 3 || board.currentGameState.fiftyMoveCounter >= 50) {
-        
+        // draw detection
+    if (board.isThreefold() || board.currentGameState.fiftyMoveCounter >= 50) {
+        engine.tt.store(board.zobrist_hash, depth, ply, 0, EXACT, Move::NullMove());
         return 0;
+    }
+
+
+    // --- TT probe ---
+    TTEntry* ttEntry = engine.tt.probe(board.zobrist_hash);
+    if (ttEntry && ttEntry->key == board.zobrist_hash) {
+        if (ttEntry->flag == EXACT) return ttEntry->eval;
+        else if (ttEntry->flag == LOWERBOUND) alpha = std::max(alpha, (int)ttEntry->eval);
+        else if (ttEntry->flag == UPPERBOUND) beta = std::min(beta, (int)ttEntry->eval);
+        if (alpha >= beta) return ttEntry->eval;
     }
 
     // Use incremental NNUE output (accumulators must be kept in sync)
@@ -155,6 +167,7 @@ int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int 
     std::copy_n(engine.movegen->moves, count, moves);
 
     int bestEval = standPat;
+    Move bestMove = Move::NullMove();
 
     for (int i = 0; i < count; i++) {
         if (limits.out_of_time()) break;
@@ -166,22 +179,24 @@ int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int 
         nnue.on_make_move(board, m);
         board.MakeMove(m);
 
-        PV childPV;
-        int score = -quiescence(-beta, -alpha, childPV, limits, ply+1);
+        int score; PV childPV;
+        score = -quiescence(-beta, -alpha, childPV, limits, ply+1, depth);
 
         // Undo board & NNUE (capture before must be reconstructed from states)
         nnue.on_unmake_move(board, m);
         board.UnmakeMove(m);
 
-        if (limits.out_of_time()) break;
-
         if (score >= beta) { STATS_FAILHIGH(ply); return beta; }
         if (score > bestEval) {
             bestEval = score;
+            bestMove = m;
             alpha = std::max(alpha, score);
             pv.set(m, childPV);
         }
     }
+
+    // store best capture or draw
+    engine.tt.store(board.zobrist_hash, depth, ply, bestEval, EXACT, bestMove);
 
     return bestEval;
 }
@@ -196,12 +211,33 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
     ScopedTimer timer(T_SEARCH);
     if (limits.out_of_time()) return alpha;
 
-    if (board.hash_history[board.zobrist_hash] >= 3 || board.currentGameState.fiftyMoveCounter >= 50) {
+    if (ply==1 && board.allGameMoves.back().uci() == "f8g8" && board.allGameMoves[board.allGameMoves.size() - 2].uci() == "h7d3") {
+        std::cout << "isthreefold: " << board.isThreefold() << std::endl; 
+
+        std::cout << "current hash: " << std::hex << board.zobrist_hash << "\texpected: 1033a4619f34dff3" << std::endl;
+        for (int i = 0; i < std::min((int)board.allGameMoves.size(), 10); i++) {
+            std::cout << board.allGameMoves[board.allGameMoves.size() -1 -i] << ": " << std::hex << board.zobrist_history[board.zobrist_history.size()-1-i] <<std::endl;
+        }
+
+        std::cout << "----- rep stack ------" << std::endl;
+        int sum = 0;
+         for (const auto& entry : board.hash_history) {
+            uint64_t hash = entry.first;
+            int count = entry.second;
+            std::cout << "Hash: 0x" << std::hex << hash 
+                    << "  Count: " << std::dec << count << "\n";
+            sum += count;
+        }
+        std::cout << "----- end " << depth << " ------" << std::endl;
+    }
+
+    if (board.isThreefold() || board.currentGameState.fiftyMoveCounter >= 50) {
+        engine.tt.store(board.zobrist_hash, depth, ply, 0, EXACT, Move::NullMove());
         return 0;
     }
 
     if (depth == 0) {
-        return use_quiescence ? quiescence(alpha, beta, pv, limits, ply) : nnue.evaluate(board.is_white_move);
+        return use_quiescence ? quiescence(alpha, beta, pv, limits, ply, depth) : nnue.evaluate(board.is_white_move);
     }
 
     int alphaOrig = alpha;
@@ -233,17 +269,28 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
         Move m = moves[i];
 
         // Apply NNUE/update & board
+        U64 pre_hash = board.zobrist_hash;
         nnue.on_make_move(board, m);
         board.MakeMove(m);
+        U64 mid_hash = board.zobrist_hash;
 
-        PV childPV;
-        int score = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply + 1, use_quiescence);
+        int score; PV childPV;
+        score = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply + 1, use_quiescence);
 
         // Undo
+        //if (mid_hash != board.zobrist_hash) {
+        //    std::cerr << "mid != zobrist\n";
+        //    std::cerr << "pre: " << std::hex << pre_hash << "\n";
+        //    std::cerr << "mid manual: " << std::hex << (pre_hash ^ board.zobrist_table[bishop][h7] ^ board.zobrist_table[bishop][g6] ^ board.zobrist_side_to_move) << "\n";
+        //    std::cerr << "mid: " << std::hex << mid_hash << "\n";
+        //    std::cerr << "board: " << std::hex << board.zobrist_hash << "\n";
+        //    std::cerr << m.uci() << std::endl;
+        //    std::cerr << board.allGameMoves.back().uci() << std::endl;
+        //   std::abort();
+        //}
         nnue.on_unmake_move(board, m);
         board.UnmakeMove(m);
-
-        if (limits.out_of_time()) break;
+        //assert(pre_hash == board.zobrist_hash);
 
         if (score > bestEval) {
             bestEval = score;
@@ -298,8 +345,8 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
 
         //std::cout << "------" << std::endl; m.PrintMove(); std::cout << "------" << std::endl;
 
-        PV childPV;
-        int eval = -negamax(depth - 1, -MATE_SCORE, MATE_SCORE, childPV, previousPV, limits, 0, true);
+        int eval; PV childPV;
+        eval = -negamax(depth - 1, -MATE_SCORE, MATE_SCORE, childPV, previousPV, limits, 0, true);
 
         // Undo
         //nnue->debug_check_incr_vs_full_after_unmake(board, m, *nnue);
@@ -346,9 +393,9 @@ SearchResult Searcher::searchAspiration(Move legal_moves[MAX_MOVES], int count, 
         nnue.on_make_move(board, m);
         board.MakeMove(m);
 
-        PV childPV;
+        int eval; PV childPV;
         STATS_ENTER(depth);
-        int eval = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, 0, true);
+        eval = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, 0, true);
 
         nnue.on_unmake_move(board, m);
         board.UnmakeMove(m);
@@ -359,7 +406,8 @@ SearchResult Searcher::searchAspiration(Move legal_moves[MAX_MOVES], int count, 
         result.root_moves[i].eval = eval;
         result.root_count++;
 
-        if (i == 0 || eval > result.eval) {
+
+        if (i == 0 || eval > result.eval) { 
             result.eval = eval;
             result.bestMove = m;
             result.best_line.set(m, childPV);

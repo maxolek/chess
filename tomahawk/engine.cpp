@@ -22,7 +22,7 @@ GameTracker tracker;
 Engine::Engine()
 {
     game_board = Board();
-    search_board = game_board;
+    search_board = Board(game_board);
 
     movegen = std::make_unique<MoveGenerator>(search_board);
 
@@ -319,7 +319,7 @@ void Engine::setPosition(const std::string& fen,
     }
 
     // --- Sync search board ---
-    search_board = game_board;
+    search_board = Board(game_board);
 
     game_over = checkGameEnd();
 }
@@ -644,7 +644,7 @@ bool Engine::checkGameEnd() {
         g_gamelog.outcome = GameResult::DRAW;
         g_gamelog.reason = GameEndReason::FIFTY_MOVE;
     }
-    else if (isThreefold()) {
+    else if (game_board.isThreefold()) {
         g_gamelog.outcome = GameResult::DRAW;
         g_gamelog.reason = GameEndReason::THREEFOLD;
     }
@@ -669,10 +669,6 @@ bool Engine::isCheckmate() {
 
 bool Engine::isStalemate() {
     return !movegen->hasLegalMoves(game_board) && !game_board.is_in_check;
-}
-
-bool Engine::isThreefold() {
-    return game_board.hash_history[game_board.zobrist_hash] >= 3;
 }
 
 

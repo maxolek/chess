@@ -15,12 +15,13 @@ import psutil
 ENGINES = {
     #"large_net": r"..\engines\large_net.exe",
     #"medium_net": r"..\engines\medium_net.exe",
+    "small_net_stats": r"..\engines\small_net_stats.exe",
     "small_net": r"..\engines\small_net.exe",
-    "static_eval": r"..\engines\classic.exe",
-    "experiment": r"..\tomahawk\tomahawk.exe"
+    #"static_eval": r"..\engines\classic.exe",
+    "3fold_fix": r"..\engines\v0_2_1_zobrist_history_fix.exe"
 }
 
-GAMES_PER_PAIR = 10 
+GAMES_PER_PAIR = 4 
 LOG_DIR = "logs"
 os.makedirs(LOG_DIR, exist_ok=True)
 
@@ -85,6 +86,10 @@ def play_single_game(white_path, black_path, white_name, black_name, start_board
         "moves": move_list,
         "final_board": board
     }
+
+# winning: 8/p2q4/8/6p1/5pk1/1P6/PK4Q1/8 b - - 11 45
+# winning: 6k1/2r1rbn1/1p2p2R/pP1pP1Rp/P4P1P/N1pBPK2/2P5/8 w - - 25 56
+# losing-draw: 6k1/5p1p/8/5B1Q/3q4/8/PP6/1K6 b - - 0 1
 
 # ---- Thread-safe PGN writer ----
 def write_pgn_threadsafe(lock, pgn_file, data, time_limit):
@@ -204,9 +209,9 @@ def run_tournament_parallel(time_limit, max_threads=None):
 
 # ---- Main ----
 if __name__ == "__main__":
-    run_tournament_parallel(1, max_threads=3)
+    run_tournament_parallel(1, max_threads=4)
     #run_tournament_parallel(3, max_threads=3)
-    run_tournament_parallel(5, max_threads=3)
+    #run_tournament_parallel(5, max_threads=3)
     #run_tournament_parallel(10, max_threads=2)
     #run_tournament_parallel(30, max_threads=3)
     #run_tournament_parallel(60, max_threads=3)

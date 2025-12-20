@@ -125,15 +125,25 @@ void UCI::handleCommand(const std::string& line) {
         }
     }
     else if (token == "dumpzobrist") {
-        std::cout << "\nCurrent Hash: " << std::hex << engine->game_board.zobrist_hash << "\n";
-        std::cout << "\n--- Hash History ---\n";
+        std::cout << "\nCurrent Hash: 0x" << std::hex 
+          << engine->game_board.zobrist_hash << "\n";
+        std::cout << "\nLast 10 hashes" << std::endl;
+        for (int i = 0; i < std::min(10,(int)engine->game_board.zobrist_history.size()); i++) {
+            const auto& elem = engine->game_board.zobrist_history[engine->game_board.zobrist_history.size() - 1 - i];
+            std::cout << elem << "\n";
+        }
+        std::cout << "\n--- Rep Stack ---\n";
+
+        int sum = 0;
         for (const auto& entry : engine->game_board.hash_history) {
             uint64_t hash = entry.first;
             int count = entry.second;
             std::cout << "Hash: 0x" << std::hex << hash 
                     << "  Count: " << std::dec << count << "\n";
+            sum += count;
         }
         std::cout << "--- End of Hash History ---\n";
+        std::cout << "allgamemoves.size: " << engine->game_board.allGameMoves.size() << "\tzobrist_history.sum: " << sum << "\tzobrist_vec.size: " << engine->search_board.zobrist_history.size() << std::endl;
     }
     else if (token == "dumpstats") {
         //engine->dumpStats(); // you implement
