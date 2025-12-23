@@ -11,7 +11,7 @@ import book  # your book.py
 import utils
 
 # ---- Engine Paths ----
-ENGINE_A = r"../tomahawk/v0_2_3_new_zobrist.exe"  # candidate
+ENGINE_A = r"../tomahawk/tomahawk.exe"  # candidate
 ENGINE_B = r"../engines/small_net_stats.exe"  # baseline
 
 # ---- SPRT Settings ----
@@ -72,7 +72,7 @@ def write_pgn(white_name, black_name, result_str, moves):
 
 # ---- Live Board GUI ----
 class LiveBoard:
-    def __init__(self, master, asset_dir="../visual_assets", square_size=80, anim_steps=10, anim_delay=20):
+    def __init__(self, master, asset_dir="../visual_assets", square_size=40, anim_steps=10, anim_delay=10):
         """
         master: Tk root or frame
         asset_dir: folder containing piece PNGs
@@ -280,7 +280,7 @@ def run_sprt():
 
     root = Tk()
     root.title("Live SPRT Board")
-    live_board = LiveBoard(root, square_size=100)
+    live_board = LiveBoard(root, square_size=70)
 
     def sprt_thread():
         nonlocal n_win, n_draw, n_loss, game_num

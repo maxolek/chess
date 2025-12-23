@@ -22,7 +22,7 @@ GameTracker tracker;
 Engine::Engine()
 {
     game_board = Board();
-    search_board = Board(game_board);
+    search_board = game_board; //Board(game_board);
 
     movegen = std::make_unique<MoveGenerator>(search_board);
 
@@ -31,6 +31,7 @@ Engine::Engine()
     evaluator.loadEndgamePST(options.endgame_pst_path);
 
     searcher = std::make_unique<Searcher>(*this, search_board, evaluator, evaluator.nnue);
+    tt.clear();
 
     book.load(options.opening_book_path);
 
@@ -319,7 +320,7 @@ void Engine::setPosition(const std::string& fen,
     }
 
     // --- Sync search board ---
-    search_board = Board(game_board);
+    search_board = game_board; //Board(game_board);
 
     game_over = checkGameEnd();
 }
@@ -612,6 +613,7 @@ void Engine::sendBestMove(Move best, Move ponder) {
 void Engine::newGame() {
     mode = EngineMode::GAME;
     startNewSession();
+    clearState();
 
     tracker.playedMoves.clear();
     tracker.lastPositionHash = 0;

@@ -30,7 +30,7 @@ Board::Board(const Board& other) {
     zobrist_history = other.zobrist_history; // deep copy
     gameStateHistory = other.gameStateHistory;
 
-    auditZobrist(other, "post-copy");
+    //auditZobrist(other, "post-copy");
     //assert(zobrist_hash == computeZobristHash());
 }
 
@@ -181,6 +181,7 @@ void Board::UnmakeMove(Move move) {
     if (move.IsPromotion()) {
         pop_bit(pieceBitboards[promotion_piece], moved_to);
         zobrist_hash ^= zobrist_table[move_color*6 + promotion_piece][moved_to];
+        zobrist_hash ^= zobrist_table[move_color*6 + pawn][moved_to]; // movePiece() resets so it must be undone
     }
 
     // --- Restore captured piece ---
@@ -405,7 +406,7 @@ void Board::setFromFEN(std::string _fen) {
 
     fen = _fen;
     fenStream >> boardState >> turn >> castling_rights >> ep >> fifty_move >> full_moves;
-
+ 
     // Reset state
     currentGameState = GameState();
     allGameMoves.clear();

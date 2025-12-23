@@ -24,6 +24,9 @@ settings.json
 *.pgn
 tests/logs/
 
+# py env
+venv/
+tests/__pycache__/
 
 # ignore object files
 *.o

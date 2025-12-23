@@ -133,7 +133,7 @@ int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int 
 
         // draw detection
     if (board.isThreefold() || board.currentGameState.fiftyMoveCounter >= 50) {
-        engine.tt.store(board.zobrist_hash, depth, ply, 0, EXACT, Move::NullMove());
+        //engine.tt.store(board.zobrist_hash, depth, ply, 0, EXACT, Move::NullMove());
         return 0;
     }
 
@@ -211,28 +211,9 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
     ScopedTimer timer(T_SEARCH);
     if (limits.out_of_time()) return alpha;
 
-    if (ply==1 && board.allGameMoves.back().uci() == "f8g8" && board.allGameMoves[board.allGameMoves.size() - 2].uci() == "h7d3") {
-        std::cout << "isthreefold: " << board.isThreefold() << std::endl; 
-
-        std::cout << "current hash: " << std::hex << board.zobrist_hash << "\texpected: 1033a4619f34dff3" << std::endl;
-        for (int i = 0; i < std::min((int)board.allGameMoves.size(), 10); i++) {
-            std::cout << board.allGameMoves[board.allGameMoves.size() -1 -i] << ": " << std::hex << board.zobrist_history[board.zobrist_history.size()-1-i] <<std::endl;
-        }
-
-        std::cout << "----- rep stack ------" << std::endl;
-        int sum = 0;
-         for (const auto& entry : board.hash_history) {
-            uint64_t hash = entry.first;
-            int count = entry.second;
-            std::cout << "Hash: 0x" << std::hex << hash 
-                    << "  Count: " << std::dec << count << "\n";
-            sum += count;
-        }
-        std::cout << "----- end " << depth << " ------" << std::endl;
-    }
 
     if (board.isThreefold() || board.currentGameState.fiftyMoveCounter >= 50) {
-        engine.tt.store(board.zobrist_hash, depth, ply, 0, EXACT, Move::NullMove());
+        //engine.tt.store(board.zobrist_hash, depth, ply, 0, EXACT, Move::NullMove());
         return 0;
     }
 
@@ -277,20 +258,8 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
         int score; PV childPV;
         score = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply + 1, use_quiescence);
 
-        // Undo
-        //if (mid_hash != board.zobrist_hash) {
-        //    std::cerr << "mid != zobrist\n";
-        //    std::cerr << "pre: " << std::hex << pre_hash << "\n";
-        //    std::cerr << "mid manual: " << std::hex << (pre_hash ^ board.zobrist_table[bishop][h7] ^ board.zobrist_table[bishop][g6] ^ board.zobrist_side_to_move) << "\n";
-        //    std::cerr << "mid: " << std::hex << mid_hash << "\n";
-        //    std::cerr << "board: " << std::hex << board.zobrist_hash << "\n";
-        //    std::cerr << m.uci() << std::endl;
-        //    std::cerr << board.allGameMoves.back().uci() << std::endl;
-        //   std::abort();
-        //}
         nnue.on_unmake_move(board, m);
         board.UnmakeMove(m);
-        //assert(pre_hash == board.zobrist_hash);
 
         if (score > bestEval) {
             bestEval = score;
