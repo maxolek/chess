@@ -1,0 +1,267 @@
+import sqlite3
+from pathlib import Path
+
+dir = "F:/databases"
+
+# long form function that create the database
+# and some associated tables
+
+def init_engine_db(db_dir=dir) -> None:
+
+    """
+        input: directory of database
+        output: None
+
+        executed: creates the engine database and 6 tables
+            engines         -- information about engines and versions
+            experiments     -- information about engine processes (e.g. sprt/sts)
+            search_summary  -- high level search info (e.g. nodes, time)
+            search_depth    -- per-depth search info (e.g. eval per depth)
+            timing          -- computation time (e.g. how long does movegen take)
+            games           -- summary game info (players, result, moves, etc)
+    """
+
+    # dir + path
+    db_dir = Path(db_dir)
+    db_dir.mkdir(parents=True, exist_ok=True)
+
+    db_path = db_dir / "chess.db"
+
+    # cnxn + cursor
+    cnxn = sqlite3.connect(db_path)
+    cur = cnxn.cursor()
+
+
+    # CREATE DB STRINGS
+
+    # engine binaries info
+    # immutable
+    engines_str = """
+        CREATE TABLE IF NOT EXISTS engines (
+            id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+            name                TEXT NOT NULL,
+            version             TEXT NOT NULL,
+            description         TEXT,
+            compile_flags       TEXT,
+            uci_options         TEXT, 
+
+            ingestion_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+    """
+
+    # key wrapper for engine processes
+    # tracks what engine ran what 
+    #  and provides FKs for table joins
+    experiments_str = """
+        CREATE TABLE IF NOT EXISTS experiments (
+            id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+            engine_id           INTEGER NOT NULL,
+            type                TEXT NOT NULL, -- sts, perft, sprt
+            start_time          DATETIME DEFAULT CURRENT_TIMESTAMP,
+            end_time            DATETIME,
+            metadata            TEXT, 
+
+            FOREIGN KEY (engine_id) REFERENCES engines(id)
+        );
+    """
+
+    # high level search info
+    search_summary_stats_str = """
+        CREATE TABLE IF NOT EXISTS searches (
+        -- metadata
+            id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+            game_id             INTEGER NULL, -- link to game/sts
+            sts_id              INTEGER NULL, 
+        -- position
+            fen                 TEXT NOT NULL,
+            ply                 INTEGER,
+            time                REAL,
+            eval                INTEGER,
+            move                TEXT,
+            principal_variation TEXT,
+        -- stats
+            depth               INTEGER,
+            nodes               INTEGER,
+            q_nodes             INTEGER,
+            tt_stores           INTEGER,
+            tt_hits             INTEGER,
+            fail_highs          INTEGER,
+            fail_lows           INTEGER,
+
+            ingestion_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            
+            FOREIGN KEY (game_id) REFERENCES games(id),
+            FOREIGN KEY (sts_id) REFERENCES sts(id)
+        );
+    """
+
+    # per-depth search info
+    search_depth_stats_str = """
+        CREATE TABLE IF NOT EXISTS searches_by_depth (
+        -- metadata
+            search_id           INTEGER NOT NULL,
+            depth               INTEGER NOT NULL,
+        -- results
+            time                REAL,
+            eval                INTEGER,
+            move                TEXT,
+        -- stats
+            nodes               INTEGER,
+            q_nodes             INTEGER,
+            tt_stores           INTEGER,
+            tt_hits             INTEGER,
+            fail_highs          INTEGER,
+            fail_lows           INTEGER,
+
+            ingestion_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            
+            PRIMARY KEY (search_id, depth),
+            FOREIGN KEY (search_id) REFERENCES searches(id)
+        );
+    """
+
+    # computation time info
+    timing_stats_str = """
+        CREATE TABLE IF NOT EXISTS timing (
+            search_id           INTEGER NOT NULL,
+            function            TEXT NOT NULL,
+            total_time          REAL,
+            num_calls           INTEGER,
+
+            ingestion_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+            PRIMARY KEY (search_id, function),
+            FOREIGN KEY (search_id) REFERENCES searches(id)
+        );
+    """
+
+    # game info
+    game_stats_str = """
+        CREATE TABLE IF NOT EXISTS games (
+        -- metadata
+            id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+            experiment_id       INTEGER NULL, -- link to sprt
+            white_engine_id     INTEGER NULL, -- nullable since may not have 2 local engines playing (e.g. lichess games)
+            black_engine_id     INTEGER NULL,
+        -- info
+            time_control        TEXT,
+            time_per_move       REAL,
+            depth_per_move      INTEGER,
+            white_player        TEXT,
+            black_player        TEXT,
+            white_elo           INTEGER,
+            black_elo           INTEGER,
+        -- results
+            result              TEXT, -- 1-0 , 0-1 , 1/2-1/2
+            termination         TEXT, -- mate, repetition, etc.
+            opening             TEXT,
+            start_fen           TEXT, -- typically START_POS but sometimes games are loaded from position
+            moves               TEXT, -- array ["e2e4", "e7e5", etc.]
+
+            ingestion_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+            FOREIGN KEY (experiment_id) REFERENCES experiments(id),
+            FOREIGN KEY (white_engine_id) REFERENCES engines(id),
+            FOREIGN KEY (black_engine_id) REFERENCES engines(id)
+        );
+    """
+
+    # SPRT tests
+    sprt_test_str = """
+        CREATE TABLE IF NOT EXISTS sprt (
+            id                              INTEGER PRIMARY KEY AUTOINCREMENT,
+            experiment_id                   INTEGER NOT NULL, 
+        -- settings
+            baseline_engine_id              INTEGER NOT NULL,
+            candidate_engine_id             INTEGER NOT NULL,
+            opening_book                    TEXT,
+            book_depth                      INTEGER,
+            time_control                    TEXT,
+            time_per_move                   REAL,
+            depth_per_move                  INTEGER,
+            elo0                            INTEGER,
+            elo1                            INTEGER,
+            alpha                           INTEGER,
+            beta                            INTEGER,
+            result                          TEXT,    -- pass/fail/inconclusive
+            elo_diff                        INTEGER,
+            llr                             REAL,
+            games_played                    INTEGER,
+            run_time                        INTEGER,
+
+            ingestion_timestamp             DATETIME DEFAULT CURRENT_TIMESTAMP,
+            
+            FOREIGN KEY (baseline_engine_id) REFERENCES engines(id),
+            FOREIGN KEY (candidate_engine_id) REFERENCES engines(id),
+            FOREIGN KEY (experiment_id) REFERENCES experiments(id)
+        );
+    """
+
+    # STS tests
+    sts_test_str = """
+        CREATE TABLE IF NOT EXISTS sts (
+        -- metadata
+            id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+            experiment_id       INTEGER NOT NULL,
+            suite               TEXT,
+            position_name       TEXT,
+            fen                 TEXT NOT NULL,
+            search_time         REAL,
+            search_depth        INTEGER,
+        -- results
+            move_is_correct     BOOLEAN,
+            engine_move         TEXT NOT NULL,
+            engine_score        INTEGER,
+            expected_move       TEXT NOT NULL,
+            expected_score      INTEGER,
+
+            ingestion_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+            FOREIGN KEY (experiment_id) REFERENCES experiments(id)
+        );
+    """
+
+    # PERFT tests
+    perft_test_str = """
+        CREATE TABLE IF NOT EXISTS perft (
+            id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+            experiment_id       INTEGER NOT NULL,
+            fen                 TEXT NOT NULL,
+            depth               INTEGER,
+            nodes               INTEGER,
+            expected_nodes      INTEGER,
+            correct             BOOLEAN,
+            time                REAL,
+
+            ingestion_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+            FOREIGN KEY (experiment_id) REFERENCES experiments(id)
+        );
+    """
+
+    # prelim execute
+    cur.execute("""
+        PRAGMA foreign_keys = ON; 
+    """)
+
+    # execute + commit
+    #   SQLite requires that reference tables exist at insert time, not create
+    #   so order isnt too important but better safe than sorry
+    #   order: top -> down ... engines -> tests -> games -> searches -> timing/details
+    for script in [
+        engines_str,
+        experiments_str,            # FK(engines.id)
+        sprt_test_str,              # FK(engines.id)
+        sts_test_str,               # FK(engines.id)
+        perft_test_str,             # FK(engines.id)
+        game_stats_str,             # FK(engines.id) + FK(sprt.id)
+        search_summary_stats_str,   # FK(engines.id) + FK(games.id) + FK(sprt.id) + FK(sts.id)
+        search_depth_stats_str,     # FK(searches.id)
+        timing_stats_str            # FK(searches.id)
+    ]:
+        cur.executescript(script)
+
+    cnxn.commit()
+
+if __name__ == "__main__":
+    init_engine_db()

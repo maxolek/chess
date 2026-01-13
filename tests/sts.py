@@ -3,15 +3,49 @@ import subprocess
 import os
 import json
 import chess
+import sqlite3
+from data import etl
+
+# --------------------------
+#       logging
+# --------------------------
+
+def upload_logs(args):
+    cnxn = sqlite3.connect("F:/databases/chess.db")
+    cnxn.row_factory = sqlite3.Row 
+
+    # probe metadata
+    meta = etl.probe_engine_metadata(args.engine)
+    engine_id = etl.get_engine_id(cnxn, version=meta["version"])
+
+    # log
+    sts_id = etl.start_experiment(
+        cnxn, 
+        "STS",
+        engine_id
+    )
+
+    # no games to map search to, so no game_map like in SPRT
+    etl.bulk_log_search_and_timing(
+        cnxn,
+        args.log,
+        {},
+        timing_path = args.log + "/timing.jsonl"
+    )
+
+    print(f"[DATA] Logging completed for STS {sts_id}")
 
 # --------------------------
 # Run engine and get eval/bestmove
 # --------------------------
-def run_eval(engine, fen, depth=8, log_dir="../tests/logs"):
+def run_eval(engine, fen, depth=8, time=None):
     """Send position and go eval command, return (score, bestmove)."""
-    engine.stdin.write(f"setoption name log_dir value {log_dir}\n".encode())
+    # position + eval
     engine.stdin.write(f"position fen {fen}\n".encode())
-    engine.stdin.write(f"go eval depth {depth}\n".encode())
+    if time is not None: 
+        engine.stdin.write(f"go eval movetime {time*1000}\n".encode())
+    else: 
+        engine.stdin.write(f"go eval depth {depth}\n".encode())
     engine.stdin.flush()
 
     score, bestmove = None, None
@@ -82,38 +116,84 @@ def parse_epd_line(line):
 
     return fen, ops, expected_moves_raw
 
+def collect_epd_files(paths):
+    epd_files = []
+
+    for path in paths:
+        path = os.path.normpath(path)
+        if os.path.isfile(path) and path.lower().endswith(".epd"):
+            epd_files.append(path)
+        elif os.path.isdir(path):
+            for root, _, files in os.walk(path):
+                for f in files:
+                    if f.lower().endswith(".epd"):
+                        epd_files.append(os.path.join(root, f))
+        else:
+            print(f"⚠ Skipping unknown path: {path}")
+
+    return sorted(set(os.path.normpath(p) for p in epd_files))
+
 # --------------------------
 # Convert expected moves to UCI
 # --------------------------
+import re
+SAN_CLEAN_RE = re.compile(r"[!?+#]")
+
 def moves_to_uci(board, expected_moves):
     """
-    Convert a list of expected moves (SAN or just squares like 'f5') into UCI moves.
+    Convert expected moves (SAN, capture SAN, or square-only hints) into UCI moves.
     """
     uci_moves = []
-    for m in expected_moves:
-        m = m.rstrip("+#")  # remove check/mate suffixes
+
+    for raw in expected_moves:
+        m =raw.strip().rstrip(",;").strip()
+        m = SAN_CLEAN_RE.sub("", m)  # remove + # ! ?
+
+        # 1️⃣ Try SAN (handles captures, promotions, castles, etc.)
         try:
-            # Try SAN first
             move = board.parse_san(m)
             uci_moves.append(move.uci())
+            continue
         except ValueError:
-            # fallback: try as destination square (for pawn pushes like 'f5')
+            pass
+
+        # 2️⃣ Square-only fallback (e.g. "f5", "e4")
+        if re.fullmatch(r"[a-h][1-8]", m):
             for legal in board.legal_moves:
                 if chess.square_name(legal.to_square) == m:
                     uci_moves.append(legal.uci())
                     break
             else:
-                print(f"⚠ Could not parse expected move '{m}' on board {board.fen()}")
+                print(f"⚠ Could not match square move '{raw}' on {board.fen()}")
+            continue
+
+        # 3️⃣ UCI fallback (some EPDs give e2e4 directly)
+        if re.fullmatch(r"[a-h][1-8][a-h][1-8][qrbn]?", m):
+            move = chess.Move.from_uci(m)
+            if move in board.legal_moves:
+                uci_moves.append(m)
+                continue
+
+        # ❌ Failed
+        print(f"⚠ Could not parse expected move '{raw}' on board {board.fen()}")
+
     return uci_moves
 
 # --------------------------
 # Run STS for a single file
 # --------------------------
-def run_sts_file(engine_path, epd_file, depth=8):
+def run_sts_file(engine_path, epd_file, depth=8, time = None, log_file = None):
     engine = subprocess.Popen([engine_path], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     total, correct = 0, 0
     diffs = []
     category_stats = {}
+
+    # logging options
+    engine.stdin.write(f"setoption name log_dir value ../logs/sts_logs\n".encode())
+    engine.stdin.write(f"setoption name timer_logging value true\n".encode())
+    engine.stdin.write(f"setoption name stats_logging value true\n".encode())
+    engine.stdin.write(f"setoption name uci_logging value true\n".encode())
+    engine.stdin.write(f"setoption name game_logging value false\n".encode())
 
     with open(epd_file, "r", encoding="utf-8") as f:
         lines = [l.strip() for l in f if l.strip() and not l.startswith("#")]
@@ -135,7 +215,8 @@ def run_sts_file(engine_path, epd_file, depth=8):
         # Convert expected moves to UCI
         expected_moves = moves_to_uci(board, expected_moves_raw)
 
-        score, bestmove = run_eval(engine, fen, depth)
+        print(f"[STS] {epd_file}: position {i}")
+        score, bestmove = run_eval(engine, fen, depth, time)
         total += 1
 
         move_ok = expected_moves and bestmove in expected_moves
@@ -161,6 +242,21 @@ def run_sts_file(engine_path, epd_file, depth=8):
             print(f"  Score diff: {score_diff}")
         print("-" * 50)
 
+        record = {
+            "epd_file": epd_file, 
+            "index": i, 
+            "category": cat, 
+            "fen": fen, 
+            "expected_moves": expected_moves, 
+            "expected_score": expected_score,
+            "engine_move": bestmove,
+            "engine_score": score, 
+            "move_ok": move_ok, 
+            "score_diff": score_diff
+        }
+        log_file.write(json.dumps(record) + "\n")
+        log_file.flush()
+
     engine.kill()
 
     file_summary = {
@@ -177,23 +273,38 @@ def run_sts_file(engine_path, epd_file, depth=8):
 # --------------------------
 # Main
 # --------------------------
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--engine", default="../tomahawk/tomahawk.exe", help="Path to UCI engine")
-    parser.add_argument("--depth", type=int, default=8)
-    parser.add_argument("--sts_dir", default="./bin/STS", help="Folder with STS##.epd files")
-    parser.add_argument("--log", default="./logs/sts_test.json", help="Output log file")
-    args = parser.parse_args()
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="SPRT runner using cutechess-cli")
+
+    parser.add_argument("--engine", default="../src/tomahawk.exe", help="Path to UCI engine")
+    parser.add_argument("--time", type=int, default=None, help = "Move time in MS")
+    parser.add_argument("--depth", type=int, default=8, help = "Search depth")
+    parser.add_argument("--sts", nargs="+", default=["./bin/STS"], help="One or more EPD files and/or folders")
+    parser.add_argument("--log", default="../logs/sts_logs/full_sts_suite.jsonl", help="Output log file")
+
+    return parser.parse_args()
+
+
+def main(args=None):
+    if args is None: 
+        args = parse_args()
 
     os.makedirs(os.path.dirname(args.log), exist_ok=True)
-    epd_files = sorted([os.path.normpath(os.path.join(args.sts_dir, f)) for f in os.listdir(args.sts_dir) if f.lower().endswith(".epd")])
+    log_f = open(args.log, "a", encoding="utf-8")
+    print(f"Results logged to {args.log}")
 
+    epd_files = collect_epd_files(args.sts)
+    if not epd_files:
+        print("❌ No EPD files found.")
+        return
+    
     global_total, global_correct = 0, 0
     all_summaries = []
 
     for epd_file in epd_files:
         print(f"\n=== Running STS file: {epd_file} ===")
-        summary = run_sts_file(args.engine, epd_file, args.depth)
+        summary = run_sts_file(args.engine, epd_file, args.depth, args.time, log_f)
         all_summaries.append(summary)
         print(f"File summary: {summary['correct']}/{summary['total']} correct ({summary['accuracy']:.1f}%)")
         global_total += summary['total']
@@ -204,15 +315,9 @@ def main():
     print(f"Total tests: {global_total}")
     print(f"Total correct: {global_correct} ({global_acc:.1f}%)")
 
-    with open(args.log, "w", encoding="utf-8") as f:
-        json.dump({
-            "global_total": global_total,
-            "global_correct": global_correct,
-            "global_accuracy": global_acc,
-            "files": all_summaries
-        }, f, indent=2)
-
-    print(f"Results logged to {args.log}")
+    # upload to db
+    upload_logs(args)
+    
 
 if __name__ == "__main__":
     main()

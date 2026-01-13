@@ -1,277 +1,225 @@
+#!/usr/bin/env python3
+import argparse
 import subprocess
+import sys
+import os
 import time
-import re
-import chess
-import utils
-#from stockfish import Stockfish
-
-STOCKFISH_PATH = r"..\stockfish-windows-x86-64-avx2\stockfish\stockfish-windows-x86-64-avx2"
-ENGINE_PATH = r"C:\Users\maxol\code\chess\tomahawk\testing.exe"
-LOG_FILE_PATH = r"C:\Users\maxol\code\chess\perft_log.txt"
-
-def log(line: str):
-    with open(LOG_FILE_PATH, "a", encoding="utf-8") as f:
-        f.write(line + "\n")
+import sqlite3
+from data import etl
 
 
-def run_stockfish_perft(fen, depth, divide=False):
-    commands = f"uci\nisready\nposition fen {fen}\ngo perft {depth}\nquit\n"
-    try:
-        sf = subprocess.Popen(
-            STOCKFISH_PATH,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            universal_newlines=True
+# -----------------------------
+# DB logging
+# -----------------------------
+def log_perft(
+    cnxn,
+    experiment_id,
+    fen,
+    depth,
+    nodes,
+    expected_nodes,
+    correct,
+    time_ms,
+):
+    cnxn.execute(
+        """
+        INSERT INTO perft (
+            experiment_id,
+            fen,
+            depth,
+            nodes,
+            expected_nodes,
+            correct,
+            time
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            experiment_id,
+            fen,
+            depth,
+            nodes,
+            expected_nodes,
+            int(correct),
+            int(time_ms),
         )
-        stdout, _ = sf.communicate(commands, timeout=30)
-        output = stdout.strip().splitlines()
-
-        if divide:
-            divide_dict = {}
-            for line in output:
-                if ':' in line:
-                    try:
-                        move, nodes = line.split(':')
-                        divide_dict[move.strip()] = int(nodes.strip())
-                    except ValueError:
-                        continue
-            return divide_dict, output
-
-        # Non-divide mode: parse total nodes
-        total_nodes = 0
-        for line in output:
-            if ':' in line:
-                try:
-                    nodes = int(line.split(':')[-1].strip())
-                    total_nodes += nodes
-                except ValueError:
-                    continue
-            elif line.strip().isdigit():
-                total_nodes += int(line.strip())
-        return total_nodes, output
-
-    except subprocess.TimeoutExpired:
-        sf.kill()
-        print("[Stockfish error] Timed out.")
-        return ({} if divide else 0), []
+    )
 
 
-def run_cpp_perft(fen, depth, divide=False):
-    mode = "divide" if divide else "perft"
-    cmd = [ENGINE_PATH, mode] + fen.split(" ") + [str(depth)]
-    #print("cmd\t",cmd)
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-        lines = result.stdout.strip().splitlines()
+# -----------------------------
+# Load positions
+# -----------------------------
+def load_positions(path):
+    """
+    Load perft positions from an epd file.
 
-        if not divide:
-            return int(lines[-1]), lines
-        divide_dict = {}
-        for line in lines:
-            if ':' in line:
-                move, nodes = line.split(':')
-                divide_dict[move.strip()] = int(nodes.strip())
-        return divide_dict, lines
-    except Exception as e:
-        print(f"[Engine error] {e}")
-        return 0 if not divide else {}, []
+    Ignores any depth counts in the line (D1..Dn) and just returns the FEN.
+    """
+    positions = []
 
-def compare_perft(fen, depth) -> None:
-    print(f"FEN: {fen}\n")
-    print(chess.Board(fen))
-    print(f"\nDepth: {depth}")
-    start = time.time()
-    my_nodes, my_output = run_cpp_perft(fen, depth)
-    mid = time.time()
-    sf_nodes, _ = run_stockfish_perft(fen, depth)
-    end = time.time()
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
 
-    print(f"\nYour engine nodes: {my_nodes} (in {mid - start:.2f}s)")
-    print(f"Stockfish nodes  : {sf_nodes} (in {end - mid:.2f}s)")
+            # Take only the first part before the first semicolon
+            fen = line.split(";")[0].strip()
+            positions.append(fen)
 
-    if my_nodes != sf_nodes:
-        print("❌ Mismatch detected!")
-    else:
-        print("✅ Correct result.")
+    return positions
 
-def compare_divide(fen, depth) -> None:
-    print(f"FEN: {fen}\n")
-    print(chess.Board(fen))
-    print(f"\nDepth: {depth}")
-    print(f"Running divide...\n")
+# -----------------------------
+# Stockfish perft
+# -----------------------------
+def sf_perft(stockfish_path, fen, depth):
+    commands = (
+        "uci\n"
+        "isready\n"
+        f"position fen {fen}\n"
+        f"go perft {depth}\n"
+        "quit\n"
+    )
 
-    log(f"\nFEN: {fen}")
-    log(f"Depth: {depth}")
+    sf = subprocess.Popen(
+        [stockfish_path],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        text=True
+    )
 
-    start = time.time()
-    my_divide, my_lines = run_cpp_perft(fen, depth, divide=True)
-    mid = time.time()
-    sf_divide, sf_lines = run_stockfish_perft(fen, depth, divide=True)
-    end = time.time()
+    stdout, _ = sf.communicate(commands, timeout=30)
 
-    all_moves = sorted(set(my_divide.keys()) | set(sf_divide.keys()))
-    correct = True
+    for line in stdout.splitlines():
+        if line.startswith("Nodes searched:"):
+            return int(line.split(":")[1].strip())
 
-    for move in all_moves:
-        my_val = my_divide.get(move, None)
-        sf_val = sf_divide.get(move, None)
-        if my_val != sf_val:
-            correct = False
-            line = f"❌ {move:5}  Your engine: {my_val}  Stockfish: {sf_val}"
-        else:
-            line = f"✅ {move:5}  {my_val}"
-        print(line)
-        log(line)
-
-    if correct:
-        print("\n✅ All perft divide results match.")
-        log("✅ All perft divide results match.\n")
-    else:
-        print("\n❌ Discrepancy found in perft divide.")
-        log("❌ Discrepancy found in perft divide.\n")
-
-    log(f"Times ||  Your engine: {mid-start:.2f}s  Stockfish: {end-mid:.2f}s")
+    raise RuntimeError("Stockfish did not report perft node count")
 
 
-    
-    
-def compare_subdivide(child_fen):
-    print(f"FEN: {child_fen}")
-    print(chess.Board(child_fen))
+# -----------------------------
+# Engine perft
+# -----------------------------
+def my_perft(engine_proc, fen, depth):
+    start = time.perf_counter()
 
-    my_divide_sub, _ = run_cpp_perft(child_fen, 1, divide=True)
-    sf_divide_sub, _ = run_stockfish_perft(child_fen, 1, divide=True)
+    engine_proc.stdin.write(f"position fen {fen}\n")
+    engine_proc.stdin.write(f"perft {depth}\n")
+    engine_proc.stdin.flush()
 
-    all_submoves = sorted(set(my_divide_sub.keys()) | set(sf_divide_sub.keys()))
-    discrepancies = False
+    nodes = None
 
-    for move in all_submoves:
-        my_count = my_divide_sub.get(move)
-        sf_count = sf_divide_sub.get(move)
-        if my_count != sf_count:
-            discrepancies = True
-            print(f"❌ {move:5}  Your engine: {my_count}  Stockfish: {sf_count}")
-        else:
-            print(f"✅ {move:5}  {my_count}")
+    while True:
+        line = engine_proc.stdout.readline()
+        if not line:
+            break
 
-    if not discrepancies:
-        print("✅ Subdivide matches for this branch.\n")
-    else:
-        print("❌ Discrepancies found in this sub-branch.\n")
+        line = line.strip()
 
+        if line.isdigit():
+            nodes = int(line)
+            break
 
+        if "nodes" in line.lower():
+            nodes = int(line.split()[-1])
+            break
 
-def show_second_level_discrepancy(fen: str, move: str):
-    print(f"\n🔍 Investigating discrepancy after move: {move}")
-    board = chess.Board(fen)
-    try:
-        board.push_uci(move)
-    except Exception as e:
-        print(f"⚠️ Could not push move {move}: {e}")
-        return
+    if nodes is None:
+        raise RuntimeError("Engine did not return perft node count")
 
-    child_fen = board.fen()
-
-    my_divide, _ = run_cpp_perft(child_fen, 1, divide=True)
-    sf_divide, _ = run_stockfish_perft(child_fen, 1, divide=True)
-
-    my_moves = set(my_divide.keys())
-    sf_moves = set(sf_divide.keys())
-
-    missing = sf_moves - my_moves
-    extra = my_moves - sf_moves
-
-    if missing:
-        print("\n❌ Missing moves (in Stockfish, not in your engine):")
-        for m in sorted(missing):
-            print(f"   {m}")
-
-    if extra:
-        print("\n❌ Extra moves (in your engine, not in Stockfish):")
-        for m in sorted(extra):
-            print(f"   {m}")
-
-    if not missing and not extra:
-        print(f"✅ All child moves match at depth 1. mm: {(len(my_moves))}\tsf: {(len(sf_moves))}")
+    time_ms = int((time.perf_counter() - start) * 1000)
+    return nodes, time_ms
 
 
-# not currently used
-def get_missing_moves(fen, depth=1):
-    board = chess.Board(fen)
+# -----------------------------
+# Main
+# -----------------------------
+def main(args=None):
+    if args is None:
+        parser = argparse.ArgumentParser(description="Perft verifier + DB logger")
+        parser.add_argument("--engine", required=True, help="Path to engine binary")
+        parser.add_argument("--stockfish", required=True, help="Path to Stockfish binary")
+        parser.add_argument("--positions", required=True, help="File containing FEN positions")
+        parser.add_argument("--depth", type=int, required=True, help="Perft depth")
 
-    my_divide, _ = run_cpp_perft(fen, depth, divide=True)
-    sf_divide, _ = run_stockfish_perft(fen, depth, divide=True)
+        args = parser.parse_args()
 
-    my_moves = set(my_divide.keys())
-    sf_moves = set(sf_divide.keys())
+    positions = load_positions(args.positions)
+    if not positions:
+        print("❌ No positions loaded")
+        sys.exit(1)
 
-    missing_from_your_engine = sf_moves - my_moves
-    extra_in_your_engine = my_moves - sf_moves
+    # -----------------------------
+    # DB setup
+    # -----------------------------
+    cnxn = sqlite3.connect("F:/databases/chess.db")
+    cnxn.row_factory = sqlite3.Row
 
-    if missing_from_your_engine:
-        print(f"\n❌ Missing moves at depth {depth}, path: {' '.join(path) or '(root)'}")
-        for move in sorted(missing_from_your_engine):
-            print(f"   Missing: {move}")
+    engine_meta = etl.probe_engine_metadata(args.engine)
+    engine_id = etl.get_engine_id(cnxn, version=engine_meta["version"])
 
-    if extra_in_your_engine:
-        print(f"\n❌ Extra moves at depth {depth}, path: {' '.join(path) or '(root)'}")
-        for move in sorted(extra_in_your_engine):
-            print(f"   Extra:   {move}")
+    experiment_id = etl.start_experiment(
+        cnxn,
+        "PERFT",
+        engine_id
+    )
 
+    print(f"[PERFT] Experiment ID: {experiment_id}")
 
-def run_test_suite(depth = 2) -> None:
-    tests = [
-        ("Initial",    "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", depth),
-        ("Kiwipete",   "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", depth),
-        ("En-passant Hell",  "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1", depth),
-        ("Complex Middle",   "r4rk1/1pp1qppp/p1np1n2/8/2P5/2N1PN2/PP2QPPP/2KR1B1R w - - 0 1", depth),
-        ("Promotions & Castling", "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8", depth)
-    ]
+    # -----------------------------
+    # Launch engine
+    # -----------------------------
+    engine = subprocess.Popen(
+        [args.engine],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        text=True,
+        bufsize=1
+    )
 
-    for name, fen, depth in tests:
-        print(f"\n--- {name} ---")
-        compare_divide(fen, depth)
+    engine.stdin.write("uci\n")
+    engine.stdin.write("isready\n")
+    engine.stdin.flush()
 
+    # -----------------------------
+    # Run tests
+    # -----------------------------
+    for idx, fen in enumerate(positions):
+        sf_nodes = sf_perft(args.stockfish, fen, args.depth)
+        my_nodes, time_ms = my_perft(engine, fen, args.depth)
 
+        correct = (sf_nodes == my_nodes)
+        status = "OK" if correct else "MISMATCH"
 
+        print(f"[{idx}] {status}")
+        print(f"SF: {sf_nodes} | Mine: {my_nodes} | {time_ms} ms")
 
-def main():
-    print("Choose test type: ")
-    print("1. perft")
-    print("2. perft divide")
-    print("3. full test suite")
-    choice = input("Enter choice (1-3): ").strip()
+        log_perft(
+            cnxn=cnxn,
+            experiment_id=experiment_id,
+            fen=fen,
+            depth=args.depth,
+            nodes=my_nodes,
+            expected_nodes=sf_nodes,
+            correct=correct,
+            time_ms=time_ms,
+        )
 
-    if choice == "1" or choice == "perft":
-        test_type = "perft"
-        fen = input("Enter FEN string: ").strip()
-        depth = input("Enter depth: ").strip()
-    elif choice == "2" or choice == 'perft divide':
-        test_type = "divide"
-        fen = input("Enter FEN string: ").strip()
-        depth = input("Enter depth: ").strip()
-    elif choice == "3" or choice == 'full test suite':
-        test_type = "full"
-        depth = input("Enter depth: ").strip()
-    else:
-        print("Invalid choice.")
-        return
+        if not correct:
+            print(f"  FEN: {fen}")
+            cnxn.commit()
+            #engine.kill()
+            #sys.exit(1)
 
-    try: # doesnt check for valid fen
-        depth = int(depth)
-    except ValueError:
-        print("Invalid depth. Must be an integer.")
-        return
+    cnxn.commit()
 
-    if test_type == "perft":
-        compare_perft(fen, depth)
-    elif test_type == 'divide':
-        compare_divide(fen, depth)
-    else:
-        run_test_suite(depth)
+    engine.stdin.write("quit\n")
+    engine.stdin.flush()
+    engine.wait(timeout=2)
+
+    #print("✅ All perft tests passed")
 
 
 if __name__ == "__main__":
     main()
-
