@@ -110,8 +110,8 @@ public:
     void initMVVLVA();
 
     // Piece-Square Tables
-    bool loadOpeningPST(const std::string& filename);
-    bool loadEndgamePST(const std::string& filename);
+    bool loadOpeningPST(const fs::path& filename);
+    bool loadEndgamePST(const fs::path& filename);
     int PST_opening[6][64];
     int PST_endgame[6][64];
 

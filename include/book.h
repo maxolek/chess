@@ -18,7 +18,7 @@ private:
 public:
     std::unordered_map<uint64_t, std::vector<BookEntry>> entries;
 
-    bool load(const std::string &path);
+    bool load(const fs::path& path);
 
     std::vector<BookEntry> get_moves(uint64_t key);
     std::string pick_weighted_move(const std::vector<BookEntry> & moves);

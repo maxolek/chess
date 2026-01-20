@@ -39,3 +39,6 @@ src/__pycache__/
 *.dll
 *.pyc
 src/*.mak
+
+# bin files
+bin/opening_books/UHO_Lichess_4852_v1.epd 

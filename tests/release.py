@@ -6,6 +6,7 @@ import sys
 import shutil
 import sqlite3
 from datetime import datetime
+from pathlib import Path
 from data import etl
 from tests import perft, sprt, sts
 
@@ -13,7 +14,9 @@ from tests import perft, sprt, sts
 # Project layout (run from /chess)
 # ============================================================
 
-PROJECT_ROOT = os.getcwd()
+# paths
+TESTS_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = TESTS_DIR.parent
 
 ENGINES_DIR = os.path.join(PROJECT_ROOT, "engines")
 LOGS_DIR    = os.path.join(PROJECT_ROOT, "logs")
@@ -31,16 +34,6 @@ STOCKFISH = os.path.join(
     "stockfish-windows-x86-64-avx2.exe"
 )
 
-
-# ============================================================
-# Utilities
-# ============================================================
-
-def clear_log_dir(path):
-    if os.path.exists(path):
-        shutil.rmtree(path)
-    os.makedirs(path, exist_ok=True)
-
 # ============================================================
 # Build
 # ============================================================
@@ -49,13 +42,13 @@ def run_make(args):
     print(f"[BUILD] Compiling engine VERSION={args.version}")
 
     clean_cmd = [
-        "make", "-C", "src",
+        "make", #"-C", "src",
         "-f", args.makefile,
         "clean"
     ]
 
     make_cmd = [
-        "make", "-C", "src",
+        "make", #"-C", "src",
         "-f", args.makefile,
         f"VERSION={args.version}"
     ]
@@ -66,11 +59,11 @@ def run_make(args):
     except subprocess.CalledProcessError:
         sys.exit("[BUILD] ❌ build failed")
 
-    src_bin  = os.path.join("src", f"{args.version}.exe")
-    dest_bin = os.path.join(ENGINES_DIR, f"{args.version}.exe")
+    #src_bin  = os.path.join("src", f"{args.version}.exe")
+    #dest_bin = os.path.join(ENGINES_DIR, f"{args.version}.exe")
 
-    print(f"[BUILD] Moving {src_bin} -> {dest_bin}")
-    shutil.move(src_bin, dest_bin)
+    #print(f"[BUILD] Moving {src_bin} -> {dest_bin}")
+    #shutil.move(src_bin, dest_bin)
     print("[BUILD] ✅ done")
 
 # ============================================================
@@ -93,7 +86,7 @@ def run_sprt(args):
         max_games=args.sprt_games,
         book=args.opening_book,
         book_depth=args.sprt_book_depth,
-        logroot="../logs/sprt_logs",
+        logroot=SPRT_LOG_DIR,
         cutechess_cli=args.cutechess_cli
     )
 
@@ -110,7 +103,8 @@ def run_sts(args):
         engine=args.engine,
         time=args.sts_time,
         depth=args.sts_depth,
-        sts=args.sts_files
+        sts=args.sts_files,
+        log_dir=STS_LOG_DIR
     )
 
     sts.main(sts_args)
@@ -160,7 +154,7 @@ def main():
 
     # STS
     parser.add_argument("--sts_files", nargs="+", required=True)
-    parser.add_argument("--sts_time", type=int, default=15)
+    parser.add_argument("--sts_time", type=float, default=5000)
     parser.add_argument("--sts_depth", type=int)
 
     # PERFT

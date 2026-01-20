@@ -1,4 +1,4 @@
-#include "nnue.h"
+#include <nnue.h>
 #include <fstream>
 #include <iostream>
 #include <algorithm>
@@ -24,7 +24,7 @@ inline int other_color(int c) { return c ^ 1; }
 // Load quantised.bin
 // ============================================================
 
-bool NNUE::load(const std::string& path) {
+bool NNUE::load(const fs::path& path) {
     std::ifstream f(path, std::ios::binary);
     if (!f) {
         std::cerr << "NNUE: failed to open " << path << "\n";

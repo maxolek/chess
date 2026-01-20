@@ -4,23 +4,33 @@ import json
 import subprocess
 import glob
 import os
+import shutil
+import argparse
+
+# utils
+
+def safe_val(val):
+    if isinstance(val, list) or isinstance(val, dict):
+        return json.dumps(val)
+    return val
 
 # --------------------------
 #        CLEAR LOGS
 # --------------------------
 
-def clear_log_folder(log_path):
-    """Remove all JSONL files in the same folder as log_path"""
+def clear_log_dir(log_dir):
+    if not os.path.isdir(log_dir):
+        return  # nothing to do
 
-    folder = os.path.dirname(log_path)
-    pattern = os.path.join(folder, "*.jsonl")
-
-    for f in glob.glob(pattern):
+    for entry in os.listdir(log_dir):
+        path = os.path.join(log_dir, entry)
         try:
-            os.remove(f)
-            print(f"[STS] Deleted old log file: {f}")
+            if os.path.isfile(path) or os.path.islink(path):
+                os.unlink(path)
+            else:
+                shutil.rmtree(path)
         except Exception as e:
-            print(f"[STS] Failed to delete {f}: {e}")
+            print(f"[WARN] Failed to delete {path}: {e}")
 
 # --------------------------
 #         GETTERS
@@ -90,18 +100,36 @@ def probe_engine_metadata(engine_path):
 # -------------------------------
 
 # start experiment and get ID for FKs
-def start_experiment(cnxn, experiment, engine_id, info=None):
+def start_experiment(cnxn, experiment, engine_id, comparison_engine_id=None, info=None):
     cursor = cnxn.cursor()
     cursor.execute(
         """
-        INSERT INTO experiments (engine_id, type, metadata, start_time)
-        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+        INSERT INTO experiments (engine_id, type, comparison_engine_id, metadata, start_time_utc)
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
         """,
-        (engine_id, experiment, info)
+        (engine_id, experiment, comparison_engine_id, info)
     )
     cnxn.commit()
     cursor.execute("SELECT last_insert_rowid()")
     return cursor.fetchone()[0]
+
+# update experiment rows (e.g. adding runtime)
+def update_experiment(cnxn, experiment_id, info=None):
+    if not info: return
+
+    cols = ", ".join(f"{col} = ?" for col in info.keys())
+    values = list(info.values()) + [experiment_id]
+
+    sql = f"""
+        UPDATE experiments
+        SET {cols}
+        WHERE id = ?
+    """
+
+    cur = cnxn.cursor()
+    cur.execute(sql, values)
+    cnxn.commit()
+
 
 # returns row_id from respsective table of inserted row
 
@@ -132,7 +160,7 @@ def log_perft(cnxn, perft_info):
     cur = cnxn.execute(
         """
         INSERT INTO perft (
-            experiment_id, fen, depth, nodes, expected_nodes, correct, time
+            experiment_id, fen, depth, nodes, expected_nodes, correct, time_ms
         )
         VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
@@ -143,190 +171,63 @@ def log_perft(cnxn, perft_info):
             perft_info.get("nodes"),
             perft_info.get("expected_nodes"),
             perft_info.get("correct"),
-            perft_info.get("time"),
+            perft_info.get("time_ms"),
         )
     )
 
+    cnxn.commit()
     return cur.lastrowid
 
 
-def log_sprt(cnxn, sprt_info):
-
+def log_sprt(cnxn, experiment_id, candidate_engine_id, baseline_engine_id, **kwargs):
+    """
+    Logs an SPRT experiment to the database.
+    kwargs can include optional parameters like elo0, elo1, alpha, beta, etc.
+    """
     cur = cnxn.execute(
         """
         INSERT INTO sprt (
             experiment_id, baseline_engine_id, candidate_engine_id, 
             opening_book, book_depth, time_control, time_per_move,
             depth_per_move, elo0, elo1, alpha, beta, result, elo_diff,
-            llr, games_played, run_time
+            llr, los, candidate_wins, candidate_losses, candidate_draws,
+            candidate_white_wins, candidate_white_losses, candidate_white_draws,
+            candidate_black_wins, candidate_black_losses, candidate_black_draws,
+            games_played, run_time_s
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
-            sprt_info["experiment_id"],
-            sprt_info["baseline_engine_id"],
-            sprt_info["candidate_engine_id"],
-            sprt_info.get("opening_book"),
-            sprt_info.get("book_depth"),
-            sprt_info.get("time_control"),
-            sprt_info.get("time_per_move"),
-            sprt_info.get("depth_per_move"),
-            sprt_info.get("elo0"),
-            sprt_info.get("elo1"),
-            sprt_info.get("alpha"),
-            sprt_info.get("beta"),
-            sprt_info.get("result"),
-            sprt_info.get("elo_diff"),
-            sprt_info.get("llr"),
-            sprt_info.get("games_played"),
-            sprt_info.get("run_time"),
+            experiment_id,
+            baseline_engine_id,
+            candidate_engine_id,
+            kwargs.get("book"),
+            kwargs.get("book_depth"),
+            kwargs.get("tc"),
+            kwargs.get("time"),
+            kwargs.get("depth"),
+            kwargs.get("elo0"),
+            kwargs.get("elo1"),
+            kwargs.get("alpha"),
+            kwargs.get("beta"),
+            kwargs.get("result"),
+            kwargs.get("elo_diff"),
+            kwargs.get("llr"),
+            kwargs.get("los"),
+            kwargs.get("candidate_wins"),
+            kwargs.get("candidate_losses"),
+            kwargs.get("candidate_draws"),
+            kwargs.get("candidate_white_wins"),
+            kwargs.get("candidate_white_losses"),
+            kwargs.get("candidate_white_draws"),
+            kwargs.get("candidate_black_wins"),
+            kwargs.get("candidate_black_losses"),
+            kwargs.get("candidate_black_draws"),
+            kwargs.get("games_played"),
+            kwargs.get("runtime"),
         )
     )
-
-    return cur.lastrowid
-
-
-def log_sts(cnxn, sts_info):
-
-    cur = cnxn.execute(
-        """
-        INSERT INTO sts (
-            experiment_id, suite, position_name, 
-            fen, search_time, search_depth, move_is_correct,
-            engine_move, engine_score, expected_move, expected_score
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            sts_info["experiment_id"],
-            sts_info["suite"],
-            sts_info["position_name"],
-            sts_info.get("fen"),
-            sts_info.get("search_time"),
-            sts_info.get("search_depth"),
-            sts_info.get("move_is_correct"),
-            sts_info.get("engine_move"),
-            sts_info.get("engine_score"),
-            sts_info.get("expected_move"),
-            sts_info.get("expected_score")
-        )
-    )
-
-    return cur.lastrowid
-
-
-def log_game(cnxn, game):
-
-    cur = cnxn.execute(
-        """
-        INSERT INTO games (
-            experiment_id, suite, position_name, 
-            fen, search_time, search_depth, move_is_correct,
-            engine_move, engine_score, expected_move, expected_score
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            game["experiment_id"],
-            game["white_engine_id"],
-            game["black_engine_id"],
-            game.get("time_control"),
-            game.get("time_per_move"),
-            game.get("depth_per_move"),
-            game.get("white_player"),
-            game.get("black_player"),
-            game.get("white_elo"),
-            game.get("black_elo"),
-            game.get("result"),
-            game.get("termination"),
-            game.get("opening"),
-            game.get("start_fen"),
-            json.dumps(game.get("moves"))
-        )
-    )
-
-    return cur.lastrowid
-
-
-def log_search(cnxn, search):
-
-    cur = cnxn.execute(
-        """
-        INSERT INTO searches (
-            game_id, sts_id, fen, time, 
-            eval, move, principal_variation, depth,
-            nodes, q_nodes, tt_stores, tt_hits,
-            fail_highs, fail_lows
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            search.get("game_id"),
-            search.get("sts_id"),
-            search["fen"],
-            search.get("time"),
-            search.get("eval"),
-            search.get("move"),
-            search.get("principal_variation"),
-            search.get("depth"),
-            search.get("nodes"),
-            search.get("q_nodes"),
-            search.get("tt_stores"),
-            search.get("tt_hits"),
-            search.get("fail_highs"),
-            search.get("fail_lows")
-        )
-    )
-
-    return cur.lastrowid
-
-
-def log_depth(cnxn, depth):
-
-    cur = cnxn.execute(
-        """
-        INSERT INTO searches_by_depth (
-            search_id, depth, time, 
-            eval, move,
-            nodes, q_nodes, tt_stores, tt_hits,
-            fail_highs, fail_lows
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            depth["search_id"],
-            depth["depth"],
-            depth.get("time"),
-            depth.get("eval"),
-            depth.get("move"),
-            depth.get("nodes"),
-            depth.get("q_nodes"),
-            depth.get("tt_stores"),
-            depth.get("tt_hits"),
-            depth.get("fail_highs"),
-            depth.get("fail_lows")
-        )
-    )
-
-    return cur.lastrowid
-
-
-def log_timing(cnxn, timing):
-
-    cur = cnxn.execute(
-        """
-        INSERT INTO timing (
-            search_id, function, time
-        )
-        VALUES (?, ?, ?)
-        """,
-        (
-            timing["search_id"],
-            timing["function"],
-            timing.get("time")
-        )
-    )
-
+    cnxn.commit()
     return cur.lastrowid
 
 
@@ -341,65 +242,91 @@ def log_timing(cnxn, timing):
 
 # will read .jsonl dumps from engine and load into tables
 # dont return row id (since may not be single valued e.g. search)
-def bulk_log_sts(cnxn, path):
+def bulk_log_sts(cnxn, path, sts_id, **kwargs):
     rows = []
 
     with open(path, "r") as f:
         for line in f:
             data = json.loads(line)
+
+            move = data.get('engine_move')
+            # most STS has only 1 best move, some have 2
+            expected_moves = data.get('expected_moves') or []
+            expected_move_1 = expected_moves[0] if len(expected_moves) > 0 else None
+            expected_move_2 = expected_moves[1] if len(expected_moves) > 1 else None
+            avoid_moves = data.get('avoid_moves')
+
+            if expected_moves != []:
+                correct = (move == expected_move_1 or move == expected_move_2)
+            elif avoid_moves is not None:
+                correct = (move != avoid_moves[0])
+
             rows.append((
-                data["experiment_id"],
-                data.get("suite"),
-                data.get("position_name"),
+                sts_id,
+                data.get("epd_file"),
+                data.get("category"),
                 data.get("fen"),
-                data.get("search_time"),
-                data.get("search_depth"),
-                data.get("move_is_correct"),
-                data.get("engine_move"),
+                kwargs.get("time"),
+                kwargs.get("depth"),
+                move,
                 data.get("engine_score"),
-                data.get("expected_move"),
-                data.get("expected_score")
+                expected_move_1,
+                data.get("expected_score"),
+                expected_move_2,
+                avoid_moves[0] if avoid_moves else None,
+                correct
             ))
             
     cnxn.executemany(
         """
         INSERT INTO sts (
             experiment_id, suite, position_name,
-            fen, search_time, search_depth, move_is_correct,
-            engine_move, engine_score, expected_move, expected_score
+            fen, search_time_ms, search_depth, 
+            engine_move, engine_score, expected_move, expected_score,
+            alt_expected_move, avoid_move, move_is_correct
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         rows
     )
+    cnxn.commit()
 
 
-def bulk_log_game(cnxn, path, experiment_id=None):
+def bulk_log_game(cnxn, path, experiment_id=None, second_engine_id=None):
     cursor = cnxn.cursor()
 
     rows = []
     game_uuids = []
 
+    white_engine_id = None 
+    black_engine_id = None 
+
+
     with open(path, "r") as f:
         for line in f:
             data = json.loads(line)
+
             game_uuids.append(data["game_uuid"])
+            if data.get('side') == "white":
+                white_engine_id = get_engine_id(cnxn, data.get('engine_id')) # data.id stores version
+                black_engine_id = second_engine_id
+            else:
+                white_engine_id = second_engine_id
+                black_engine_id = get_engine_id(cnxn, data.get('engine_id'))
+
             rows.append((
                 experiment_id,
-                data.get("white_engine_id"),
-                data.get("black_engine_id"),
+                white_engine_id,
+                black_engine_id,
                 data.get("time_control"),
                 data.get("time_per_move"),
                 data.get("depth_per_move"),
-                data.get("white_player"),
-                data.get("black_player"),
-                data.get("white_elo"),
-                data.get("black_elo"),
                 data.get("result"),
                 data.get("termination"),
                 data.get("opening"),
                 data.get("start_fen"),
                 json.dumps(data.get("moves")),
+                data.get("time_s")
             ))
 
     cursor.executemany(
@@ -408,12 +335,10 @@ def bulk_log_game(cnxn, path, experiment_id=None):
             experiment_id,
             white_engine_id, black_engine_id,
             time_control, time_per_move, depth_per_move,
-            white_player, black_player,
-            white_elo, black_elo,
             result, termination,
-            opening, start_fen, moves
+            opening, start_fen, moves, run_time_s
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         rows
     )
@@ -433,6 +358,7 @@ def bulk_log_search_and_timing(
     cnxn,
     search_path,
     game_map,
+    engine_id=None,
     timing_path=None,
     sts_id=None
 ):
@@ -440,44 +366,52 @@ def bulk_log_search_and_timing(
 
     searches_rows = []
     uuid_map = {}  # search_uuid -> search_id
+    game_id = None
 
     with open(search_path, "r") as f:
         for line in f:
             data = json.loads(line)
 
-            game_uuid = data["game_uuid"]
-            game_id = game_map.get(game_uuid)
-
-            if game_id is None:
-                raise RuntimeError(f"Unknown game_uuid {game_uuid}")
+            if not sts_id or game_map == {}:
+                game_uuid = data["game_uuid"]
+                game_id = game_map.get(game_uuid)
 
             searches_rows.append((
-                game_id,
+                engine_id,
+                game_id, # one or the other, or neither for an offline search
                 sts_id,
                 data.get("fen"),
                 data.get("ply"),
                 data.get("time_ms"),
                 data.get("root_eval"),
-                data.get("best_move"),
-                data.get("principal_variation"),
                 data.get("max_depth"),
+                data.get("best_move"),
+                safe_val(data.get("principal_variation")),
                 data.get("nodes"),
                 data.get("qnodes"),
                 data.get("tt_stores"),
                 data.get("tt_hits"),
+                data.get("tt_fill"),
                 data.get("fail_highs"),
                 data.get("fail_lows"),
+                data.get("fail_high_first"),
+                data.get("fail_high_late"),
+                data.get("aspirationFailHighResearches"),
+                data.get("aspirationFailLowResearches"),
+                data.get("see_prunes"),
+                data.get("delta_prunes"),
                 data["search_uuid"],  # temp
             ))
 
     cursor.executemany(
         """
         INSERT INTO searches (
-            game_id, sts_id, fen, ply, time, eval, move,
-            principal_variation, depth, nodes, q_nodes, tt_stores, tt_hits,
-            fail_highs, fail_lows
+            engine_id, game_id, sts_id, fen, ply, time_ms, eval, depth, move, 
+            principal_variation, nodes, q_nodes, tt_stores, tt_hits, tt_fill,
+            fail_highs, fail_lows, fail_high_first, fail_high_late, fail_high_researches, fail_low_researches,
+            see_prunes, delta_prunes
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         [row[:-1] for row in searches_rows]
     )
@@ -511,18 +445,26 @@ def bulk_log_search_and_timing(
                     data.get("depthQNodes", [0]*n)[d],
                     data.get("depthTTStores", [0]*n)[d],
                     data.get("depthTTHits", [0]*n)[d],
+                    data.get("depthTTFill", [0]*n)[d],
                     data.get("depthFailHighs", [0]*n)[d],
                     data.get("depthFailLows", [0]*n)[d],
+                    data.get("depthFailHighFirst", [0]*n)[d],
+                    data.get("depthFailHighLate", [0]*n)[d],
+                    data.get("depthAspirationFailHighResearches", [0]*n)[d],
+                    data.get("depthAspirationFailLowResearches", [0]*n)[d],
+                    data.get("depthSEEPrunes", [0]*n)[d], 
+                    data.get("depthDeltaPrunes", [0]*n)[d]
                 ))
 
     cursor.executemany(
         """
         INSERT INTO searches_by_depth (
-            search_id, depth, time, eval, move,
-            nodes, q_nodes, tt_stores, tt_hits,
-            fail_highs, fail_lows
+            search_id, depth, time_ms, eval, move,
+            nodes, q_nodes, tt_stores, tt_hits, tt_fill,
+            fail_highs, fail_lows, fail_high_first, fail_high_late,
+            fail_high_researches, fail_low_researches, see_prunes, delta_prunes
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         depth_rows
     )
@@ -556,7 +498,7 @@ def bulk_log_search_and_timing(
 
         cursor.executemany(
             """
-            INSERT INTO timing (search_id, function, total_time, num_calls)
+            INSERT INTO timing (search_id, function, total_time_ms, num_calls)
             VALUES (?, ?, ?, ?)
             """,
             timing_rows
@@ -568,3 +510,20 @@ def bulk_log_search_and_timing(
         f"{len(depth_rows)} depth rows, "
         f"{len(timing_rows)} timing rows."
     )
+
+
+
+if __name__ == "__main__":
+    p = argparse.ArgumentParser(description="ETL functions for chess.db\nRegister engines, upload logs, clear directories")
+    
+    p.add_argument("--register_engine", action="store_true", help="Flag to register engine to chess.db")
+    p.add_argument("--name", default=None, type=str, help="Engine name")
+    p.add_argument("--version", default=None, type=str, help="Engine version")
+    p.add_argument("--description", default=None, type=str, help="Engine description (changes from last iteration, etc)")
+    p.add_argument("--uci_options", default=None, type=str, help="UCI settings of the engine (e.g. threads, hash size, etc.)")
+
+    args = p.parse_args()
+    cnxn = sqlite3.connect('F:/databases/chess.db')
+
+    if args.register_engine:
+        register_engine(cnxn, {"name": args.name, "version": args.version, "description": args.description, "uci_options": args.uci_options})

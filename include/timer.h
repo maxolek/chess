@@ -54,7 +54,10 @@ struct Timer {
 
 struct TimerStats { uint64_t cycles = 0; uint64_t calls = 0; };
 struct Timing { TimerStats stats[T_COUNT]{}; };
+
 inline Timing g_timing{};
+inline LARGE_INTEGER g_game_start{};
+inline LARGE_INTEGER g_game_end{};
 
 // Scoped timer
 struct ScopedTimer {
@@ -74,7 +77,7 @@ struct ScopedTimer {
 
 // Header-only logging
 inline void logTimingStats(const std::string& fen = "") {
-    static std::ofstream out(Logging::log_dir + "/timing.jsonl", std::ios::app);
+    static std::ofstream out(Logging::log_dir / "timing.jsonl", std::ios::app);
     if (!out.is_open()) return;
 
     const auto& root = g_timing.stats[T_ROOT];

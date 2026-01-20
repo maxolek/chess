@@ -15,6 +15,7 @@
 #include "game_log.h"
 #include "NNUE.h"
 #include "book.h"
+#include <filesystem>
 
 class Searcher;
 struct SearchLimits;
@@ -56,11 +57,11 @@ struct UCIOptions {
     bool delta_pruning = true;
     bool see_pruning = true;
     // books
-    std::string opening_pst_path = "../bin/pst_opening.txt";
-    std::string endgame_pst_path = "../bin/pst_endgame.txt";
-    std::string nnue_weight_path = "../bin/nnue_wgts/768_128x2.bin";
-    std::string opening_book_path = "../bin/Titans.bin";
-    std::string syzygyPath = "";
+    fs::path opening_pst_path   = Logging::project_root / "bin/pst_opening.txt";
+    fs::path endgame_pst_path   = Logging::project_root / "bin/pst_endgame.txt";
+    fs::path nnue_weight_path   = Logging::project_root / "bin/nnue_wgts/768_128x2.bin";
+    fs::path opening_book_path  = Logging::project_root / "bin/Titans.bin";
+    fs::path syzygyPath         = Logging::project_root; // default empty
 };
 
 // GAMES

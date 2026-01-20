@@ -6,35 +6,183 @@ import sys
 from datetime import datetime
 import sqlite3
 from data import etl
+import re 
+from pathlib import Path
+import time
+from datetime import datetime, timezone
 
-def upload_logs(args):
+# paths
+TESTS_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = TESTS_DIR.parent
+# log paths
+LOGS_DIR = PROJECT_ROOT / "logs"
+SPRT_LOG_DIR = LOGS_DIR / "sprt_logs"
+GAME_JSON = SPRT_LOG_DIR / "game.jsonl"
+SEARCH_JSON = SPRT_LOG_DIR / "search.jsonl"
+TIMING_JSON = SPRT_LOG_DIR / "timing.jsonl"
+
+def parse_cutechess_output(output, candidate_name="Candidate"):
+    def safe_int(x):
+        try:
+            return int(x)
+        except Exception:
+            return 0
+
+    def safe_float(x):
+        try:
+            v = float(x)
+            if not (v == v and abs(v) != float("inf")):
+                return None
+            return v
+        except Exception:
+            return None
+
+    stats = {
+        "candidate_wins": 0,
+        "candidate_losses": 0,
+        "candidate_draws": 0,
+
+        "candidate_white_wins": 0,
+        "candidate_white_losses": 0,
+        "candidate_white_draws": 0,
+
+        "candidate_black_wins": 0,
+        "candidate_black_losses": 0,
+        "candidate_black_draws": 0,
+
+        "games_played": 0,
+        "result": None,
+    }
+
+    # --- Regexes ---
+    score_re = re.compile(
+        rf"Score of {re.escape(candidate_name)} vs .+?:\s*(\d+)\s*-\s*(\d+)\s*-\s*(\d+)"
+    )
+
+    white_re = re.compile(
+        rf"\.\.\.\s*{re.escape(candidate_name)} playing White:\s*(\d+)\s*-\s*(\d+)\s*-\s*(\d+)"
+    )
+
+    black_re = re.compile(
+        rf"\.\.\.\s*{re.escape(candidate_name)} playing Black:\s*(\d+)\s*-\s*(\d+)\s*-\s*(\d+)"
+    )
+
+    number = r"[+-]?(?:\d+(?:\.\d+)?|inf|nan)"
+    elo_re = re.compile(
+        rf"""
+        Elo\ difference:\s*(?P<elo>{number})\s*\+/-\s*{number}
+        ,\s*LOS:\s*(?P<los>{number})\s*%
+        ,\s*DrawRatio:\s*(?P<draw>{number})\s*%
+        """,
+        re.IGNORECASE | re.VERBOSE
+    )
+
+    sprt_re = re.compile(
+        r"SPRT:\s*llr\s*([-\d\.]+)\s*\([^)]+\),\s*lbound\s*([-\d\.]+),\s*ubound\s*([-\d\.]+)",
+        re.IGNORECASE,
+    )
+
+    # We overwrite on every match → last one wins
+    for line in output.splitlines():
+        line = line.strip()
+
+        if m := score_re.search(line):
+            w, l, d = map(safe_int, m.groups())
+            stats["candidate_wins"] = w
+            stats["candidate_losses"] = l
+            stats["candidate_draws"] = d
+            stats["games_played"] = w + l + d
+            continue
+
+        if m := white_re.search(line):
+            stats["candidate_white_wins"] = safe_int(m.group(1))
+            stats["candidate_white_losses"] = safe_int(m.group(2))
+            stats["candidate_white_draws"] = safe_int(m.group(3))
+            continue
+
+        if m := black_re.search(line):
+            stats["candidate_black_wins"] = safe_int(m.group(1))
+            stats["candidate_black_losses"] = safe_int(m.group(2))
+            stats["candidate_black_draws"] = safe_int(m.group(3))
+            continue
+
+        if m := elo_re.search(line):
+            stats["elo_diff"] = safe_float(m.group("elo"))
+            stats["los"] = safe_float(m.group("los"))
+            stats["draw_ratio"] = safe_float(m.group("draw"))
+            continue
+
+        if m := sprt_re.search(line):
+            stats["llr"] = safe_float(m.group(1))
+            stats["lbound"] = safe_float(m.group(2))
+            stats["ubound"] = safe_float(m.group(3))
+            continue
+
+    # derive final result string
+    #   improvement test: elo1 > elo0 
+    #   non-regression test: elo1 < elo0
+    #       [BOTH] llr > ubound = pass, llr < lbound = fail, else inconclusive
+    if stats["llr"] > stats["ubound"]:
+        stats["result"] = "pass"
+    elif stats["llr"] < stats["lbound"]:
+        stats["result"] = "fail"
+    else:
+        stats["result"] = "inconclusive"
+
+    return stats
+
+
+
+def upload_logs(args, cute_chess_stats, runtime=None):
     cnxn = sqlite3.connect("F:/databases/chess.db")
-    engine_version = etl.probe_engine_metadata(args.engine_a)['version']
+    candidate_engine_version = etl.probe_engine_metadata(args.engine_a)['version']
+    baseline_engine_version = etl.probe_engine_metadata(args.engine_b)['version']
 
     # get engine_id by probing db.engines via version
-    engine_id = etl.get_engine_id(cnxn, version=engine_version)
+    candidate_engine_id = etl.get_engine_id(cnxn, version=candidate_engine_version)
+    baseline_engine_id = etl.get_engine_id(cnxn, version=baseline_engine_version)
 
     # log sprt experiment
     sprt_id = etl.start_experiment(
         cnxn, 
         "SPRT",
-        engine_id
+        candidate_engine_id,
+        comparison_engine_id = baseline_engine_id
     )
 
     # map search --> game
     game_map = etl.bulk_log_game(
         cnxn, 
-        "./logs/sprt_logs/game.jsonl", 
-        sprt_id
+        GAME_JSON, 
+        sprt_id,
+        baseline_engine_id
     )
+
     # log search+timing with game mapping
     etl.bulk_log_search_and_timing(
         cnxn, 
-        "./logs/sprt_logs/search.jsonl",
+        SEARCH_JSON,
         game_map, 
-        timing_path="./logs/sprt_logs/timing.jsonl"
+        timing_path=TIMING_JSON,
+        engine_id=candidate_engine_id
     )
 
+    # log sprt experiment details in db.sprt
+    etl.log_sprt(
+        cnxn,
+        sprt_id,  # experiment_id
+        candidate_engine_id,
+        baseline_engine_id,
+        **{**vars(args), **cute_chess_stats},
+        runtime=runtime
+    )
+    etl.update_experiment(
+        cnxn, 
+        sprt_id, 
+        {"end_time_utc": datetime.now(timezone.utc).isoformat()}
+    )
+
+    etl.clear_log_dir(args.logroot)
     print(f"[DATA] Logging completed for SPRT {sprt_id}.")
 
 
@@ -65,13 +213,13 @@ def parse_args():
     p.add_argument("--max-games", type=int, default=1000)
 
     # Opening book
-    p.add_argument("--book", required=True, help="Opening book file")
+    p.add_argument("--book",  help="Opening book file")
     p.add_argument("--book-depth", type=int, default=8)
 
     # Logging
     p.add_argument(
         "--logroot",
-        default="../logs/sprt_logs",
+        default=SPRT_LOG_DIR,
         help="Root directory for SPRT logs"
     )
 
@@ -110,6 +258,17 @@ def main(args=None):
     else:
         each_block.append(f"tc={args.tc}")
 
+    # opening book
+    book_block = []
+    if args.book is not None:
+        book_block.append("-openings")
+        book_block.append(f"file={os.path.abspath(args.book)}")
+        book_block.append(f"format={os.path.splitext(args.book)[1][1:]}")
+        book_block.append("order=random")
+        book_block.append(f"plies={args.book_depth}")
+        book_block.append("-srand")
+        book_block.append("42")
+
     cmd = [
         args.cutechess_cli,
 
@@ -133,15 +292,8 @@ def main(args=None):
         f"elo1={args.elo1}",
         f"alpha={args.alpha}",
         f"beta={args.beta}",
-
-        # Openings
-        "-openings",
-        f"file={os.path.abspath(args.book)}",
-        f"format={os.path.splitext(args.book)[1][1:]}",
-        "order=random",
-        f"plies={args.book_depth}",
-        "-srand", "42",
-
+        
+    ] + book_block + [
         # Runtime
         "-repeat",
         "-concurrency", "2",
@@ -151,9 +303,31 @@ def main(args=None):
     print("[SPRT] Launching cutechess:")
     print(" ".join(cmd))
 
-    subprocess.check_call(cmd)
-    upload_logs(args)
-    etl.clear_log_folder(args.logroot)
+    output_lines = []
+    start_time = time.time()
+
+    with subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1  # line-buffered
+    ) as proc:
+
+        for line in proc.stdout:
+            print(line, end="")      # live console output
+            output_lines.append(line)
+
+        ret = proc.wait()
+
+    if ret != 0:
+        raise subprocess.CalledProcessError(ret, cmd)
+
+    run_time = time.time() - start_time
+    output = "".join(output_lines)
+    stats = parse_cutechess_output(output)
+
+    upload_logs(args, cute_chess_stats=stats, runtime=run_time)
 
     print("[SPRT] Completed successfully")
     print(f"[SPRT] Logs written to {args.logroot}")

@@ -135,7 +135,8 @@ public:
     bool shouldPrune(
         Move& move,
         int standPat,
-        int alpha
+        int alpha,
+        int ply
     );
 
     // ------------------------------- Make/unmake w/ NNUE -------------------------------

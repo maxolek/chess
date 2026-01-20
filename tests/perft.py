@@ -6,44 +6,9 @@ import os
 import time
 import sqlite3
 from data import etl
+from datetime import datetime, timezone
 
-
-# -----------------------------
-# DB logging
-# -----------------------------
-def log_perft(
-    cnxn,
-    experiment_id,
-    fen,
-    depth,
-    nodes,
-    expected_nodes,
-    correct,
-    time_ms,
-):
-    cnxn.execute(
-        """
-        INSERT INTO perft (
-            experiment_id,
-            fen,
-            depth,
-            nodes,
-            expected_nodes,
-            correct,
-            time
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            experiment_id,
-            fen,
-            depth,
-            nodes,
-            expected_nodes,
-            int(correct),
-            int(time_ms),
-        )
-    )
-
+STOCKFISH = r"C:\Users\maxol\chess\engines\stockfish\stockfish-windows-x86-64-avx2.exe"
 
 # -----------------------------
 # Load positions
@@ -138,7 +103,7 @@ def main(args=None):
     if args is None:
         parser = argparse.ArgumentParser(description="Perft verifier + DB logger")
         parser.add_argument("--engine", required=True, help="Path to engine binary")
-        parser.add_argument("--stockfish", required=True, help="Path to Stockfish binary")
+        parser.add_argument("--stockfish", default=STOCKFISH, help="Path to Stockfish binary")
         parser.add_argument("--positions", required=True, help="File containing FEN positions")
         parser.add_argument("--depth", type=int, required=True, help="Perft depth")
 
@@ -195,15 +160,17 @@ def main(args=None):
         print(f"[{idx}] {status}")
         print(f"SF: {sf_nodes} | Mine: {my_nodes} | {time_ms} ms")
 
-        log_perft(
-            cnxn=cnxn,
-            experiment_id=experiment_id,
-            fen=fen,
-            depth=args.depth,
-            nodes=my_nodes,
-            expected_nodes=sf_nodes,
-            correct=correct,
-            time_ms=time_ms,
+        etl.log_perft(
+            cnxn,
+            {
+                'experiment_id':experiment_id,
+                'fen':fen,
+                'depth':args.depth,
+                'nodes':my_nodes,
+                'expected_nodes':sf_nodes,
+                'correct':correct,
+                'time_ms':time_ms
+            }
         )
 
         if not correct:
@@ -213,6 +180,12 @@ def main(args=None):
             #sys.exit(1)
 
     cnxn.commit()
+
+    etl.update_experiment(
+        cnxn, 
+        experiment_id,
+        {"end_time_utc": datetime.now(timezone.utc).isoformat()}
+    )
 
     engine.stdin.write("quit\n")
     engine.stdin.flush()

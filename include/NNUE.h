@@ -66,10 +66,10 @@ struct Accumulator {
 class NNUE {
 public:
     NNUE() {};
-    NNUE(const std::string& path) { load(path); };
+    NNUE(const fs::path& path) { load(path); };
 
     // Load quantised network
-    bool load(const std::string& path);
+    bool load(const fs::path& path);
 
     // Compute final output from accumulators
     int evaluate(bool is_white_move); 

@@ -36,13 +36,14 @@ struct GameLog {
     GameResult outcome = GameResult::ONGOING;
     GameEndReason reason = GameEndReason::NONE;
 
+    std::string side;
     int plies = 0;
     int finalEval = 0;
 
     uint64_t totalNodes = 0;
     uint64_t totalQNodes = 0;
 
-    double totalTimeMs = 0;
+    double totalTimeSeconds = 0;
     double avgNPS = 0;
 
 };
@@ -52,7 +53,7 @@ inline GameLog g_gamelog;
 inline void logGameLog() {
     if (!Logging::track_game_log) return;
 
-    static std::ofstream out(Logging::log_dir + "/game.jsonl", std::ios::app);
+    static std::ofstream out(Logging::log_dir / "game.jsonl", std::ios::app);
     if (!out.is_open()) return;
 
     out << "{"
@@ -61,6 +62,7 @@ inline void logGameLog() {
         << "\"type\":\"game\","
         << "\"session\":" << currentSession() << ","
         << "\"game_uuid\":\"" << g_run_context.game_uuid << "\","
+        << "\"side\":\"" << g_gamelog.side << "\","
         << "\"result\":" << int(g_gamelog.outcome) << ","
         << "\"reason\":" << int(g_gamelog.reason) << ","
         << "\"plies\":" << g_gamelog.plies << ",";
@@ -75,7 +77,7 @@ inline void logGameLog() {
 
     out << "\"nodes\":" << g_gamelog.totalNodes << ","
         << "\"qnodes\":" << g_gamelog.totalQNodes << ","
-        << "\"time_ms\":" << g_gamelog.totalTimeMs << ","
+        << "\"time_s\":" << g_gamelog.totalTimeSeconds << ","
         << "\"avg_nps\":" << g_gamelog.avgNPS << ","
         << "\"start_fen\":\"" << g_gamelog.startFEN << "\""
         << "}\n";

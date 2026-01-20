@@ -1,8 +1,8 @@
-#include "UCI.h"
-#include "session.h"
-#include "engine.h"
-#include "board.h"
-#include "PrecomputedMoveData.h"
+#include <UCI.h>
+#include <session.h>
+#include <engine.h>
+#include <board.h>
+#include <PrecomputedMoveData.h>
 #include <iostream>
 #include <atomic>
 #include <thread>

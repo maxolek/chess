@@ -1,4 +1,4 @@
-#include "evaluator.h"
+#include <evaluator.h>
 #include <fstream>
 #include <sstream>
 #include <iomanip>
@@ -11,7 +11,7 @@ Evaluator::Evaluator() {}
 
 
 // =================== PST Loading ===================
-bool Evaluator::loadOpeningPST(const std::string& filename) {
+bool Evaluator::loadOpeningPST(const fs::path& filename) {
     std::ifstream file(filename);
     if (!file.is_open()) {
         std::cerr << "Failed to open PST file: " << filename << std::endl;
@@ -50,7 +50,7 @@ bool Evaluator::loadOpeningPST(const std::string& filename) {
     return true;
 }
 
-bool Evaluator::loadEndgamePST(const std::string& filename) {
+bool Evaluator::loadEndgamePST(const fs::path& filename) {
         std::ifstream file(filename);
     if (!file.is_open()) {
         std::cerr << "Failed to open PST file: " << filename << std::endl;

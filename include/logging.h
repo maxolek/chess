@@ -3,6 +3,8 @@
 #include "helpers.h"
 #include <filesystem>
 
+namespace fs = std::filesystem;
+
 struct RunContext {
     std::string game_uuid; // updates when a new game starts
     std::string search_uuid; // updates every search
@@ -14,12 +16,13 @@ struct Logging {
     static inline bool track_timers        = false;
     static inline bool track_search_stats  = true;
     static inline bool track_game_log      = true;
-    static inline bool track_uci           = true;
+    static inline bool track_uci           = false;
 
     // ---- directory ----
     // uci is .log, rest are .jsonl
-    static inline std::string DEFAULT_LOG_DIR = "../logs/test_logs";
-    static inline std::string log_dir = DEFAULT_LOG_DIR;
+    static inline const fs::path project_root = PROJECT_ROOT; // compile time constant (str)
+    static inline fs::path DEFAULT_LOG_DIR = project_root / "logs/test_logs";
+    static inline fs::path log_dir = DEFAULT_LOG_DIR;
     static inline std::ofstream uci_file;
     static inline std::ofstream search_file;
     static inline std::ofstream game_file; 
@@ -30,13 +33,13 @@ struct Logging {
         std::filesystem::create_directories(log_dir);
 
         if (track_uci)
-            uci_file.open(log_dir + "/uci.log", std::ios::app);
+            uci_file.open(log_dir / "uci.log", std::ios::app);
         if (track_search_stats)
-            search_file.open(log_dir + "/search.jsonl", std::ios::app);
+            search_file.open(log_dir / "search.jsonl", std::ios::app);
         if (track_game_log)
-            game_file.open(log_dir + "/game.jsonl", std::ios::app);
+            game_file.open(log_dir / "game.jsonl", std::ios::app);
         if (track_timers)
-            timing_file.open(log_dir + "/timing.jsonl", std::ios::app);
+            timing_file.open(log_dir / "timing.jsonl", std::ios::app);
     }
 
     static void closeFiles() {
@@ -62,10 +65,15 @@ struct Logging {
     }
 
     // ---- setters (called from setoption) ----
-    static void setLogDir(const std::string& path) {
-        if (log_dir == path) return;
-        log_dir = path;
-        reopenFiles();
+    static void setLogDir(const std::string& path_str) {
+        setLogDir(std::filesystem::path(path_str));
+    }
+    static void setLogDir(const fs::path& path) {
+        fs::path dir = path;
+        if (dir.is_relative()) dir = project_root / dir; 
+        if (log_dir == dir) return; 
+        log_dir = dir; 
+        initFiles();
     }
 
     static void setTrackTimers(bool v) {

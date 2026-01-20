@@ -1,4 +1,4 @@
-#include "magics.h"
+#include <magics.h>
 
 namespace Magics {
     U64 rookAttackTable[64][4096]; // size must be 2^maxBits = 2^12

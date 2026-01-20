@@ -2,8 +2,8 @@
 // i.e. 50 move rule, en-passant, castling, captures
 //      these require previous information to be known
 
-#include "helpers.h"
-#include "gamestate.h"
+#include <helpers.h>
+#include <gamestate.h>
 
 /*
 int GameState::capturedPieceType = -1;

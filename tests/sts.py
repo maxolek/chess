@@ -5,6 +5,19 @@ import json
 import chess
 import sqlite3
 from data import etl
+from pathlib import Path
+from datetime import datetime, timezone
+
+# paths
+TESTS_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = TESTS_DIR.parent
+# log paths
+LOGS_DIR = PROJECT_ROOT / "logs"
+STS_LOGS_DIR = LOGS_DIR / "sts_logs"
+GAME_JSON = STS_LOGS_DIR / "game.jsonl"
+SEARCH_JSON = STS_LOGS_DIR / "search.jsonl"
+TIMING_JSON = STS_LOGS_DIR / "timing.jsonl"
+STS_JSON = STS_LOGS_DIR / "sts_suite.jsonl"
 
 # --------------------------
 #       logging
@@ -25,14 +38,25 @@ def upload_logs(args):
         engine_id
     )
 
+    etl.bulk_log_sts(cnxn, STS_JSON, sts_id, **vars(args))
+
     # no games to map search to, so no game_map like in SPRT
     etl.bulk_log_search_and_timing(
         cnxn,
-        args.log,
+        SEARCH_JSON,
         {},
-        timing_path = args.log + "/timing.jsonl"
+        timing_path = TIMING_JSON,
+        sts_id = sts_id,
+        engine_id = engine_id
     )
 
+    etl.update_experiment(
+        cnxn, 
+        sts_id, 
+        {"end_time_utc": datetime.now(timezone.utc).isoformat()}
+    )
+
+    etl.clear_log_dir(STS_LOGS_DIR)
     print(f"[DATA] Logging completed for STS {sts_id}")
 
 # --------------------------
@@ -43,7 +67,7 @@ def run_eval(engine, fen, depth=8, time=None):
     # position + eval
     engine.stdin.write(f"position fen {fen}\n".encode())
     if time is not None: 
-        engine.stdin.write(f"go eval movetime {time*1000}\n".encode())
+        engine.stdin.write(f"go eval movetime {time}\n".encode())
     else: 
         engine.stdin.write(f"go eval depth {depth}\n".encode())
     engine.stdin.flush()
@@ -68,20 +92,20 @@ def run_eval(engine, fen, depth=8, time=None):
 # --------------------------
 def parse_epd_line(line):
     """
-    Parse EPD line into (fen, ops dict, expected_moves)
+    Parse an EPD line into (fen, ops dict, expected_moves, avoid_moves)
     """
     line = line.strip()
     if not line or line.startswith("#"):
-        return None, {}, []
+        return None, {}, [], []
 
     # Split on semicolon for EPD operations
     parts = line.split(";")
-    main_part = parts[0].strip()  # FEN + optional bm
+    main_part = parts[0].strip()  # FEN + optional bm/am
     ops_parts = parts[1:]
 
     tokens = main_part.split()
     if len(tokens) < 4:
-        return None, {}, []
+        return None, {}, [], []
 
     # Standard FEN fields
     pieces = tokens[0]
@@ -92,11 +116,28 @@ def parse_epd_line(line):
     fullmove = "1"
     fen = f"{pieces} {turn} {castling} {en_passant} {halfmove} {fullmove}"
 
-    # Extract expected moves after 'bm' in main_part
-    expected_moves_raw = []
+    # Initialize moves
+    expected_moves = []
+    avoid_moves = []
+
+    # Extract expected moves after 'bm'
     if "bm" in tokens:
         bm_index = tokens.index("bm")
-        expected_moves_raw = tokens[bm_index + 1:]
+        # Take all tokens until the next token starts with ';' or end of list
+        for t in tokens[bm_index + 1:]:
+            if t.endswith(";"):
+                expected_moves.append(t.rstrip(";"))
+                break
+            expected_moves.append(t)
+
+    # Extract avoid moves after 'am'
+    if "am" in tokens:
+        am_index = tokens.index("am")
+        for t in tokens[am_index + 1:]:
+            if t.endswith(";"):
+                avoid_moves.append(t.rstrip(";"))
+                break
+            avoid_moves.append(t)
 
     # Parse ops (id, ce, c0, etc.)
     ops = {}
@@ -114,24 +155,27 @@ def parse_epd_line(line):
         elif token.startswith("c0"):
             ops["c0"] = token.split(" ", 1)[1].strip('" ')
 
-    return fen, ops, expected_moves_raw
+    return fen, ops, expected_moves, avoid_moves
+
 
 def collect_epd_files(paths):
-    epd_files = []
+    epd_files = set()
 
-    for path in paths:
-        path = os.path.normpath(path)
-        if os.path.isfile(path) and path.lower().endswith(".epd"):
-            epd_files.append(path)
-        elif os.path.isdir(path):
-            for root, _, files in os.walk(path):
-                for f in files:
-                    if f.lower().endswith(".epd"):
-                        epd_files.append(os.path.join(root, f))
+    for p in paths:
+        path = PROJECT_ROOT / Path(p)
+
+        if path.is_file() and path.suffix.lower() == ".epd":
+            epd_files.add(path.resolve())
+
+        elif path.is_dir():
+            for f in path.rglob("*.epd"):
+                epd_files.add(f.resolve())
+
         else:
             print(f"⚠ Skipping unknown path: {path}")
 
-    return sorted(set(os.path.normpath(p) for p in epd_files))
+    # return as strings
+    return sorted(str(p) for p in epd_files)
 
 # --------------------------
 # Convert expected moves to UCI
@@ -183,13 +227,20 @@ def moves_to_uci(board, expected_moves):
 # Run STS for a single file
 # --------------------------
 def run_sts_file(engine_path, epd_file, depth=8, time = None, log_file = None):
-    engine = subprocess.Popen([engine_path], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+    engine_dir = os.path.dirname(os.path.abspath(engine_path))
+    engine = subprocess.Popen(
+        [engine_path],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        cwd=engine_dir
+    )
     total, correct = 0, 0
     diffs = []
     category_stats = {}
 
     # logging options
-    engine.stdin.write(f"setoption name log_dir value ../logs/sts_logs\n".encode())
+    engine.stdin.write(f"setoption name log_dir value {STS_LOGS_DIR}\n".encode())
     engine.stdin.write(f"setoption name timer_logging value true\n".encode())
     engine.stdin.write(f"setoption name stats_logging value true\n".encode())
     engine.stdin.write(f"setoption name uci_logging value true\n".encode())
@@ -199,7 +250,7 @@ def run_sts_file(engine_path, epd_file, depth=8, time = None, log_file = None):
         lines = [l.strip() for l in f if l.strip() and not l.startswith("#")]
 
     for i, line in enumerate(lines, 1):
-        fen, ops, expected_moves_raw = parse_epd_line(line)
+        fen, ops, expected_moves_raw, avoid_moves_raw = parse_epd_line(line)
         if not fen:
             print(f"[{i}/{len(lines)}] Skipping malformed line: {line}")
             continue
@@ -214,12 +265,13 @@ def run_sts_file(engine_path, epd_file, depth=8, time = None, log_file = None):
 
         # Convert expected moves to UCI
         expected_moves = moves_to_uci(board, expected_moves_raw)
+        avoid_moves = moves_to_uci(board, avoid_moves_raw)
 
         print(f"[STS] {epd_file}: position {i}")
         score, bestmove = run_eval(engine, fen, depth, time)
         total += 1
 
-        move_ok = expected_moves and bestmove in expected_moves
+        move_ok = (expected_moves and bestmove in expected_moves) or (avoid_moves and bestmove not in avoid_moves)
         if move_ok:
             correct += 1
         category_stats.setdefault(cat, {"total": 0, "correct": 0})
@@ -235,7 +287,10 @@ def run_sts_file(engine_path, epd_file, depth=8, time = None, log_file = None):
 
         print(f"[{i}/{len(lines)}] {cat}")
         print(f"  FEN:      {fen}")
-        print(f"  Expected: moves={expected_moves}, score={expected_score}")
+        if expected_moves:
+            print(f"  Expected: moves={expected_moves}, score={expected_score}")
+        elif avoid_moves:
+            print(f"  Avoid:    moves={avoid_moves}, score={expected_score}")
         print(f"  Engine:   move={bestmove}, score={score}")
         print("  ✅ Move correct" if move_ok else "  ❌ Move incorrect")
         if score_diff is not None:
@@ -251,13 +306,15 @@ def run_sts_file(engine_path, epd_file, depth=8, time = None, log_file = None):
             "expected_score": expected_score,
             "engine_move": bestmove,
             "engine_score": score, 
+            "avoid_moves": avoid_moves,
             "move_ok": move_ok, 
             "score_diff": score_diff
         }
         log_file.write(json.dumps(record) + "\n")
         log_file.flush()
 
-    engine.kill()
+    engine.terminate()
+    engine.wait(timeout=1)
 
     file_summary = {
         "file": epd_file,
@@ -275,13 +332,13 @@ def run_sts_file(engine_path, epd_file, depth=8, time = None, log_file = None):
 # --------------------------
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="SPRT runner using cutechess-cli")
+    parser = argparse.ArgumentParser(description="STS (test positions) runner")
 
-    parser.add_argument("--engine", default="../src/tomahawk.exe", help="Path to UCI engine")
+    parser.add_argument("--engine", default="./src/tomahawk.exe", help="Path to UCI engine")
     parser.add_argument("--time", type=int, default=None, help = "Move time in MS")
-    parser.add_argument("--depth", type=int, default=8, help = "Search depth")
+    parser.add_argument("--depth", type=int, default=None, help = "Search depth")
     parser.add_argument("--sts", nargs="+", default=["./bin/STS"], help="One or more EPD files and/or folders")
-    parser.add_argument("--log", default="../logs/sts_logs/full_sts_suite.jsonl", help="Output log file")
+    #parser.add_argument("--log_dir", default="./logs/sts_logs/", help="Output log directory")
 
     return parser.parse_args()
 
@@ -290,9 +347,12 @@ def main(args=None):
     if args is None: 
         args = parse_args()
 
-    os.makedirs(os.path.dirname(args.log), exist_ok=True)
-    log_f = open(args.log, "a", encoding="utf-8")
-    print(f"Results logged to {args.log}")
+    #log_dir = os.path.abspath(args.log_dir)
+    #os.makedirs(log_dir, exist_ok=True)
+    #sts_log_path = os.path.join(log_dir, "sts_suite.jsonl")
+
+    log_f = open(STS_JSON, "w", encoding="utf-8")
+    print(f"Results logged to {STS_JSON}")
 
     epd_files = collect_epd_files(args.sts)
     if not epd_files:
@@ -316,6 +376,7 @@ def main(args=None):
     print(f"Total correct: {global_correct} ({global_acc:.1f}%)")
 
     # upload to db
+    log_f.close()
     upload_logs(args)
     
 

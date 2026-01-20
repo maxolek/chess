@@ -1,6 +1,18 @@
 #pragma once
 #include "helpers.h"
 #include "move.h"
+#include <vector>
+#include <algorithm>
+#include <cmath>
+
+// -------------------------------
+// Stats tracking
+// -------------------------------
+struct TTStats {
+    size_t totalStores = 0;
+    size_t totalHits = 0;
+    size_t overwritten = 0;
+};
 
 // -------------------------------
 // Bound types for TT entries
@@ -20,8 +32,8 @@ struct TTEntry {
     int16_t depth = 0;     // iterative_depth recorded
     int16_t horizon = 0;   // ply + depth
     uint16_t age = 0;      // Age counter
-    BoundType flag = EXACT; 
-    uint16_t bestMove = 0; // Encoded move (use 16-bit int instead of Move object)
+    BoundType flag = EXACT;
+    uint16_t bestMove = 0; // Encoded move
 };
 
 // -------------------------------
@@ -29,19 +41,33 @@ struct TTEntry {
 // -------------------------------
 class TranspositionTable {
 public:
-    TranspositionTable(size_t mbSize = 512) { resize(mbSize); }
+    TTStats stats;
+
+    TranspositionTable(size_t mbSize = 512) {
+        resize(mbSize);
+    }
 
     // Resize table to given MB size
     void resize(size_t mbSize) {
         size_t bytes = mbSize * 1024 * 1024;
-        entriesCount = 1ULL << static_cast<size_t>(std::log2(bytes / sizeof(TTEntry)));
+        entriesCount = 1ULL << static_cast<size_t>(
+            std::log2(bytes / sizeof(TTEntry))
+        );
+
         table.assign(entriesCount, TTEntry{});
+        filledCount = 0;
+        stats = TTStats{};
     }
 
     // Probe TT for a given key
     inline TTEntry* probe(U64 key) {
         ScopedTimer timer(T_TT_PROBE);
-        return &table[key & (entriesCount - 1)]; // power-of-2 indexing
+        TTEntry* entry = &table[key & (entriesCount - 1)];
+
+        if (entry->key == key && key != 0)
+            stats.totalHits++;
+
+        return entry;
     }
 
     // Store an entry
@@ -51,8 +77,17 @@ public:
         TTEntry* entry = probe(key);
         int horizon = ply + depth;
 
+        bool wasEmpty   = (entry->key == 0);
+        bool overwritten = (!wasEmpty && entry->key != key);
+
         // Replace if new key or deeper horizon
         if (entry->key != key || horizon >= entry->horizon) {
+            if (overwritten)
+                stats.overwritten++;
+
+            if (wasEmpty)
+                filledCount++;   
+
             entry->key = key;
             entry->eval = static_cast<int16_t>(score);
             entry->depth = static_cast<int16_t>(depth);
@@ -60,15 +95,30 @@ public:
             entry->flag = flag;
             entry->bestMove = bestMove.Value();
             entry->age++;
+
+            stats.totalStores++;
         }
     }
 
     // Clear all entries
     void clear() {
         std::fill(table.begin(), table.end(), TTEntry{});
+        stats = TTStats{};
+        filledCount = 0;
     }
+
+    // Fill metrics (O(1))
+    size_t filled() const {
+        return filledCount;
+    }
+
+    double fillRatio() const {
+        return static_cast<double>(filledCount) / entriesCount;
+    }
+
+    size_t entriesCount = 0;
 
 private:
     std::vector<TTEntry> table;
-    size_t entriesCount = 0;
+    size_t filledCount = 0;   
 };

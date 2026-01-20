@@ -38,14 +38,14 @@ def init_engine_db(db_dir=dir) -> None:
     # immutable
     engines_str = """
         CREATE TABLE IF NOT EXISTS engines (
-            id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-            name                TEXT NOT NULL,
-            version             TEXT NOT NULL,
-            description         TEXT,
-            compile_flags       TEXT,
-            uci_options         TEXT, 
+            id                          INTEGER PRIMARY KEY AUTOINCREMENT,
+            name                        TEXT NOT NULL,
+            version                     TEXT NOT NULL,
+            description                 TEXT,
+            compile_flags               TEXT,
+            uci_options                 TEXT, 
 
-            ingestion_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            integestion_timestamp_utc   DATETIME DEFAULT CURRENT_TIMESTAMP
         );
     """
 
@@ -54,12 +54,13 @@ def init_engine_db(db_dir=dir) -> None:
     #  and provides FKs for table joins
     experiments_str = """
         CREATE TABLE IF NOT EXISTS experiments (
-            id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-            engine_id           INTEGER NOT NULL,
-            type                TEXT NOT NULL, -- sts, perft, sprt
-            start_time          DATETIME DEFAULT CURRENT_TIMESTAMP,
-            end_time            DATETIME,
-            metadata            TEXT, 
+            id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+            engine_id               INTEGER NOT NULL,
+            comparison_engine_id    INTEGER NULL, -- e.g. old engine, stockfish, in sprt
+            type                    TEXT NOT NULL, -- sts, perft, sprt
+            start_time_utc          DATETIME DEFAULT CURRENT_TIMESTAMP,
+            end_time_utc            DATETIME,
+            metadata                TEXT, 
 
             FOREIGN KEY (engine_id) REFERENCES engines(id)
         );
@@ -69,27 +70,37 @@ def init_engine_db(db_dir=dir) -> None:
     search_summary_stats_str = """
         CREATE TABLE IF NOT EXISTS searches (
         -- metadata
-            id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-            game_id             INTEGER NULL, -- link to game/sts
-            sts_id              INTEGER NULL, 
+            id                          INTEGER PRIMARY KEY AUTOINCREMENT,
+            engine_id                   INTEGER NULL,
+            game_id                     INTEGER NULL, -- link to game/sts
+            sts_id                      INTEGER NULL, 
         -- position
-            fen                 TEXT NOT NULL,
-            ply                 INTEGER,
-            time                REAL,
-            eval                INTEGER,
-            move                TEXT,
-            principal_variation TEXT,
+            fen                         TEXT NOT NULL,
+            ply                         INTEGER,
+            time_ms                     REAL,
+            eval                        INTEGER,
+            depth                       INTEGER,
+            move                        TEXT,
+            principal_variation         TEXT,
         -- stats
-            depth               INTEGER,
-            nodes               INTEGER,
-            q_nodes             INTEGER,
-            tt_stores           INTEGER,
-            tt_hits             INTEGER,
-            fail_highs          INTEGER,
-            fail_lows           INTEGER,
+            nodes                       INTEGER,
+            q_nodes                     INTEGER,
+            tt_stores                   INTEGER,
+            tt_hits                     INTEGER,
+            tt_fill                     REAL,
+            fail_highs                  INTEGER,
+            fail_lows                   INTEGER,
+        -- specifics
+            fail_high_first             INTEGER,
+            fail_high_late              INTEGER, -- late is subjective
+            fail_high_researches        INTEGER,
+            fail_low_researches         INTEGER,
+            see_prunes                  INTEGER,
+            delta_prunes                INTEGER,
 
-            ingestion_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            integestion_timestamp_utc   DATETIME DEFAULT CURRENT_TIMESTAMP,
             
+            FOREIGN KEY (engine_id) REFERENCES engines(id),
             FOREIGN KEY (game_id) REFERENCES games(id),
             FOREIGN KEY (sts_id) REFERENCES sts(id)
         );
@@ -99,21 +110,29 @@ def init_engine_db(db_dir=dir) -> None:
     search_depth_stats_str = """
         CREATE TABLE IF NOT EXISTS searches_by_depth (
         -- metadata
-            search_id           INTEGER NOT NULL,
-            depth               INTEGER NOT NULL,
+            search_id                   INTEGER NOT NULL,
+            depth                       INTEGER NOT NULL,
         -- results
-            time                REAL,
-            eval                INTEGER,
-            move                TEXT,
+            time_ms                     REAL,
+            eval                        INTEGER,
+            move                        TEXT,
         -- stats
-            nodes               INTEGER,
-            q_nodes             INTEGER,
-            tt_stores           INTEGER,
-            tt_hits             INTEGER,
-            fail_highs          INTEGER,
-            fail_lows           INTEGER,
+            nodes                       INTEGER,
+            q_nodes                     INTEGER,
+            tt_stores                   INTEGER,
+            tt_hits                     INTEGER,
+            tt_fill                     REAL,
+            fail_highs                  INTEGER,
+            fail_lows                   INTEGER,
+        -- specifics
+            fail_high_first             INTEGER,
+            fail_high_late              INTEGER,
+            fail_high_researches        INTEGER,
+            fail_low_researches         INTEGER,
+            see_prunes                  INTEGER,
+            delta_prunes                INTEGER,
 
-            ingestion_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            integestion_timestamp_utc   DATETIME DEFAULT CURRENT_TIMESTAMP,
             
             PRIMARY KEY (search_id, depth),
             FOREIGN KEY (search_id) REFERENCES searches(id)
@@ -123,12 +142,12 @@ def init_engine_db(db_dir=dir) -> None:
     # computation time info
     timing_stats_str = """
         CREATE TABLE IF NOT EXISTS timing (
-            search_id           INTEGER NOT NULL,
-            function            TEXT NOT NULL,
-            total_time          REAL,
-            num_calls           INTEGER,
+            search_id                   INTEGER NOT NULL,
+            function                    TEXT NOT NULL,
+            total_time_ms               REAL,
+            num_calls                   INTEGER,
 
-            ingestion_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            integestion_timestamp_utc   DATETIME DEFAULT CURRENT_TIMESTAMP,
 
             PRIMARY KEY (search_id, function),
             FOREIGN KEY (search_id) REFERENCES searches(id)
@@ -139,26 +158,27 @@ def init_engine_db(db_dir=dir) -> None:
     game_stats_str = """
         CREATE TABLE IF NOT EXISTS games (
         -- metadata
-            id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-            experiment_id       INTEGER NULL, -- link to sprt
-            white_engine_id     INTEGER NULL, -- nullable since may not have 2 local engines playing (e.g. lichess games)
-            black_engine_id     INTEGER NULL,
+            id                          INTEGER PRIMARY KEY AUTOINCREMENT,
+            experiment_id               INTEGER NULL, -- link to sprt
+            white_engine_id             INTEGER NULL, -- nullable since may not have 2 local engines playing (e.g. lichess games)
+            black_engine_id             INTEGER NULL,
         -- info
-            time_control        TEXT,
-            time_per_move       REAL,
-            depth_per_move      INTEGER,
-            white_player        TEXT,
-            black_player        TEXT,
-            white_elo           INTEGER,
-            black_elo           INTEGER,
+            time_control                TEXT,
+            time_per_move               REAL,
+            depth_per_move              INTEGER,
+            --white_player                TEXT,
+            --black_player                TEXT,
+            --white_elo                   INTEGER,
+            --black_elo                   INTEGER,
         -- results
-            result              TEXT, -- 1-0 , 0-1 , 1/2-1/2
-            termination         TEXT, -- mate, repetition, etc.
-            opening             TEXT,
-            start_fen           TEXT, -- typically START_POS but sometimes games are loaded from position
-            moves               TEXT, -- array ["e2e4", "e7e5", etc.]
+            result                      TEXT, -- 1-0 , 0-1 , 1/2-1/2
+            termination                 TEXT, -- mate, repetition, etc.
+            opening                     TEXT,
+            start_fen                   TEXT, -- typically START_POS but sometimes games are loaded from position
+            moves                       TEXT, -- array ["e2e4", "e7e5", etc.]
+            run_time_s                  REAL,
 
-            ingestion_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            integestion_timestamp_utc   DATETIME DEFAULT CURRENT_TIMESTAMP,
 
             FOREIGN KEY (experiment_id) REFERENCES experiments(id),
             FOREIGN KEY (white_engine_id) REFERENCES engines(id),
@@ -183,13 +203,25 @@ def init_engine_db(db_dir=dir) -> None:
             elo1                            INTEGER,
             alpha                           INTEGER,
             beta                            INTEGER,
+        -- results
             result                          TEXT,    -- pass/fail/inconclusive
             elo_diff                        INTEGER,
             llr                             REAL,
+            los                             REAL, -- liklihood of superiority
+            candidate_wins                  INTEGER, -- all of these wdl stats are for candidate engine
+            candidate_losses                INTEGER,
+            candidate_draws                 INTEGER,
+            candidate_white_wins            INTEGER,
+            candidate_white_losses          INTEGER,
+            candidate_white_draws           INTEGER,
+            candidate_black_wins            INTEGER,
+            candidate_black_losses          INTEGER,
+            candidate_black_draws           INTEGER,
+        -- summaries
             games_played                    INTEGER,
-            run_time                        INTEGER,
+            run_time_s                      INTEGER,
 
-            ingestion_timestamp             DATETIME DEFAULT CURRENT_TIMESTAMP,
+            integestion_timestamp_utc       DATETIME DEFAULT CURRENT_TIMESTAMP,
             
             FOREIGN KEY (baseline_engine_id) REFERENCES engines(id),
             FOREIGN KEY (candidate_engine_id) REFERENCES engines(id),
@@ -201,21 +233,23 @@ def init_engine_db(db_dir=dir) -> None:
     sts_test_str = """
         CREATE TABLE IF NOT EXISTS sts (
         -- metadata
-            id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-            experiment_id       INTEGER NOT NULL,
-            suite               TEXT,
-            position_name       TEXT,
-            fen                 TEXT NOT NULL,
-            search_time         REAL,
-            search_depth        INTEGER,
+            id                          INTEGER PRIMARY KEY AUTOINCREMENT,
+            experiment_id               INTEGER NOT NULL,
+            suite                       TEXT,
+            position_name               TEXT,
+            fen                         TEXT NOT NULL,
+            search_time_ms              REAL,
+            search_depth                INTEGER,
         -- results
-            move_is_correct     BOOLEAN,
-            engine_move         TEXT NOT NULL,
-            engine_score        INTEGER,
-            expected_move       TEXT NOT NULL,
-            expected_score      INTEGER,
-
-            ingestion_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            engine_move                 TEXT NOT NULL,
+            engine_score                INTEGER,
+            expected_move               TEXT NULL,
+            expected_score              INTEGER,
+            alt_expected_move           TEXT NULL, -- sometimes a 2nd move is acceptable (in cases of >2 we just ignore those)
+            avoid_move                  TEXT NULL, -- am (instead of bm) 
+            move_is_correct             BOOLEAN,
+            
+            integestion_timestamp_utc   DATETIME DEFAULT CURRENT_TIMESTAMP,
 
             FOREIGN KEY (experiment_id) REFERENCES experiments(id)
         );
@@ -224,16 +258,16 @@ def init_engine_db(db_dir=dir) -> None:
     # PERFT tests
     perft_test_str = """
         CREATE TABLE IF NOT EXISTS perft (
-            id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-            experiment_id       INTEGER NOT NULL,
-            fen                 TEXT NOT NULL,
-            depth               INTEGER,
-            nodes               INTEGER,
-            expected_nodes      INTEGER,
-            correct             BOOLEAN,
-            time                REAL,
+            id                          INTEGER PRIMARY KEY AUTOINCREMENT,
+            experiment_id               INTEGER NOT NULL,
+            fen                         TEXT NOT NULL,
+            depth                       INTEGER,
+            nodes                       INTEGER,
+            expected_nodes              INTEGER,
+            correct                     BOOLEAN,
+            time_ms                     REAL,
 
-            ingestion_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            integestion_timestamp_utc   DATETIME DEFAULT CURRENT_TIMESTAMP,
 
             FOREIGN KEY (experiment_id) REFERENCES experiments(id)
         );

@@ -1,5 +1,6 @@
 import sqlite3
 from pathlib import Path
+import argparse
 
 def drop_all_tables(db_dir="F:/databases") -> None:
     """
@@ -69,4 +70,13 @@ def clear_all_tables(db_dir="F:/databases") -> None:
     cnxn.close()
 
 if __name__ == "__main__":
-    clear_all_tables()
+    # clear tables or drop tables
+    p = argparse.ArgumentParser(description="Clear and/or delete chess.db tables")
+    p.add_argument("--clear", action="store_true")
+    p.add_argument("--delete", action="store_true")
+    args = p.parse_args()
+
+    if args.clear:
+        clear_all_tables()
+    if args.delete:
+        drop_all_tables()

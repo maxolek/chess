@@ -3,7 +3,7 @@
 // looks for valid:
 // sliding moves, king moves, pins, captures, etc.
 
-#include "moveGenerator.h"
+#include <moveGenerator.h>
 
 MoveGenerator::MoveGenerator(const Board& _board) {
     // load movegen at given state
@@ -526,10 +526,6 @@ void MoveGenerator::updateAttackMapAndCheck(U64 attacks_bb, bool ours, int start
             pin_rays |= PrecomputedMoveData::rayMasks[start_square][sqidx(own&kings)];
         }
 
-        if (pin_rays & (1ULL << g8)) {
-            std::cout << "\n\nsquare: " << start_square << std::endl;
-            std::cout << "piece: " << piece_type << std::endl;
-        }
 
         // checks
         if (attacks_bb & (own & kings)) {

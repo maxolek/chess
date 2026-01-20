@@ -1,5 +1,5 @@
-#include "searcher.h"
-#include "engine.h"
+#include <searcher.h>
+#include <engine.h>
 #include <limits>
 #include <cstring>
 #include <cassert>
@@ -22,19 +22,24 @@ void Searcher::updatePV(std::vector<Move>& pv, const Move& move, const std::vect
 }
 
 // leaf node pruning
-bool Searcher::shouldPrune(Move& move, int standPat, int alpha) {
+bool Searcher::shouldPrune(Move& move, int standPat, int alpha, int ply) {
     int captured = board.getCapturedPiece(move.TargetSquare());
 
     // see pruning (excl promo and checks)
     if (captured != -1 && !move.IsPromotion() && !board.is_in_check) {
         int seeGain = eval.SEE(board, move);
-        if (seeGain < -50) return true;
+        if (seeGain < -50) {
+            STATS_PRUNE(ply, "see");
+            return true;
+        }
     }
 
     // delta purning
     if (captured != -1 && !move.IsPromotion() && !board.is_in_check) {
-        if (standPat + MAX_DELTA < alpha)
+        if (standPat + MAX_DELTA < alpha) {
+            STATS_PRUNE(ply, "delta");
             return true;
+        }
     }
 
     return false;
@@ -131,7 +136,7 @@ int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int 
     
     if (limits.out_of_time()) return alpha;
 
-        // draw detection
+    // draw detection
     if (board.isThreefold() || board.currentGameState.fiftyMoveCounter >= 50) {
         //engine.tt.store(board.zobrist_hash, depth, ply, 0, EXACT, Move::NullMove());
         return 0;
@@ -157,7 +162,7 @@ int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int 
 
     STATS_QNODE(ply); // macro unchanged
 
-    // generate only captures/promotions if your movegen supports that flag
+    // generate only captures/promotions 
     int count = engine.movegen->generateMoves(board, true);
     Move moves[MAX_MOVES];
     if (count == 0) {
@@ -173,7 +178,7 @@ int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int 
         if (limits.out_of_time()) break;
 
         Move m = moves[i];
-        if (shouldPrune(m, standPat, alpha)) continue;
+        if (shouldPrune(m, standPat, alpha, ply)) continue;
 
         // Apply NNUE incremental update then board move
         nnue.on_make_move(board, m);
@@ -186,7 +191,7 @@ int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int 
         nnue.on_unmake_move(board, m);
         board.UnmakeMove(m);
 
-        if (score >= beta) { STATS_FAILHIGH(ply); return beta; }
+        if (score >= beta) { STATS_FAILHIGH(ply, ""); return beta; }
         if (score > bestEval) {
             bestEval = score;
             bestMove = m;
@@ -225,7 +230,7 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
     TTEntry* ttEntry = engine.tt.probe(board.zobrist_hash);
 
     if (ttEntry && ttEntry->key == board.zobrist_hash && ttEntry->depth >= depth) {
-        STATS_TT_HIT(ply);
+        STATS_TT_HIT(ply, engine.tt);
         int ttScore = ttEntry->eval;
         if (ttScore > MATE_SCORE - 1000) ttScore -= ply;
         else if (ttScore < -MATE_SCORE + 1000) ttScore += ply;
@@ -269,8 +274,10 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
 
         alpha = std::max(alpha, bestEval);
         if (alpha >= beta) {
-            STATS_FAILHIGH(ply);
-            if (i == 0) STATS_INC(fail_high_first);
+            
+            if (i == 0) STATS_FAILHIGH(ply, "first");
+            else if (i >= count / 2) STATS_FAILHIGH(ply, "late");
+            else STATS_FAILHIGH(ply, "");
 
             if (!Move::SameMove(killerMoves[depth][0], m) && !m.IsPromotion() &&
                 !(1ULL << m.TargetSquare() & board.colorBitboards[1 - board.move_color])) {
@@ -288,7 +295,7 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
     else if (bestEval >= beta) { flag = LOWERBOUND; }
 
     engine.tt.store(board.zobrist_hash, depth, ply, bestEval, flag, bestMove);
-    STATS_TT_STORE(depth);
+    STATS_TT_STORE(depth, engine.tt);
 
     return bestEval;
 }

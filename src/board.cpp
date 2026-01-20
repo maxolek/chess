@@ -2,11 +2,11 @@
 // functions for move execution, undo, bitboards, Zobrist hashing, and FEN handling.
 
 // Includes
-#include "PrecomputedMoveData.h"
-#include "move.h"
-#include "gamestate.h"
-#include "board.h"
-#include "magics.h"
+#include <PrecomputedMoveData.h>
+#include <move.h>
+#include <gamestate.h>
+#include <board.h>
+#include <magics.h>
 
 // ------------------------------------------------------------
 // Constructors

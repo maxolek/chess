@@ -3,12 +3,12 @@
 #include <unordered_map>
 #include <string>
 #include <cstdint>
-#include "book.h"
-#include "helpers.h"
-#include "move.h"
+#include <book.h>
+#include <helpers.h>
+#include <move.h>
 
 
-bool PolyglotBook::load(const std::string &path) {
+bool PolyglotBook::load(const fs::path& path) {
     entries.clear();
     std::ifstream file(path, std::ios::binary);
     if (!file.is_open()) return false;

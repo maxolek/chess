@@ -1,6 +1,6 @@
 // Engine.cpp
-#include "engine.h"
-#include "searcher.h"
+#include <engine.h>
+#include <searcher.h>
 #include <iostream>
 #include <thread>
 #include <chrono>
@@ -146,7 +146,7 @@ void Engine::setOption(const std::string& name, const std::string& value) {
 
     // -------- books / paths --------
     else if (name == "opening_pst_file") {
-        options.opening_pst_path = "../bin/" + value + ".txt";
+        options.opening_pst_path = PROJECT_ROOT / fs::path("bin") / fs::path(value + ".txt");
         if(evaluator.loadEndgamePST(options.opening_pst_path)) {
             std::cout << "info string OpeningPST loaded successfully: " << options.opening_pst_path << std::endl;
         } else {
@@ -154,7 +154,7 @@ void Engine::setOption(const std::string& name, const std::string& value) {
         }
     }
     else if (name == "endgame_pst_file") {
-        options.endgame_pst_path = "../bin/" + value + ".txt";
+        options.endgame_pst_path = PROJECT_ROOT / fs::path("bin") / fs::path(value + ".txt");
         if(evaluator.loadEndgamePST(options.endgame_pst_path)) {
             std::cout << "info string EndgamePST loaded successfully: " << options.endgame_pst_path << std::endl;
         } else {
@@ -162,7 +162,7 @@ void Engine::setOption(const std::string& name, const std::string& value) {
         }
     }
     else if (name == "nnue_weight_file") {
-        options.nnue_weight_path = "../bin/nnue_wgts/" + value + ".bin";
+        options.nnue_weight_path = PROJECT_ROOT / fs::path("bin/nnue_wgts") / fs::path(value + ".bin");
         if (options.nnue) {
             if(evaluator.nnue.load(options.nnue_weight_path)) {
                 std::cout << "info string NNUE loaded successfully: " << options.nnue_weight_path << std::endl;
@@ -172,7 +172,7 @@ void Engine::setOption(const std::string& name, const std::string& value) {
         }
     }
     else if (name == "opening_book") {
-        options.opening_book_path = "../bin/" + value + ".bin"; // auto-construct full path
+        options.opening_book_path = PROJECT_ROOT / fs::path("bin") / fs::path(value + ".bin"); // auto-construct full path
 
         if (!value.empty()) {
             if (book.load(options.opening_book_path))
@@ -505,13 +505,8 @@ void Engine::iterativeDeepening() {
                                                    alpha, beta);
 
                 if (Logging::track_search_stats) {
-                    if ((int)g_stats.aspirationResearches.size() <= depth) {
-                        g_stats.aspirationResearches.resize(depth + 1);
-                    }
-
-                    auto &asp = g_stats.aspirationResearches[depth];
-                    if (result.eval <= alpha) asp.push_back(-1);
-                    else if (result.eval >= beta) asp.push_back(+1);
+                    if (result.eval <= alpha) STATS_ASPIRATION_FAILLOW(depth);
+                    else if (result.eval >= beta) STATS_ASPIRATION_FAILHIGH(depth);
                 }
 
                 if (result.eval <= alpha) alpha -= delta;
@@ -562,6 +557,7 @@ void Engine::iterativeDeepening() {
         g_stats.nps = elapsed > 0 ? (1000.0 * g_stats.nodes / elapsed) : 0.0;
         g_stats.rootEval = last_result.eval;
         g_stats.bestMove = last_result.bestMove;
+        g_stats.principal_variation = last_result.best_line.line;
 
         g_stats.ebf = pow(double(g_stats.nodes) / 1.0, 1.0 / g_stats.maxDepth); // rough estimate
         g_stats.qratio = double(g_stats.qnodes) / g_stats.nodes;
@@ -623,16 +619,18 @@ void Engine::newGame() {
     startNewSession();
     clearState();
     g_run_context.game_uuid = generate_uuid();
+    QueryPerformanceCounter(&g_game_start);
 
     tracker.playedMoves.clear();
     tracker.lastPositionHash = 0;
     tracker.active = true;
 
-    if (Logging::log_dir == Logging::DEFAULT_LOG_DIR) Logging::setLogDir("../logs/game_logs");
+    if (Logging::log_dir == Logging::DEFAULT_LOG_DIR) Logging::setLogDir(Logging::project_root / "logs/game_logs");
     g_gamelog = GameLog{};
     g_gamelog.startFEN = game_board.getBoardFEN();
 
     side = game_board.is_white_move ? EngineSide::WHITE : EngineSide::BLACK;
+    g_gamelog.side = game_board.is_white_move ? "white" : "black";
 
     game_board.setFromFEN(STARTPOS_FEN);
     search_board = game_board;
@@ -665,6 +663,8 @@ bool Engine::checkGameEnd() {
     }
 
     // finalize
+    QueryPerformanceCounter(&g_game_end);
+    g_gamelog.totalTimeSeconds = double(g_game_end.QuadPart - g_game_start.QuadPart) / double(Timer::freq());
     g_gamelog.moves = game_board.allGameMoves;
     g_gamelog.finalEval = evaluator.nnue.full_eval(game_board);
     logGameLog();
@@ -793,7 +793,7 @@ void Engine::staticEvalTest() {
     report.computeTapered(phase, evalWeights);
 
     std::cout << "=== Static Evaluation ===\n";
-    std::cout << "Phase: " << phase << " / 256\n";
+    std::cout << "Phase: " << phase << ") / 256\n";
     report.printDetailed(evalWeights);
 }
 
