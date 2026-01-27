@@ -242,12 +242,20 @@ def main(args=None):
 
     each_block = [
         "-each",
-        "proto=uci",
+        "proto=uci"
+    ]
+    log_a_block = [
         f"option.log_dir={args.logroot}",
         "option.timer_logging=true",
         "option.stats_logging=true",
         "option.game_logging=true",
         "option.uci_logging=true",
+    ]
+    log_b_block = [
+        "option.timer_logging=false",
+        "option.stats_logging=false",
+        "option.game_logging=false",
+        "option.uci_logging=false",
     ]
 
     # Time control
@@ -277,13 +285,15 @@ def main(args=None):
         "name=Candidate",
         f"cmd={engine_a}",
         f"dir={os.path.dirname(engine_a)}",
+    ] + log_a_block + [
 
         # Baseline engine
         "-engine",
         "name=Baseline",
         f"cmd={engine_b}",
         f"dir={os.path.dirname(engine_b)}",
-    ] + each_block + [
+    ] + log_b_block + each_block + [
+
         # SPRT
         "-maxmoves", "100",
         "-games", str(args.max_games),
@@ -292,8 +302,8 @@ def main(args=None):
         f"elo1={args.elo1}",
         f"alpha={args.alpha}",
         f"beta={args.beta}",
-        
     ] + book_block + [
+
         # Runtime
         "-repeat",
         "-concurrency", "2",

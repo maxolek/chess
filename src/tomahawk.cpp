@@ -6,47 +6,56 @@
 #include <iostream>
 #include <atomic>
 #include <thread>
-#include <windows.h>
-#include <unistd.h>
+
+#ifdef _WIN32
+    #include <windows.h>
+#else
+    #include <unistd.h>
+    #include <pthread.h>
+#endif
 
 // version name set at compile time
 #ifndef ENGINE_ID
 #define ENGINE_ID "unknown"
 #endif
 
-// set cpu affinity to ensure pcores not ecores are used for beter performance
+// ---------------------
+// CPU affinity
+// ---------------------
 void pin_to_pcores() {
-    // P-cores (0,1,6,7,8,9,18,19)
+#ifdef _WIN32
+    // Windows example: P-cores (0,1,6,7,8,9,18,19)
     DWORD_PTR mask = 0;
     mask |= (1ULL << 0);
-   // mask |= (1ULL << 1);
-    //mask |= (1ULL << 6);
-    //mask |= (1ULL << 7);
-    //mask |= (1ULL << 8);
-    //mask |= (1ULL << 9);
-    //mask |= (1ULL << 18);
-    //mask |= (1ULL << 19);
-
     HANDLE hProc = GetCurrentProcess();
-
     if (!SetProcessAffinityMask(hProc, mask)) 
         std::cerr << "Failed to set CPU affinity, error " << GetLastError() << "\n";
-    
+#else
+    // macOS/Linux: pin to core 0 for now (more complex topologies need sysconf/CPU_SETSIZE)
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(0, &cpuset);
+
+    pthread_t thread = pthread_self();
+    int s = pthread_setaffinity_np(thread, sizeof(cpu_set_t), &cpuset);
+    if (s != 0)
+        std::cerr << "Failed to set CPU affinity\n";
+#endif
 }
 
-// uci loop to allow continuous communication during game/search
+// ---------------------
+// UCI listening loop
+// ---------------------
 std::atomic<bool> keepListening(true);
+
 void listenLoop(UCI& uci) {
     std::string line;
     while (keepListening) {
         if (!std::getline(std::cin, line)) {
-            // End of input or error, stop listening
             keepListening = false;
             break;
         }
-        // Process the input line here
         uci.handleCommand(line);
-
         if (line == "quit") {
             keepListening = false;
             break;
@@ -54,20 +63,22 @@ void listenLoop(UCI& uci) {
     }
 }
 
-
+// ---------------------
+// main
+// ---------------------
 int main() {
-    // env
+    // environment
     pin_to_pcores();
-    initInstance(); // PID-based instance id
-    startNewSession(); // session=1
+    initInstance();      // PID-based instance id
+    startNewSession();   // session=1
 
     // inits
     Logging::initFiles();
     PrecomputedMoveData::init();
     Magics::initMagics();
 
-    // obj creation
-    Engine engine = Engine();
+    // engine
+    Engine engine;
     UCI uci(engine);
 
     // uci loop

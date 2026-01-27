@@ -11,22 +11,17 @@
 #include <stack>
 #include <unordered_map>
 #include <memory>
-#include <cstdlib>  
-#include <ctime>  
-#include <random> 
+#include <cstdlib>
+#include <ctime>
+#include <random>
 #include <cctype>
 #include <sstream>
 #include <chrono>
 #include <iomanip>
 #include <limits>
-#include <fstream>
-#include <iostream>
 #include <cstring>
-#include <algorithm>
 #include <cassert>
-#include <windows.h>
 #include <mutex>
-#include <objbase.h>
 
 typedef uint64_t U64;
 typedef unsigned short ushort;
@@ -76,26 +71,23 @@ extern std::string file_char;
 extern std::string results_string[];
 
 // uuid for keys in logging
-// generate v4 uuid
+// UUID v4 generator (cross-platform)
 inline std::string generate_uuid() {
-    GUID guid;
-    if (CoCreateGuid(&guid) != S_OK) {
-        throw std::runtime_error("Failed to generate GUID");
-    }
+    static std::random_device rd;
+    static std::mt19937_64 gen(rd());
+    static std::uniform_int_distribution<uint64_t> dis;
+
+    uint64_t part1 = dis(gen);
+    uint64_t part2 = dis(gen);
 
     std::ostringstream oss;
     oss << std::hex << std::setfill('0')
-        << std::setw(8) << guid.Data1 << "-"
-        << std::setw(4) << guid.Data2 << "-"
-        << std::setw(4) << guid.Data3 << "-"
-        << std::setw(2) << (int)guid.Data4[0]
-        << std::setw(2) << (int)guid.Data4[1] << "-"
-        << std::setw(2) << (int)guid.Data4[2]
-        << std::setw(2) << (int)guid.Data4[3]
-        << std::setw(2) << (int)guid.Data4[4]
-        << std::setw(2) << (int)guid.Data4[5]
-        << std::setw(2) << (int)guid.Data4[6]
-        << std::setw(2) << (int)guid.Data4[7];
+        << std::setw(8) << ((part1 >> 32) & 0xFFFFFFFF) << "-"
+        << std::setw(4) << ((part1 >> 16) & 0xFFFF) << "-"
+        << std::setw(4) << ((part1 >> 0) & 0xFFFF) << "-"
+        << std::setw(4) << ((part2 >> 48) & 0xFFFF) << "-"
+        << std::setw(12) << (part2 & 0xFFFFFFFFFFFFULL);
+
     return oss.str();
 }
 

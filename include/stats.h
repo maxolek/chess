@@ -20,64 +20,77 @@
 //      search stats
 // -------------------------
 
+// 3 layer structure
+//  1. full search summary 
+//      total nodes, total ttHits, final eval/move
+//  2. iterative deepening breakdown
+//      nodes, etc. on it_d = 4,5,6
+//  3. tree ply breakdown
+//      nodes, ttHits, etc. on tree ply (depth in search tree)
+//      multiple counts lower plies as it_deep will lead to searching ply < it_deep multiple times
+//      Qnodes are assigned to the search_depth ply 
+//          (e.g. if Qsearch is triggered at ply=6, all Q-stats are assigned to ply=6 even though Qsearch technically increases ply)
 struct SearchStats {
-    // General
-    int ply = 1;
+    //  results / env
+    int game_ply = 1;
+    int eval = 0;
+    Move move = Move::NullMove();
+    std::vector<Move> principal_variation;
+    uint64_t time_ms = 0;
+
+    // full summary
+    int max_completed_depth = 0;
+    int max_depth = 0;
+    int max_qdepth = 0;
     uint64_t nodes = 0;
     uint64_t qnodes = 0;
-    uint64_t ttHits = 0;
-    uint64_t ttStores = 0;
-    double ttFillRatio = 0.0; // snapshot at ply
-    uint64_t ttOverwritten = 0; // snapshot
-    uint64_t failHighs = 0;
-    uint64_t failLows = 0;
-
-    // pruning
-    uint64_t delta_prunes = 0;
+    uint64_t tt_hits = 0;
+    uint64_t tt_stores = 0;
+    double tt_fill_ratio = 0.0; // snapshot
+    uint64_t tt_overwritten = 0;
+    uint64_t fail_highs = 0;
+    uint64_t fail_lows = 0;
+    uint64_t fail_high_firsts = 0;
+    uint64_t fail_high_lates = 0;
+    uint64_t aspiration_fail_low_researches = 0;
+    uint64_t aspiration_fail_high_researches = 0;
     uint64_t see_prunes = 0;
+    uint64_t delta_prunes = 0;
 
-    // Root results
-    int rootEval = 0;
-    Move bestMove = Move::NullMove();
-    std::vector<Move> principal_variation;
+    // iterative depth (stats per depth of single search)
+    // tracks performance improvements across depths
+    std::vector<uint64_t> it_depth_time_ms;
+    std::vector<int> it_depth_eval;
+    std::vector<Move> it_depth_move;
+    //std::vector<std::vector<Move>> it_depth_pv;
+    std::vector<uint64_t> it_depth_nodes;
+    std::vector<uint64_t> it_depth_qnodes;
+    std::vector<uint64_t> it_depth_ttstores;
+    std::vector<uint64_t> it_depth_tthits;
+    std::vector<uint64_t> it_depth_ttfill;
+    std::vector<uint64_t> it_depth_fail_highs;
+    std::vector<uint64_t> it_depth_fail_lows;
+    std::vector<uint64_t> it_depth_fail_high_firsts;
+    std::vector<uint64_t> it_depth_fail_high_lates;
+    std::vector<uint64_t> it_depth_aspiration_failhigh_researches;
+    std::vector<uint64_t> it_depth_aspiration_faillow_researches;
+    std::vector<uint64_t> it_depth_see_prunes;
+    std::vector<uint64_t> it_depth_delta_prunes;
 
-    // Branching factors
-    double ebf = 0.0;
-    double qratio = 0.0;
-
-    // Aspiration window re-searches
-    int aspirationFailLow;
-    int aspirationFailHigh;
-
-    // Per-depth
-    int maxDepth = 0;
-    std::vector<uint64_t> depthSEEPrunes;
-    std::vector<uint64_t> depthDeltaPrunes;
-    std::vector<uint64_t> depthAspirationFailLowResearches;
-    std::vector<uint64_t> depthAspirationFailHighResearches;
-    std::vector<uint64_t> depthNodes;
-    std::vector<uint64_t> depthQNodes;
-    std::vector<uint64_t> depthFailHighs;
-    std::vector<uint64_t> depthFailLows;
-    std::vector<uint64_t> depthFailHighFirst;
-    std::vector<uint64_t> depthFailHighLate;
-    std::vector<uint64_t> depthTTHits;
-    std::vector<uint64_t> depthTTStores;
-    std::vector<double> timerPerDepthMS;
-    std::vector<Move> bestMovePerDepth;
-
-    // Move ordering
-    uint64_t fail_high_first = 0;
-    uint64_t fail_high_late = 0;
-    int bestmoveStable = 0;
-
-    // Timing
-    uint64_t timeMs = 0;
-    double nps = 0.0;
-
-    // Eval trajectory
-    std::vector<int> evalPerDepth;
-
+    // tree depth (stats per depth of search tree for single search)
+    //  this leads to multi-counting as it_depth searches d=1..it_depth tree depths
+    //  but this is where the actual work is done
+    //      so search improvements based on data may begin here
+    std::vector<uint64_t> tree_depth_nodes; 
+    std::vector<uint64_t> tree_depth_qnodes;
+    std::vector<uint64_t> tree_depth_ttstores;
+    std::vector<uint64_t> tree_depth_tthits;
+    std::vector<uint64_t> tree_depth_fail_highs;
+    std::vector<uint64_t> tree_depth_fail_lows;
+    std::vector<uint64_t> tree_depth_fail_high_firsts;
+    std::vector<uint64_t> tree_depth_fail_high_lates;
+    std::vector<uint64_t> tree_depth_see_prunes;
+    std::vector<uint64_t> tree_depth_delta_prunes;
 };
 
 // --- single header-only global instance ---
@@ -90,122 +103,146 @@ inline SearchStats g_stats{};
 #define STATS_ADD(field, val) \
     do { if (Logging::track_search_stats) g_stats.field += (val); } while(0)
 
-#define STATS_DEPTH_INIT(depth) \
-    do { \
-        if (Logging::track_search_stats) { \
-            if ((int)g_stats.depthNodes.size() <= (depth)) { \
-                g_stats.depthNodes.resize(depth + 1, 0); \
-                g_stats.depthQNodes.resize(depth + 1, 0); \
-                g_stats.depthFailHighs.resize(depth + 1, 0); \
-                g_stats.depthFailLows.resize(depth + 1, 0); \
-                g_stats.depthTTHits.resize(depth + 1, 0); \
-                g_stats.depthTTStores.resize(depth + 1, 0); \
-                g_stats.depthSEEPrunes.resize(depth + 1, 0); \
-                g_stats.depthDeltaPrunes.resize(depth + 1, 0); \
-                g_stats.depthFailHighFirst.resize(depth + 1, 0); \
-                g_stats.depthFailHighLate.resize(depth + 1, 0); \
-                g_stats.depthAspirationFailLowResearches.resize(depth + 1, 0); \
-                g_stats.depthAspirationFailHighResearches.resize(depth + 1, 0); \
-            } \
-        } \
-    } while(0)
+#define STATS_DEPTH_INIT(it_d, ply)                                  \
+    do {                                                            \
+        if (Logging::track_search_stats) {                          \
+            size_t it_size = it_d + 1;                              \
+            size_t ply_size = ply + 1;                               \
+            g_stats.it_depth_nodes.resize(std::max(it_size, g_stats.it_depth_nodes.size()), 0); \
+            g_stats.it_depth_qnodes.resize(std::max(it_size, g_stats.it_depth_qnodes.size()), 0); \
+            /*g_stats.it_depth_eval.resize(std::max(it_size, g_stats.it_depth_eval.size()), 0);*/ \
+            /*g_stats.it_depth_move.resize(std::max(it_size, g_stats.it_depth_move.size()), Move::NullMove());*/ \
+            g_stats.it_depth_ttstores.resize(std::max(it_size, g_stats.it_depth_ttstores.size()), 0); \
+            g_stats.it_depth_tthits.resize(std::max(it_size, g_stats.it_depth_tthits.size()), 0); \
+            g_stats.it_depth_fail_highs.resize(std::max(it_size, g_stats.it_depth_fail_highs.size()), 0); \
+            g_stats.it_depth_fail_lows.resize(std::max(it_size, g_stats.it_depth_fail_lows.size()), 0); \
+            g_stats.it_depth_fail_high_firsts.resize(std::max(it_size, g_stats.it_depth_fail_high_firsts.size()), 0); \
+            g_stats.it_depth_fail_high_lates.resize(std::max(it_size, g_stats.it_depth_fail_high_lates.size()), 0); \
+            g_stats.it_depth_aspiration_failhigh_researches.resize(std::max(it_size, g_stats.it_depth_aspiration_failhigh_researches.size()), 0); \
+            g_stats.it_depth_aspiration_faillow_researches.resize(std::max(it_size, g_stats.it_depth_aspiration_faillow_researches.size()), 0); \
+            g_stats.it_depth_see_prunes.resize(std::max(it_size, g_stats.it_depth_see_prunes.size()), 0); \
+            g_stats.it_depth_delta_prunes.resize(std::max(it_size, g_stats.it_depth_delta_prunes.size()), 0); \
+                                                                        \
+            g_stats.tree_depth_nodes.resize(std::max(ply_size, g_stats.tree_depth_nodes.size()), 0); \
+            g_stats.tree_depth_qnodes.resize(std::max(ply_size, g_stats.tree_depth_qnodes.size()), 0); \
+            g_stats.tree_depth_ttstores.resize(std::max(ply_size, g_stats.tree_depth_ttstores.size()), 0); \
+            g_stats.tree_depth_tthits.resize(std::max(ply_size, g_stats.tree_depth_tthits.size()), 0); \
+            g_stats.tree_depth_fail_highs.resize(std::max(ply_size, g_stats.tree_depth_fail_highs.size()), 0); \
+            g_stats.tree_depth_fail_lows.resize(std::max(ply_size, g_stats.tree_depth_fail_lows.size()), 0); \
+            g_stats.tree_depth_fail_high_firsts.resize(std::max(ply_size, g_stats.tree_depth_fail_high_firsts.size()), 0); \
+            g_stats.tree_depth_fail_high_lates.resize(std::max(ply_size, g_stats.tree_depth_fail_high_lates.size()), 0); \
+            g_stats.tree_depth_see_prunes.resize(std::max(ply_size, g_stats.tree_depth_see_prunes.size()), 0); \
+            g_stats.tree_depth_delta_prunes.resize(std::max(ply_size, g_stats.tree_depth_delta_prunes.size()), 0); \
+        }                                                           \
+    } while (0)
 
-#define STATS_ENTER(depth) \
-    do { \
-        if (Logging::track_search_stats) { \
-            STATS_DEPTH_INIT(depth); \
-            g_stats.depthNodes[depth]++; \
-            g_stats.nodes++; \
-        } \
-    } while(0)
+#define STATS_NODE(it_d, ply)                                \
+    do {                                                    \
+        if (Logging::track_search_stats) {                  \
+            STATS_DEPTH_INIT(it_d, ply);                    \
+            g_stats.nodes++;                                \
+            g_stats.it_depth_nodes[it_d]++;                 \
+            g_stats.tree_depth_nodes[ply]++;                \
+        }                                                   \
+    } while (0)
 
-#define STATS_QNODE(depth) \
-    do { \
-        if (Logging::track_search_stats) { \
-            STATS_DEPTH_INIT(depth); \
-            g_stats.depthQNodes[depth]++; \
-            g_stats.qnodes++; \
-        } \
-    } while(0)
+#define STATS_QNODE(it_d, ply)                               \
+    do {                                                    \
+        if (Logging::track_search_stats) {                  \
+            STATS_DEPTH_INIT(it_d, it_d);                    \
+            g_stats.qnodes++;                               \
+            g_stats.it_depth_qnodes[it_d]++;                \
+            g_stats.tree_depth_qnodes[it_d]++;               \
+            g_stats.max_qdepth = std::max(g_stats.max_qdepth, ply); \
+        }                                                   \
+    } while (0)
 
 #define STATS_ASPIRATION_FAILLOW(depth) \
     do { \
         if (Logging::track_search_stats) { \
-            STATS_DEPTH_INIT(depth); \
-            g_stats.aspirationFailLow++; \
-            g_stats.depthAspirationFailLowResearches[depth]++; \
+            STATS_DEPTH_INIT(depth, 0); \
+            g_stats.aspiration_fail_low_researches++; \
+            g_stats.it_depth_aspiration_faillow_researches[depth]++; \
         } \
     } while(0)
 
 #define STATS_ASPIRATION_FAILHIGH(depth) \
     do { \
         if (Logging::track_search_stats) { \
-            STATS_DEPTH_INIT(depth); \
-            g_stats.aspirationFailHigh++; \
-            g_stats.depthAspirationFailHighResearches[depth]++; \
+            STATS_DEPTH_INIT(depth, 0); \
+            g_stats.aspiration_fail_high_researches++; \
+            g_stats.it_depth_aspiration_failhigh_researches[depth]++; \
         } \
     } while(0)
 
-#define STATS_FAILHIGH(depth, flag) \
-    do { \
-        if (Logging::track_search_stats) { \
-            STATS_DEPTH_INIT(depth); \
-            g_stats.depthFailHighs[depth]++; \
-            g_stats.failHighs++; \
-            if (flag == "first") { \
-                g_stats.fail_high_first++; \
-                g_stats.depthFailHighFirst[depth]++; \
-            } else if (flag == "late") { \
-                g_stats.fail_high_late++; \
-                g_stats.depthFailHighLate[depth]++; \
-            } \
-        } \
-    } while(0)
+#define STATS_FAILHIGH(it_d, ply, first)                     \
+    do {                                                    \
+        if (Logging::track_search_stats) {                  \
+            STATS_DEPTH_INIT(it_d, ply);                    \
+            g_stats.fail_highs++;                           \
+            g_stats.it_depth_fail_highs[it_d]++;            \
+            g_stats.tree_depth_fail_highs[ply]++;           \
+            if (first) {                                    \
+                g_stats.fail_high_firsts++;                 \
+                g_stats.it_depth_fail_high_firsts[it_d]++;  \
+                g_stats.tree_depth_fail_high_firsts[ply]++; \
+            } else {                                        \
+                g_stats.fail_high_lates++;                  \
+                g_stats.it_depth_fail_high_lates[it_d]++;   \
+                g_stats.tree_depth_fail_high_lates[ply]++;  \
+            }                                               \
+        }                                                   \
+    } while (0)
 
-#define STATS_FAILLOW(depth) \
-    do { \
-        if (Logging::track_search_stats) { \
-            STATS_DEPTH_INIT(depth); \
-            g_stats.depthFailLows[depth]++; \
-            g_stats.failLows++; \
-        } \
-    } while(0)
+#define STATS_FAILLOW(it_d, ply)                             \
+    do {                                                    \
+        if (Logging::track_search_stats) {                  \
+            STATS_DEPTH_INIT(it_d, ply);                    \
+            g_stats.fail_lows++;                            \
+            g_stats.it_depth_fail_lows[it_d]++;             \
+            g_stats.tree_depth_fail_lows[ply]++;            \
+        }                                                   \
+    } while (0)
 
-#define STATS_TT_HIT(depth, tt_ref) \
-    do { \
-        if (Logging::track_search_stats) { \
-            STATS_DEPTH_INIT(depth); \
-            g_stats.depthTTHits[depth]++; \
-            g_stats.ttHits++; \
-            /*g_stats.ttFillRatio = (tt_ref).fillRatio();*/ /* snapshot */ \
-            /*g_stats.ttOverwritten = (tt_ref).stats.overwritten;*/ \
-        } \
-    } while(0)
+#define STATS_TT_HIT(it_d, ply)                              \
+    do {                                                    \
+        if (Logging::track_search_stats) {                  \
+            STATS_DEPTH_INIT(it_d, ply);                    \
+            g_stats.tt_hits++;                              \
+            g_stats.it_depth_tthits[it_d]++;                \
+            g_stats.tree_depth_tthits[ply]++;               \
+        }                                                   \
+    } while (0)
 
-#define STATS_TT_STORE(depth, tt_ref) \
-    do { \
-        if (Logging::track_search_stats) { \
-            STATS_DEPTH_INIT(depth); \
-            g_stats.depthTTStores[depth]++; \
-            g_stats.ttStores++; \
-            /*g_stats.ttFillRatio = (tt_ref).fillRatio();*/ \
-            /*g_stats.ttOverwritten = (tt_ref).stats.overwritten;*/ \
-        } \
-    } while(0)
+#define STATS_TT_STORE(it_d, ply)                            \
+    do {                                                    \
+        if (Logging::track_search_stats) {                  \
+            STATS_DEPTH_INIT(it_d, ply);                    \
+            g_stats.tt_stores++;                            \
+            g_stats.it_depth_ttstores[it_d]++;              \
+            g_stats.tree_depth_ttstores[ply]++;             \
+        }                                                   \
+    } while (0)
 
-#define STATS_PRUNE(depth, type) \
-    do { \
-        if (Logging::track_search_stats) { \
-            STATS_DEPTH_INIT(depth); \
-            if (type == "see") { \
-                g_stats.see_prunes++; \
-                g_stats.depthSEEPrunes[depth]++; \
-            } else if (type == "delta") { \
-                g_stats.delta_prunes++; \
-                g_stats.depthDeltaPrunes[depth]++; \
-            } \
-        } \
-    } while(0)
+#define STATS_SEE_PRUNE(it_d, ply)                           \
+    do {                                                    \
+        if (Logging::track_search_stats) {                  \
+            STATS_DEPTH_INIT(it_d, ply);                    \
+            g_stats.see_prunes++;                           \
+            g_stats.it_depth_see_prunes[it_d]++;            \
+            g_stats.tree_depth_see_prunes[ply]++;           \
+        }                                                   \
+    } while (0)
+
+#define STATS_DELTA_PRUNE(it_d, ply)                         \
+    do {                                                    \
+        if (Logging::track_search_stats) {                  \
+            STATS_DEPTH_INIT(it_d, ply);                    \
+            g_stats.delta_prunes++;                         \
+            g_stats.it_depth_delta_prunes[it_d]++;          \
+            g_stats.tree_depth_delta_prunes[ply]++;         \
+        }                                                   \
+    } while (0)
 
 // -------------------------
 //      Logging Functions
@@ -217,8 +254,18 @@ inline void logSearchStats(const std::string& fen = "") {
     static std::ofstream out(Logging::log_dir / "search.jsonl", std::ios::app);
     if (!out.is_open()) return;
 
-    // helpers
     auto vec_to_json = [](const auto& v) {
+        std::ostringstream oss;
+        oss << "[";
+        for (size_t i = 1; i < v.size(); ++i) {
+            if (i > 1) oss << ",";
+            oss << v[i];
+        }
+        oss << "]";
+        return oss.str();
+    };
+
+    auto vec_to_json_itdp_summary = [](const auto& v) {
         std::ostringstream oss;
         oss << "[";
         for (size_t i = 0; i < v.size(); ++i) {
@@ -229,23 +276,7 @@ inline void logSearchStats(const std::string& fen = "") {
         return oss.str();
     };
 
-    auto nested_vec_to_json = [](const auto& vv) {
-        std::ostringstream oss;
-        oss << "[";
-        for (size_t i = 0; i < vv.size(); ++i) {
-            if (i) oss << ",";
-            oss << "[";
-            for (size_t j = 0; j < vv[i].size(); ++j) {
-                if (j) oss << ",";
-                oss << vv[i][j];
-            }
-            oss << "]";
-        }
-        oss << "]";
-        return oss.str();
-    };
-
-    auto moves_to_json = [](const auto& v) {
+    auto moves_to_json = [](const std::vector<Move>& v) {
         std::ostringstream oss;
         oss << "[";
         for (size_t i = 0; i < v.size(); ++i) {
@@ -256,7 +287,6 @@ inline void logSearchStats(const std::string& fen = "") {
         return oss.str();
     };
 
-    // single JSONL object
     out << "{"
         << "\"engine_id\":\"" << ENGINE_ID << "\","
         << "\"instance_id\":" << instanceID() << ","
@@ -265,48 +295,67 @@ inline void logSearchStats(const std::string& fen = "") {
         << "\"game_uuid\":\"" << g_run_context.game_uuid << "\","
         << "\"search_uuid\":\"" << g_run_context.search_uuid << "\","
         << "\"fen\":\"" << fen << "\","
-        << "\"ply\":" << g_stats.ply << ","
+        << "\"ply\":" << g_stats.game_ply << ","
+
         << "\"nodes\":" << g_stats.nodes << ","
         << "\"qnodes\":" << g_stats.qnodes << ","
-        << "\"tt_hits\":" << g_stats.ttHits << ","
-        << "\"tt_stores\":" << g_stats.ttStores << ","
-        << "\"tt_fill\":" << g_stats.ttFillRatio << ","
-        << "\"tt_overwritten\":" << g_stats.ttOverwritten << ","
-        << "\"fail_highs\":" << g_stats.failHighs << ","
-        << "\"fail_lows\":" << g_stats.failLows << ","
-        << "\"fail_high_first\":" << g_stats.fail_high_first << ","
-        << "\"fail_high_late\":" << g_stats.fail_high_late << ","
-        << "\"ebf\":" << g_stats.ebf << ","
-        << "\"qratio\":" << g_stats.qratio << ","
-        << "\"max_depth\":" << g_stats.maxDepth << ","
-        << "\"time_ms\":" << g_stats.timeMs << ","
-        << "\"nps\":" << g_stats.nps << ","
-        << "\"root_eval\":" << g_stats.rootEval << ","
-        << "\"best_move\":\"" << g_stats.bestMove.uci() << "\","
-        << "\"principal_variation\":" << moves_to_json(g_stats.principal_variation) << ","
+        << "\"tt_hits\":" << g_stats.tt_hits << ","
+        << "\"tt_stores\":" << g_stats.tt_stores << ","
+        << "\"tt_fill\":" << g_stats.tt_fill_ratio << ","
+        << "\"tt_overwritten\":" << g_stats.tt_overwritten << ","
+
+        << "\"fail_highs\":" << g_stats.fail_highs << ","
+        << "\"fail_lows\":" << g_stats.fail_lows << ","
+        << "\"fail_high_first\":" << g_stats.fail_high_firsts << ","
+        << "\"fail_high_late\":" << g_stats.fail_high_lates << ","
+
         << "\"delta_prunes\":" << g_stats.delta_prunes << ","
         << "\"see_prunes\":" << g_stats.see_prunes << ","
-        << "\"depthNodes\":" << vec_to_json(g_stats.depthNodes) << ","
-        << "\"depthQNodes\":" << vec_to_json(g_stats.depthQNodes) << ","
-        << "\"depthFailHighs\":" << vec_to_json(g_stats.depthFailHighs) << ","
-        << "\"depthFailLows\":" << vec_to_json(g_stats.depthFailLows) << ","
-        << "\"depthTTHits\":" << vec_to_json(g_stats.depthTTHits) << ","
-        << "\"depthTTStores\":" << vec_to_json(g_stats.depthTTStores) << ","
-        << "\"depthSEEPrunes\":" << vec_to_json(g_stats.depthSEEPrunes) << ","
-        << "\"depthDeltaPrunes\":" << vec_to_json(g_stats.depthDeltaPrunes) << ","
-        << "\"aspirationFailLowResearches\":" << g_stats.aspirationFailLow << ","
-        << "\"aspirationFailHighResearches\":" << g_stats.aspirationFailHigh << ","
-        << "\"depthAspirationFailLowResearches\":" << vec_to_json(g_stats.depthAspirationFailLowResearches) << ","
-        << "\"depthAspirationFailHighResearches\":" << vec_to_json(g_stats.depthAspirationFailHighResearches) << ","
-        << "\"depthFailHighFirst\":" << vec_to_json(g_stats.depthFailHighFirst) << ","
-        << "\"depthFailHighLate\":" << vec_to_json(g_stats.depthFailHighLate) << ","
-        << "\"evalPerDepth\":" << vec_to_json(g_stats.evalPerDepth) << ","
-        << "\"bestMovePerDepth\":" << moves_to_json(g_stats.bestMovePerDepth) << ","
-        << "\"timeOnDepthMS\":" << vec_to_json(g_stats.timerPerDepthMS)
+        << "\"aspiration_fail_low_researches\":" << g_stats.aspiration_fail_low_researches << ","
+        << "\"aspiration_fail_high_researches\":" << g_stats.aspiration_fail_high_researches << ","
+
+        << "\"max_depth\":" << g_stats.max_depth << ","
+        << "\"max_qdepth\":" << g_stats.max_qdepth << ","
+        << "\"completed_depth\":" << g_stats.max_completed_depth << ","
+        << "\"time_ms\":" << g_stats.time_ms << ","
+        << "\"root_eval\":" << g_stats.eval << ","
+        << "\"best_move\":\"" << g_stats.move.uci() << "\","
+        << "\"principal_variation\":" << moves_to_json(g_stats.principal_variation) << ","
+
+        // iteration stats
+        << "\"itdepth_time_ms\":" << vec_to_json_itdp_summary(g_stats.it_depth_time_ms) << ","
+        << "\"itdepth_eval\":" << vec_to_json_itdp_summary(g_stats.it_depth_eval) << ","
+        << "\"itdepth_move\":" << moves_to_json(g_stats.it_depth_move) << ","
+        << "\"itdepth_nodes\":" << vec_to_json(g_stats.it_depth_nodes) << ","
+        << "\"itdepth_qnodes\":" << vec_to_json(g_stats.it_depth_qnodes) << ","
+        << "\"itdepth_tthits\":" << vec_to_json(g_stats.it_depth_tthits) << ","
+        << "\"itdepth_ttstores\":" << vec_to_json(g_stats.it_depth_ttstores) << ","
+        << "\"itdepth_fail_highs\":" << vec_to_json(g_stats.it_depth_fail_highs) << ","
+        << "\"itdepth_fail_lows\":" << vec_to_json(g_stats.it_depth_fail_lows) << ","
+        << "\"itdepth_fail_high_firsts\":" << vec_to_json(g_stats.it_depth_fail_high_firsts) << ","
+        << "\"itdepth_fail_high_lates\":" << vec_to_json(g_stats.it_depth_fail_high_lates) << ","
+        << "\"itdepth_aspiration_failhigh_researches\":" << vec_to_json(g_stats.it_depth_aspiration_failhigh_researches) << ","
+        << "\"itdepth_aspiration_faillow_researches\":" << vec_to_json(g_stats.it_depth_aspiration_faillow_researches) << ","
+        << "\"itdepth_see_prunes\":" << vec_to_json(g_stats.it_depth_see_prunes) << ","
+        << "\"itdepth_delta_prunes\":" << vec_to_json(g_stats.it_depth_delta_prunes) << ","
+
+        // tree ply stats
+        << "\"treedepth_nodes\":" << vec_to_json(g_stats.tree_depth_nodes) << ","
+        << "\"treedepth_qnodes\":" << vec_to_json(g_stats.tree_depth_qnodes) << ","
+        << "\"treedepth_tt_hits\":" << vec_to_json(g_stats.tree_depth_tthits) << ","
+        << "\"treedepth_tt_stores\":" << vec_to_json(g_stats.tree_depth_ttstores) << ","
+        << "\"treedepth_fail_highs\":" << vec_to_json(g_stats.tree_depth_fail_highs) << ","
+        << "\"treedepth_fail_lows\":" << vec_to_json(g_stats.tree_depth_fail_lows) << ","
+        << "\"treedepth_fail_high_firsts\":" << vec_to_json(g_stats.tree_depth_fail_high_firsts) << ","
+        << "\"treedepth_fail_high_lates\":" << vec_to_json(g_stats.tree_depth_fail_high_lates) << ","
+        << "\"treedepth_see_prunes\":" << vec_to_json(g_stats.tree_depth_see_prunes) << ","
+        << "\"treedepth_delta_prunes\":" << vec_to_json(g_stats.tree_depth_delta_prunes)
+
         << "}\n";
 
     out.flush();
 }
+
 
 
 // -------------------------

@@ -29,7 +29,7 @@ bool Searcher::shouldPrune(Move& move, int standPat, int alpha, int ply) {
     if (captured != -1 && !move.IsPromotion() && !board.is_in_check) {
         int seeGain = eval.SEE(board, move);
         if (seeGain < -50) {
-            STATS_PRUNE(ply, "see");
+            STATS_SEE_PRUNE(ply, ply);
             return true;
         }
     }
@@ -37,7 +37,7 @@ bool Searcher::shouldPrune(Move& move, int standPat, int alpha, int ply) {
     // delta purning
     if (captured != -1 && !move.IsPromotion() && !board.is_in_check) {
         if (standPat + MAX_DELTA < alpha) {
-            STATS_PRUNE(ply, "delta");
+            STATS_DELTA_PRUNE(ply, ply);
             return true;
         }
     }
@@ -131,7 +131,7 @@ int Searcher::generateAndOrderMoves(Move moves[MAX_MOVES], int ply, const std::v
 // QUIESCENCE SEARCH
 // ============================================================================
 
-int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int ply, int depth) {
+int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int ply, int depth, int search_depth) {
     ScopedTimer timer(T_QSEARCH);
     
     if (limits.out_of_time()) return alpha;
@@ -160,7 +160,7 @@ int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int 
 
     //return standPat;
 
-    STATS_QNODE(ply); // macro unchanged
+    STATS_QNODE(search_depth, ply); // macro unchanged
 
     // generate only captures/promotions 
     int count = engine.movegen->generateMoves(board, true);
@@ -178,20 +178,25 @@ int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int 
         if (limits.out_of_time()) break;
 
         Move m = moves[i];
-        if (shouldPrune(m, standPat, alpha, ply)) continue;
+        if (shouldPrune(m, standPat, alpha, search_depth)) continue;
 
         // Apply NNUE incremental update then board move
         nnue.on_make_move(board, m);
         board.MakeMove(m);
 
         int score; PV childPV;
-        score = -quiescence(-beta, -alpha, childPV, limits, ply+1, depth);
+        score = -quiescence(-beta, -alpha, childPV, limits, ply+1, depth, search_depth);
 
         // Undo board & NNUE (capture before must be reconstructed from states)
         nnue.on_unmake_move(board, m);
         board.UnmakeMove(m);
 
-        if (score >= beta) { STATS_FAILHIGH(ply, ""); return beta; }
+        if (score >= beta) { 
+            if (i == 0) STATS_FAILHIGH(search_depth, search_depth, "first");
+            else if (i >= count / 2) STATS_FAILHIGH(search_depth, search_depth, "late");
+            else STATS_FAILHIGH(search_depth, search_depth, ""); 
+            return beta; 
+        }
         if (score > bestEval) {
             bestEval = score;
             bestMove = m;
@@ -202,6 +207,7 @@ int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int 
 
     // store best capture or draw
     engine.tt.store(board.zobrist_hash, depth, ply, bestEval, EXACT, bestMove);
+    STATS_TT_STORE(search_depth, search_depth);
 
     return bestEval;
 }
@@ -212,7 +218,7 @@ int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int 
 
 int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
                       std::vector<Move>& previousPV, SearchLimits& limits, int ply, bool use_quiescence) {
-    STATS_ENTER(ply); // track node per depth
+    STATS_NODE(depth+ply, ply); // track node per depth
     ScopedTimer timer(T_SEARCH);
     if (limits.out_of_time()) return alpha;
 
@@ -223,14 +229,14 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
     }
 
     if (depth == 0) {
-        return use_quiescence ? quiescence(alpha, beta, pv, limits, ply, depth) : nnue.evaluate(board.is_white_move);
+        return use_quiescence ? quiescence(alpha, beta, pv, limits, ply, depth, ply) : nnue.evaluate(board.is_white_move);
     }
 
     int alphaOrig = alpha;
     TTEntry* ttEntry = engine.tt.probe(board.zobrist_hash);
 
     if (ttEntry && ttEntry->key == board.zobrist_hash && ttEntry->depth >= depth) {
-        STATS_TT_HIT(ply, engine.tt);
+        STATS_TT_HIT(depth+ply, ply);
         int ttScore = ttEntry->eval;
         if (ttScore > MATE_SCORE - 1000) ttScore -= ply;
         else if (ttScore < -MATE_SCORE + 1000) ttScore += ply;
@@ -275,9 +281,9 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
         alpha = std::max(alpha, bestEval);
         if (alpha >= beta) {
             
-            if (i == 0) STATS_FAILHIGH(ply, "first");
-            else if (i >= count / 2) STATS_FAILHIGH(ply, "late");
-            else STATS_FAILHIGH(ply, "");
+            if (i == 0) STATS_FAILHIGH(depth+ply, ply, "first");
+            else if (i >= count / 2) STATS_FAILHIGH(depth+ply, ply, "late");
+            else STATS_FAILHIGH(depth+ply, ply, "");
 
             if (!Move::SameMove(killerMoves[depth][0], m) && !m.IsPromotion() &&
                 !(1ULL << m.TargetSquare() & board.colorBitboards[1 - board.move_color])) {
@@ -291,11 +297,11 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
     }
 
     BoundType flag = EXACT;
-    if (bestEval <= alphaOrig) { flag = UPPERBOUND; STATS_FAILLOW(ply); }
+    if (bestEval <= alphaOrig) { flag = UPPERBOUND; STATS_FAILLOW(depth+ply, ply); }
     else if (bestEval >= beta) { flag = LOWERBOUND; }
 
     engine.tt.store(board.zobrist_hash, depth, ply, bestEval, flag, bestMove);
-    STATS_TT_STORE(depth, engine.tt);
+    STATS_TT_STORE(depth+ply, ply);
 
     return bestEval;
 }
@@ -322,7 +328,8 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
         //std::cout << "------" << std::endl; m.PrintMove(); std::cout << "------" << std::endl;
 
         int eval; PV childPV;
-        eval = -negamax(depth - 1, -MATE_SCORE, MATE_SCORE, childPV, previousPV, limits, 0, true);
+        STATS_NODE(depth, 1);
+        eval = -negamax(depth - 1, -MATE_SCORE, MATE_SCORE, childPV, previousPV, limits, 1, true);
 
         // Undo
         //nnue->debug_check_incr_vs_full_after_unmake(board, m, *nnue);
@@ -370,8 +377,8 @@ SearchResult Searcher::searchAspiration(Move legal_moves[MAX_MOVES], int count, 
         board.MakeMove(m);
 
         int eval; PV childPV;
-        STATS_ENTER(depth);
-        eval = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, 0, true);
+        STATS_NODE(depth, 1);
+        eval = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, 1, true);
 
         nnue.on_unmake_move(board, m);
         board.UnmakeMove(m);

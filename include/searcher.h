@@ -103,7 +103,8 @@ public:
         PV& pv,
         SearchLimits& limits,
         int ply,
-        int depth
+        int depth,
+        int search_depth
     );
 
     // ------------------------------- Ordering & Scoring -------------------------------

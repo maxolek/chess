@@ -16,7 +16,8 @@ def drop_all_tables(db_dir="F:/databases") -> None:
 
     tables = [
         "timing",
-        "searches_by_depth",
+        "searches_by_iteration",
+        "searches_by_tree_depth",
         "searches",
         "games",
         "sprt",
@@ -48,7 +49,8 @@ def clear_all_tables(db_dir="F:/databases") -> None:
 
     tables = [
         "timing",
-        "searches_by_depth",
+        "searches_by_iteration",
+        "searches_by_tree_depth",
         "searches",
         "games",
         "sprt",

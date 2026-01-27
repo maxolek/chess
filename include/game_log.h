@@ -11,8 +11,10 @@
 #include "logging.h"
 #include <vector>
 
+inline std::chrono::steady_clock::time_point g_game_start_time;
+inline std::chrono::steady_clock::time_point g_game_end_time;
 
-enum class GameResult { ONGOING, WIN, LOSS, DRAW , ABORTED };
+enum class GameResult { ONGOING, WHITE_WIN, BLACK_WIN, DRAW, ABORTED };
 enum class GameEndReason {
     NONE,
     CHECKMATE,
@@ -75,11 +77,17 @@ inline void logGameLog() {
     }
     out << "],";
 
-    out << "\"nodes\":" << g_gamelog.totalNodes << ","
-        << "\"qnodes\":" << g_gamelog.totalQNodes << ","
-        << "\"time_s\":" << g_gamelog.totalTimeSeconds << ","
-        << "\"avg_nps\":" << g_gamelog.avgNPS << ","
-        << "\"start_fen\":\"" << g_gamelog.startFEN << "\""
+    out << "\"time_s\":" << g_gamelog.totalTimeSeconds << ","
+        << "\"start_fen\":\"" << g_gamelog.startFEN << "\",";
+
+    out << "\"wtime\":" << g_gamelog.wtime << ","
+        << "\"btime\":" << g_gamelog.btime << ","
+        << "\"winc\":" << g_gamelog.winc << ","
+        << "\"binc\":" << g_gamelog.binc << ","
+        << "\"movestogo\":" << g_gamelog.movestogo << ","
+        << "\"depth\":" << g_gamelog.depth << ","
+        << "\"nodes\":" << g_gamelog.nodes << ","
+        << "\"movetime\":" << g_gamelog.movetime
         << "}\n";
 
     out.flush();

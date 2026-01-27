@@ -45,7 +45,7 @@ def init_engine_db(db_dir=dir) -> None:
             compile_flags               TEXT,
             uci_options                 TEXT, 
 
-            integestion_timestamp_utc   DATETIME DEFAULT CURRENT_TIMESTAMP
+            ingestion_timestamp_utc   DATETIME DEFAULT CURRENT_TIMESTAMP
         );
     """
 
@@ -80,11 +80,12 @@ def init_engine_db(db_dir=dir) -> None:
             time_ms                     REAL,
             eval                        INTEGER,
             depth                       INTEGER,
+            qdepth                      INTEGER, -- depth reached through quiescence (leaf extension of search depth ^^)
             move                        TEXT,
             principal_variation         TEXT,
         -- stats
             nodes                       INTEGER,
-            q_nodes                     INTEGER,
+            qnodes                      INTEGER,
             tt_stores                   INTEGER,
             tt_hits                     INTEGER,
             tt_fill                     REAL,
@@ -98,7 +99,7 @@ def init_engine_db(db_dir=dir) -> None:
             see_prunes                  INTEGER,
             delta_prunes                INTEGER,
 
-            integestion_timestamp_utc   DATETIME DEFAULT CURRENT_TIMESTAMP,
+            ingestion_timestamp_utc     DATETIME DEFAULT CURRENT_TIMESTAMP,
             
             FOREIGN KEY (engine_id) REFERENCES engines(id),
             FOREIGN KEY (game_id) REFERENCES games(id),
@@ -106,9 +107,9 @@ def init_engine_db(db_dir=dir) -> None:
         );
     """
 
-    # per-depth search info
+    # per-iteration-depth search info
     search_depth_stats_str = """
-        CREATE TABLE IF NOT EXISTS searches_by_depth (
+        CREATE TABLE IF NOT EXISTS searches_by_iteration (
         -- metadata
             search_id                   INTEGER NOT NULL,
             depth                       INTEGER NOT NULL,
@@ -118,7 +119,8 @@ def init_engine_db(db_dir=dir) -> None:
             move                        TEXT,
         -- stats
             nodes                       INTEGER,
-            q_nodes                     INTEGER,
+            qnodes                      INTEGER,
+            qdepth                      INTEGER,
             tt_stores                   INTEGER,
             tt_hits                     INTEGER,
             tt_fill                     REAL,
@@ -132,8 +134,35 @@ def init_engine_db(db_dir=dir) -> None:
             see_prunes                  INTEGER,
             delta_prunes                INTEGER,
 
-            integestion_timestamp_utc   DATETIME DEFAULT CURRENT_TIMESTAMP,
+            ingestion_timestamp_utc     DATETIME DEFAULT CURRENT_TIMESTAMP,
             
+            PRIMARY KEY (search_id, depth),
+            FOREIGN KEY (search_id) REFERENCES searches(id)
+        );
+    """
+
+    # per-search_tree-ply search info
+    search_ply_stats_str = """
+        CREATE TABLE IF NOT EXISTS searches_by_tree_depth (
+        --metadata
+            search_id                   INTEGER NOT NULL,
+            depth                       INTEGER NOT NULL,
+            --time_ms                     REAL,
+        -- stats
+            nodes                       INTEGER,
+            qnodes                      INTEGER,
+            tt_stores                   INTEGER,
+            tt_hits                     INTEGER,
+            --tt_fill                     REAL,
+            fail_highs                  INTEGER,
+            fail_lows                   INTEGER,
+            fail_high_first             INTEGER,
+            fail_high_late              INTEGER,
+            see_prunes                  INTEGER,
+            delta_prunes                INTEGER,
+
+            ingestion_timestamp_utc     DATETIME DEFAULT CURRENT_TIMESTAMP,
+
             PRIMARY KEY (search_id, depth),
             FOREIGN KEY (search_id) REFERENCES searches(id)
         );
@@ -147,7 +176,7 @@ def init_engine_db(db_dir=dir) -> None:
             total_time_ms               REAL,
             num_calls                   INTEGER,
 
-            integestion_timestamp_utc   DATETIME DEFAULT CURRENT_TIMESTAMP,
+            ingestion_timestamp_utc   DATETIME DEFAULT CURRENT_TIMESTAMP,
 
             PRIMARY KEY (search_id, function),
             FOREIGN KEY (search_id) REFERENCES searches(id)
@@ -163,9 +192,14 @@ def init_engine_db(db_dir=dir) -> None:
             white_engine_id             INTEGER NULL, -- nullable since may not have 2 local engines playing (e.g. lichess games)
             black_engine_id             INTEGER NULL,
         -- info
-            time_control                TEXT,
-            time_per_move               REAL,
-            depth_per_move              INTEGER,
+            wtime                       INTEGER,
+            winc                        INTEGER,
+            btime                       INTEGER,
+            binc                        INTEGER,
+            movestogo                   INTEGER,
+            depth                       INTEGER,
+            nodes                       INTEGER,
+            movetime                    INTEGER,
             --white_player                TEXT,
             --black_player                TEXT,
             --white_elo                   INTEGER,
@@ -178,7 +212,7 @@ def init_engine_db(db_dir=dir) -> None:
             moves                       TEXT, -- array ["e2e4", "e7e5", etc.]
             run_time_s                  REAL,
 
-            integestion_timestamp_utc   DATETIME DEFAULT CURRENT_TIMESTAMP,
+            ingestion_timestamp_utc     DATETIME DEFAULT CURRENT_TIMESTAMP,
 
             FOREIGN KEY (experiment_id) REFERENCES experiments(id),
             FOREIGN KEY (white_engine_id) REFERENCES engines(id),
@@ -221,7 +255,7 @@ def init_engine_db(db_dir=dir) -> None:
             games_played                    INTEGER,
             run_time_s                      INTEGER,
 
-            integestion_timestamp_utc       DATETIME DEFAULT CURRENT_TIMESTAMP,
+            ingestion_timestamp_utc         DATETIME DEFAULT CURRENT_TIMESTAMP,
             
             FOREIGN KEY (baseline_engine_id) REFERENCES engines(id),
             FOREIGN KEY (candidate_engine_id) REFERENCES engines(id),
@@ -249,7 +283,7 @@ def init_engine_db(db_dir=dir) -> None:
             avoid_move                  TEXT NULL, -- am (instead of bm) 
             move_is_correct             BOOLEAN,
             
-            integestion_timestamp_utc   DATETIME DEFAULT CURRENT_TIMESTAMP,
+            ingestion_timestamp_utc     DATETIME DEFAULT CURRENT_TIMESTAMP,
 
             FOREIGN KEY (experiment_id) REFERENCES experiments(id)
         );
@@ -267,7 +301,7 @@ def init_engine_db(db_dir=dir) -> None:
             correct                     BOOLEAN,
             time_ms                     REAL,
 
-            integestion_timestamp_utc   DATETIME DEFAULT CURRENT_TIMESTAMP,
+            ingestion_timestamp_utc     DATETIME DEFAULT CURRENT_TIMESTAMP,
 
             FOREIGN KEY (experiment_id) REFERENCES experiments(id)
         );
@@ -291,6 +325,7 @@ def init_engine_db(db_dir=dir) -> None:
         game_stats_str,             # FK(engines.id) + FK(sprt.id)
         search_summary_stats_str,   # FK(engines.id) + FK(games.id) + FK(sprt.id) + FK(sts.id)
         search_depth_stats_str,     # FK(searches.id)
+        search_ply_stats_str,       # FK(searches.id)
         timing_stats_str            # FK(searches.id)
     ]:
         cur.executescript(script)

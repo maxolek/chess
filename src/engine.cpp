@@ -324,6 +324,11 @@ void Engine::setPosition(const std::string& fen,
     // --- Sync search board ---
     search_board = game_board; //Board(game_board);
 
+    // --- game handling ---
+    if (mode == EngineMode::GAME) {
+        side = game_board.is_white_move ? EngineSide::WHITE : EngineSide::BLACK;
+        g_gamelog.side = game_board.is_white_move ? "white" : "black";
+    }
 
     game_over = checkGameEnd();
 }
@@ -353,6 +358,18 @@ inline int Engine::get_prev_eval(Move m) const {
 // --------------------
 
 void Engine::computeSearchTime(const SearchSettings& settings) {
+    if (g_run_context.is_new_game) {
+        g_gamelog.wtime = settings.wtime; 
+        g_gamelog.btime = settings.btime; 
+        g_gamelog.winc = settings.winc; 
+        g_gamelog.binc = settings.binc; 
+        g_gamelog.movestogo = settings.movestogo;
+        g_gamelog.depth = settings.depth;
+        g_gamelog.nodes = settings.nodes;
+        g_gamelog.movetime = settings.movetime;
+        g_run_context.is_new_game = false;
+    }
+
     int movesToGo = settings.movestogo > 0 ? settings.movestogo : 20;
 
     // hard coded time/depth
@@ -450,7 +467,9 @@ void Engine::ponderHit() {
 void Engine::iterativeDeepening() {
     ScopedTimer engineTimer(T_SEARCH); // top-level engine timer
     auto start_time = std::chrono::steady_clock::now();
-    limits.max_depth = std::min(limits.max_depth, 30);
+    //limits.start_time = start_time;
+    //limits.max_depth = (limits.max_depth < 0) ? 30 : std::min(limits.max_depth, 30);
+    //limits.stopped = false;
     g_run_context.search_uuid = generate_uuid();
 
     // reset global stats
@@ -479,6 +498,7 @@ void Engine::iterativeDeepening() {
     while (!limits.should_stop(depth)) {
         ScopedTimer timer(T_ROOT);
         auto depth_start = std::chrono::steady_clock::now();
+        g_stats.max_depth = depth;
 
         // --- move ordering ---
         if (depth > 1) {
@@ -521,6 +541,7 @@ void Engine::iterativeDeepening() {
         if (!Move::SameMove(result.bestMove, Move::NullMove())) {
             last_result = result;
             store_last_result(result);
+            g_stats.max_completed_depth = depth;
         }
 
         // --- determine best move and eval ---
@@ -536,11 +557,11 @@ void Engine::iterativeDeepening() {
         auto depth_end = std::chrono::steady_clock::now();
 
         if (Logging::track_search_stats) {
-            g_stats.maxDepth = depth;
-            g_stats.evalPerDepth.push_back(result.eval);
-            g_stats.bestMovePerDepth.push_back(result.bestMove);
-            g_stats.timerPerDepthMS.push_back( std::chrono::duration<double, std::milli>(depth_end - depth_start).count());
-            if (Move::SameMove(bestMove, prevBest)) g_stats.bestmoveStable++;
+            //g_stats.max_completed_depth = depth;
+            g_stats.it_depth_eval.push_back(result.eval);
+            g_stats.it_depth_move.push_back(result.bestMove);
+            g_stats.it_depth_time_ms.push_back( std::chrono::duration<double, std::milli>(depth_end - depth_start).count());
+            //if (Move::SameMove(bestMove, prevBest)) g_stats.bestmoveStable++;
         }
 
         prevBest = bestMove;
@@ -552,15 +573,15 @@ void Engine::iterativeDeepening() {
     if (Logging::track_search_stats) {
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
                         std::chrono::steady_clock::now() - start_time).count();
-        g_stats.ply = ply;
-        g_stats.timeMs = elapsed;
-        g_stats.nps = elapsed > 0 ? (1000.0 * g_stats.nodes / elapsed) : 0.0;
-        g_stats.rootEval = last_result.eval;
-        g_stats.bestMove = last_result.bestMove;
+        g_stats.game_ply = ply;
+        g_stats.time_ms = elapsed;
+        //g_stats.nps = elapsed > 0 ? (1000.0 * g_stats.nodes / elapsed) : 0.0;
+        g_stats.eval = last_result.eval;
+        g_stats.move = last_result.bestMove;
         g_stats.principal_variation = last_result.best_line.line;
 
-        g_stats.ebf = pow(double(g_stats.nodes) / 1.0, 1.0 / g_stats.maxDepth); // rough estimate
-        g_stats.qratio = double(g_stats.qnodes) / g_stats.nodes;
+        //g_stats.ebf = pow(double(g_stats.nodes) / 1.0, 1.0 / g_stats.maxDepth); // rough estimate
+        //g_stats.qratio = double(g_stats.qnodes) / g_stats.nodes;
 
         tracker.bestMoves.push_back(bestMove);
         tracker.evals.push_back(bestEval);
@@ -619,7 +640,8 @@ void Engine::newGame() {
     startNewSession();
     clearState();
     g_run_context.game_uuid = generate_uuid();
-    QueryPerformanceCounter(&g_game_start);
+    g_run_context.is_new_game = true;
+    g_game_start_time = std::chrono::steady_clock::now();
 
     tracker.playedMoves.clear();
     tracker.lastPositionHash = 0;
@@ -629,8 +651,6 @@ void Engine::newGame() {
     g_gamelog = GameLog{};
     g_gamelog.startFEN = game_board.getBoardFEN();
 
-    side = game_board.is_white_move ? EngineSide::WHITE : EngineSide::BLACK;
-    g_gamelog.side = game_board.is_white_move ? "white" : "black";
 
     game_board.setFromFEN(STARTPOS_FEN);
     search_board = game_board;
@@ -641,9 +661,8 @@ bool Engine::checkGameEnd() {
 
     if (isCheckmate()) {
         g_gamelog.outcome =
-            game_board.is_white_move && side == EngineSide::WHITE 
-                                     ? GameResult::WIN
-                                     : GameResult::LOSS;
+            !game_board.is_white_move ? GameResult::WHITE_WIN
+                                     : GameResult::BLACK_WIN;
         g_gamelog.reason = GameEndReason::CHECKMATE;
     }
     else if (isStalemate()) {
@@ -663,13 +682,14 @@ bool Engine::checkGameEnd() {
     }
 
     // finalize
-    QueryPerformanceCounter(&g_game_end);
-    g_gamelog.totalTimeSeconds = double(g_game_end.QuadPart - g_game_start.QuadPart) / double(Timer::freq());
+    g_game_end_time = std::chrono::steady_clock::now();
+    g_gamelog.totalTimeSeconds = std::chrono::duration<double>(g_game_end_time - g_game_start_time).count();
     g_gamelog.moves = game_board.allGameMoves;
     g_gamelog.finalEval = evaluator.nnue.full_eval(game_board);
     logGameLog();
     g_gamelog.finalized = true;
-    tt.clear();
+
+    //tt.clear();
 
     return true;
 }

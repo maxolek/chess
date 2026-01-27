@@ -6,6 +6,7 @@
 namespace fs = std::filesystem;
 
 struct RunContext {
+    bool is_new_game = false; // flag to set certain log attributes when a new game is triggered
     std::string game_uuid; // updates when a new game starts
     std::string search_uuid; // updates every search
 };

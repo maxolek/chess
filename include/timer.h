@@ -6,7 +6,7 @@
 #include "session.h"
 #include "logging.h"
 #include <vector>
-#include <windows.h>
+#include <chrono>
 #include <fstream>
 
 // Timer IDs
@@ -30,34 +30,27 @@ inline const char* TimerNames[T_COUNT] = {
     "BOOK_PROBE"
 };
 
-// Timer structs
+// Timer struct using std::chrono
 struct Timer {
-    LARGE_INTEGER start;
+    using clock = std::chrono::high_resolution_clock;
+    clock::time_point start;
 
-    __forceinline void begin() { QueryPerformanceCounter(&start); }
+    __forceinline void begin() { start = clock::now(); }
 
     __forceinline uint64_t end() const {
-        LARGE_INTEGER now;
-        QueryPerformanceCounter(&now);
-        return now.QuadPart - start.QuadPart;
+        auto now = clock::now();
+        return std::chrono::duration_cast<std::chrono::nanoseconds>(now - start).count();
     }
 
-    static uint64_t freq() {
-        static uint64_t f = []{
-            LARGE_INTEGER li;
-            QueryPerformanceFrequency(&li);
-            return li.QuadPart;
-        }();
-        return f;
-    }
+    static uint64_t freq() { return 1'000'000'000ULL; } // nanoseconds
 };
 
 struct TimerStats { uint64_t cycles = 0; uint64_t calls = 0; };
 struct Timing { TimerStats stats[T_COUNT]{}; };
 
 inline Timing g_timing{};
-inline LARGE_INTEGER g_game_start{};
-inline LARGE_INTEGER g_game_end{};
+inline uint64_t g_game_start = 0;
+inline uint64_t g_game_end = 0;
 
 // Scoped timer
 struct ScopedTimer {
@@ -84,7 +77,7 @@ inline void logTimingStats(const std::string& fen = "") {
     double total_ms = double(root.cycles) / Timer::freq() * 1000.0;
 
     out << "{";
-    out << "\"engine_id\":\"" << ENGINE_ID << "\",";
+    out << "\"engine_id\":\"" << ENGINE_ID << "\","; 
     out << "\"instance_id\":" << instanceID() << ",";
     out << "\"type\":\"timing\",";
     out << "\"session\":" << currentSession() << ",";
@@ -110,6 +103,5 @@ inline void logTimingStats(const std::string& fen = "") {
     out << "}\n";
     out.flush();
 }
-
 
 #endif

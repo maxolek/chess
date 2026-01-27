@@ -153,7 +153,7 @@ def main():
     parser.add_argument("--sprt_book_depth", type=int, default=8)
 
     # STS
-    parser.add_argument("--sts_files", nargs="+", required=True)
+    parser.add_argument("--sts_files", nargs="+")
     parser.add_argument("--sts_time", type=float, default=5000)
     parser.add_argument("--sts_depth", type=int)
 

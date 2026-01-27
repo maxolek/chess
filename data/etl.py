@@ -7,6 +7,16 @@ import os
 import shutil
 import argparse
 
+# paths
+DATA_DIR = Path(__file__).resolve().parent 
+PROJECT_ROOT = DATA_DIR.parent 
+# log paths
+LOGS_DIR = PROJECT_ROOT / "logs"
+GAMES_LOG_DIR = LOGS_DIR / "game_logs"
+GAME_JSON = GAMES_LOG_DIR / "game.jsonl"
+SEARCH_JSON = GAMES_LOG_DIR / "search.jsonl"
+TIMING_JSON = GAMES_LOG_DIR / "timing.jsonl"
+
 # utils
 
 def safe_val(val):
@@ -94,6 +104,40 @@ def probe_engine_metadata(engine_path):
 
     return meta
 
+
+def extract_engine_id_from_search(search_path):
+    with open(search_path, "r") as f:
+        for line in f:
+            data = json.loads(line)
+            if "engine_id" in data:
+                return data["engine_id"]
+    return None
+
+# -------------------------------
+#       LOG GAMES DIRECTORY
+# -------------------------------
+
+def log_games_directory(cnxn):
+    game_map = {}
+
+    # ---- games ----
+    if Path(GAME_JSON).is_file():
+        game_map = bulk_log_game(cnxn, GAME_JSON)
+    else:
+        print(f"[INFO] No game log found: {GAME_JSON}")
+
+    # ---- searches / timing ----
+    if Path(SEARCH_JSON).is_file():
+        bulk_log_search_and_timing(
+            cnxn,
+            SEARCH_JSON,
+            game_map,
+            timing_path=TIMING_JSON if Path(TIMING_JSON).is_file() else None
+        )
+    else:
+        print(f"[INFO] No search log found: {SEARCH_JSON}")
+
+    clear_log_dir(GAMES_LOG_DIR)
 
 # -------------------------------
 #   LOG SINGLE ROW TO DATABASE
@@ -254,11 +298,11 @@ def bulk_log_sts(cnxn, path, sts_id, **kwargs):
             expected_moves = data.get('expected_moves') or []
             expected_move_1 = expected_moves[0] if len(expected_moves) > 0 else None
             expected_move_2 = expected_moves[1] if len(expected_moves) > 1 else None
-            avoid_moves = data.get('avoid_moves')
+            avoid_moves = data.get('avoid_moves') or []
 
             if expected_moves != []:
                 correct = (move == expected_move_1 or move == expected_move_2)
-            elif avoid_moves is not None:
+            elif avoid_moves != []:
                 correct = (move != avoid_moves[0])
 
             rows.append((
@@ -318,11 +362,16 @@ def bulk_log_game(cnxn, path, experiment_id=None, second_engine_id=None):
                 experiment_id,
                 white_engine_id,
                 black_engine_id,
-                data.get("time_control"),
-                data.get("time_per_move"),
-                data.get("depth_per_move"),
+                data.get("wtime"),
+                data.get("btime"),
+                data.get("winc"),
+                data.get("binc"),
+                data.get("movestogo"),
+                data.get("depth"),
+                data.get("nodes"),
+                data.get("movetime"),
                 data.get("result"),
-                data.get("termination"),
+                data.get("reason"),
                 data.get("opening"),
                 data.get("start_fen"),
                 json.dumps(data.get("moves")),
@@ -334,11 +383,11 @@ def bulk_log_game(cnxn, path, experiment_id=None, second_engine_id=None):
         INSERT INTO games (
             experiment_id,
             white_engine_id, black_engine_id,
-            time_control, time_per_move, depth_per_move,
+            wtime, btime, winc, binc, movestogo, depth, nodes, movetime,
             result, termination,
             opening, start_fen, moves, run_time_s
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         rows
     )
@@ -368,6 +417,20 @@ def bulk_log_search_and_timing(
     uuid_map = {}  # search_uuid -> search_id
     game_id = None
 
+    if engine_id is None:
+        engine_version = extract_engine_id_from_search(search_path)
+        if engine_version is None:
+            raise RuntimeError("engine_version not provided and not found in search log")
+
+        engine_id = get_engine_id(cnxn, engine_version)
+        if engine_id is None:
+            raise RuntimeError("engine_id not provided and not found in database")
+        
+    # ----------------
+    # --- SEARCHES ---
+    # ----------------
+
+    # full search summary
     with open(search_path, "r") as f:
         for line in f:
             data = json.loads(line)
@@ -385,6 +448,7 @@ def bulk_log_search_and_timing(
                 data.get("time_ms"),
                 data.get("root_eval"),
                 data.get("max_depth"),
+                data.get("max_qdepth"),
                 data.get("best_move"),
                 safe_val(data.get("principal_variation")),
                 data.get("nodes"),
@@ -396,8 +460,8 @@ def bulk_log_search_and_timing(
                 data.get("fail_lows"),
                 data.get("fail_high_first"),
                 data.get("fail_high_late"),
-                data.get("aspirationFailHighResearches"),
-                data.get("aspirationFailLowResearches"),
+                data.get("aspiration_fail_high_researches"),
+                data.get("aspiration_fail_low_researches"),
                 data.get("see_prunes"),
                 data.get("delta_prunes"),
                 data["search_uuid"],  # temp
@@ -406,12 +470,12 @@ def bulk_log_search_and_timing(
     cursor.executemany(
         """
         INSERT INTO searches (
-            engine_id, game_id, sts_id, fen, ply, time_ms, eval, depth, move, 
-            principal_variation, nodes, q_nodes, tt_stores, tt_hits, tt_fill,
+            engine_id, game_id, sts_id, fen, ply, time_ms, eval, depth, qdepth, move, 
+            principal_variation, nodes, qnodes, tt_stores, tt_hits, tt_fill,
             fail_highs, fail_lows, fail_high_first, fail_high_late, fail_high_researches, fail_low_researches,
             see_prunes, delta_prunes
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         [row[:-1] for row in searches_rows]
     )
@@ -426,50 +490,95 @@ def bulk_log_search_and_timing(
     for row, sid in zip(searches_rows, search_ids):
         uuid_map[row[-1]] = sid
 
-    # Per-depth data
+    # Per-iteration-depth data
+    #  captures d=1,2,3 of an iterative deepening search
     depth_rows = []
     with open(search_path, "r") as f:
         for line in f:
             data = json.loads(line)
             search_id = uuid_map[data["search_uuid"]]
 
-            n = len(data.get("evalPerDepth", []))
+            n = len(data.get("itdepth_nodes", []))
             for d in range(n):
                 depth_rows.append((
                     search_id,
                     d + 1,
-                    data.get("timeOnDepthMS", [0]*n)[d],
-                    data.get("evalPerDepth", [0]*n)[d],
-                    data.get("bestMovePerDepth", [None]*n)[d],
-                    data.get("depthNodes", [0]*n)[d],
-                    data.get("depthQNodes", [0]*n)[d],
-                    data.get("depthTTStores", [0]*n)[d],
-                    data.get("depthTTHits", [0]*n)[d],
-                    data.get("depthTTFill", [0]*n)[d],
-                    data.get("depthFailHighs", [0]*n)[d],
-                    data.get("depthFailLows", [0]*n)[d],
-                    data.get("depthFailHighFirst", [0]*n)[d],
-                    data.get("depthFailHighLate", [0]*n)[d],
-                    data.get("depthAspirationFailHighResearches", [0]*n)[d],
-                    data.get("depthAspirationFailLowResearches", [0]*n)[d],
-                    data.get("depthSEEPrunes", [0]*n)[d], 
-                    data.get("depthDeltaPrunes", [0]*n)[d]
+                    data.get("itdepth_time_ms", [0]*n)[d],
+                    data.get("itdepth_eval", [0]*n)[d],
+                    data.get("itdepth_move", [None]*n)[d],
+                    data.get("itdepth_qdepth", [0]*n)[d],
+                    data.get("itdepth_nodes", [0]*n)[d],
+                    data.get("itdepth_qnodes", [0]*n)[d],
+                    data.get("itdepth_ttstores", [0]*n)[d],
+                    data.get("itdepth_tthits", [0]*n)[d],
+                    data.get("itdepth_ttfill", [0]*n)[d],
+                    data.get("itdepth_fail_highs", [0]*n)[d],
+                    data.get("itdepth_fail_lows", [0]*n)[d],
+                    data.get("itdepth_fail_high_firsts", [0]*n)[d],
+                    data.get("itdepth_fail_high_lates", [0]*n)[d],
+                    data.get("itdepth_aspiration_failhigh_researches", [0]*n)[d],
+                    data.get("itdepth_aspiration_faillow_researches", [0]*n)[d],
+                    data.get("itdepth_see_prunes", [0]*n)[d], 
+                    data.get("itdepth_delta_prunes", [0]*n)[d]
                 ))
 
     cursor.executemany(
         """
-        INSERT INTO searches_by_depth (
-            search_id, depth, time_ms, eval, move,
-            nodes, q_nodes, tt_stores, tt_hits, tt_fill,
+        INSERT INTO searches_by_iteration (
+            search_id, depth, time_ms, eval, move, qdepth,
+            nodes, qnodes, tt_stores, tt_hits, tt_fill,
             fail_highs, fail_lows, fail_high_first, fail_high_late,
             fail_high_researches, fail_low_researches, see_prunes, delta_prunes
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         depth_rows
     )
 
-    # Timing
+    # per-search_tree-depth data
+    #   captures d=1,2,3 of the search tree
+    #     d >= i all touch d=i, so multiple counting occurs
+    ply_rows = []
+    with open(search_path, "r") as f:
+        for line in f:
+            data = json.loads(line)
+            search_id = uuid_map[data["search_uuid"]]
+
+            n = len(data.get("treedepth_nodes", []))
+            for d in range(n):
+                ply_rows.append((
+                    search_id,
+                    d + 1, 
+                    #data.get("ply_time_ms", [0]*n)[d],
+                    data.get("treedepth_nodes", [0]*n)[d],
+                    data.get("treedepth_qnodes", [0]*n)[d],
+                    data.get("treedepth_tt_stores", [0]*n)[d],
+                    data.get("treedepth_tt_hits", [0]*n)[d],
+                    #data.get("ply_tt_fill", [0]*n)[d],
+                    data.get("treedepth_fail_highs", [0]*n)[d],
+                    data.get("treedepth_fail_lows", [0]*n)[d],
+                    data.get("treedepth_fail_high_firsts", [0]*n)[d],
+                    data.get("treedepth_fail_high_lates", [0]*n)[d],
+                    data.get("treedepth_see_prunes", [0]*n)[d],
+                    data.get("treedepth_delta_prunes", [0]*n)[d],
+                ))
+
+    cursor.executemany(
+        """
+        INSERT INTO searches_by_tree_depth (
+            search_id, depth, 
+            nodes, qnodes, tt_stores, tt_hits, fail_highs, fail_lows,
+            fail_high_first, fail_high_late, see_prunes, delta_prunes
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        ply_rows
+    )
+
+    # ----------------
+    # ---- TIMING ----
+    # ----------------
+
     timing_rows = []
     if timing_path:
         with open(timing_path, "r") as f:
@@ -507,7 +616,7 @@ def bulk_log_search_and_timing(
     cnxn.commit()
     print(
         f"[INFO] Inserted {len(searches_rows)} searches, "
-        f"{len(depth_rows)} depth rows, "
+        f"{len(depth_rows), len(ply_rows)} depth rows, "
         f"{len(timing_rows)} timing rows."
     )
 
@@ -516,14 +625,23 @@ def bulk_log_search_and_timing(
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description="ETL functions for chess.db\nRegister engines, upload logs, clear directories")
     
+    # register engine to database for use in experiments
+    #   release pipeline automatically registers engine
     p.add_argument("--register_engine", action="store_true", help="Flag to register engine to chess.db")
     p.add_argument("--name", default=None, type=str, help="Engine name")
     p.add_argument("--version", default=None, type=str, help="Engine version")
     p.add_argument("--description", default=None, type=str, help="Engine description (changes from last iteration, etc)")
     p.add_argument("--uci_options", default=None, type=str, help="UCI settings of the engine (e.g. threads, hash size, etc.)")
 
+    # log game files
+    #   currently no auto sch, but this will game that easier
+    p.add_argument("--log_games", action="store_true", help="Flag to log game directory (games.jsonl, search.jsonl [, timing.jsonl]) to chess.db")
+    #p.add_argument("--games_dir", type=str, default="logs/game_logs", help="Directory where game files are stored")
+
     args = p.parse_args()
     cnxn = sqlite3.connect('F:/databases/chess.db')
 
     if args.register_engine:
         register_engine(cnxn, {"name": args.name, "version": args.version, "description": args.description, "uci_options": args.uci_options})
+    elif args.log_games:
+        log_games_directory(cnxn) 
