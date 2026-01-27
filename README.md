@@ -1,6 +1,6 @@
 # Tomahawk Chess Engine
 
-Tomahawk is a high-performance chess engine written in C++ with a Python-based testing and visualization framework. It combines modern search algorithms, efficient move generation, and a rich evaluation function to deliver competitive gameplay and easy experimentation.
+Tomahawk is a NNUE chess engine written in C++ with a Python testing framework. It utilizes the UCI protocal.
 
 Play at https://lichess.org/@/tomahawkBOT
 
@@ -13,16 +13,15 @@ Play at https://lichess.org/@/tomahawkBOT
 - **Quiescence Search**: Extends search at tactical positions to avoid horizon effect.
 - **Aspiration Windows**: Dyanmic alpha-beta values based on previous iteration, with dynamic scaling.
 - **Move Ordering Heuristics**: Includes TT move, SEE, MVA-LVA, killer moves, history heuristics, and PV moves.
-- **Tapered Evaluation**: Weights evaluation based on game phase.
 - **Evaluation Function**:
-  - King safety (pawn shields, tropism)
-  - Pawn structure and passed pawns
-  - Piece-square tables (optimized PST)
-  - Static Exchange Evaluation (SEE) for tactical accuracy
-  - Center control metrics
+  768-128x2 NNUE
+  - incremental dual-perspective accumulators
+  - trained on T60T70wIsRightFarseer
+  - dynamic lr, wdl+eval based target function
+  - quantization for faster forward pass
+  - **Tapered Evaluation**: training of larger nets and the use of different evaluations based on game phase in progress
 - **Magic Bitboards**: Fast sliding piece move generation.
 - **Transposition Table (TT)**: Caches evaluated positions for faster search.
-- **UCI Interface**: Full Universal Chess Interface support.
 
 ### Testing & Analysis
 - Python-based **testing framework** for SPRT, Elo estimation, and statistical analysis.
@@ -37,14 +36,6 @@ Play at https://lichess.org/@/tomahawkBOT
 /visual_assets  --> .svg/.png for visuals
 /bin            --> opening book, PST tables
 
-## Requirements
-
-- **C++ Compiler**: Supports C++17 or later.
-- **Python 3.10+**
-- **Python Libraries**:
-  - `python-chess`
-  - `tkinter` (standard with Python)
-- Optional: piece PNG assets for visualization.
 
 ## Usage
 
