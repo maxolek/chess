@@ -41,29 +41,29 @@ STOCKFISH = os.path.join(
 def run_make(args):
     print(f"[BUILD] Compiling engine VERSION={args.version}")
 
-    clean_cmd = [
-        "make", #"-C", "src",
-        "-f", args.makefile,
-        "clean"
+    build_dir = "build"
+
+    configure_cmd = [
+        "cmake",
+        "-S", ".",                # source dir
+        "-B", build_dir,           # build dir
+        f"-DVERSION={args.version}",
+        "-DCMAKE_BUILD_TYPE=Release",
     ]
 
-    make_cmd = [
-        "make", #"-C", "src",
-        "-f", args.makefile,
-        f"VERSION={args.version}"
+    build_cmd = [
+        "cmake",
+        "--build", build_dir,
+        "--config", "Release",     # important for MSVC
+        "--parallel",
     ]
 
     try:
-        subprocess.check_call(clean_cmd)
-        subprocess.check_call(make_cmd)
+        subprocess.check_call(configure_cmd)
+        subprocess.check_call(build_cmd)
     except subprocess.CalledProcessError:
         sys.exit("[BUILD] ❌ build failed")
 
-    #src_bin  = os.path.join("src", f"{args.version}.exe")
-    #dest_bin = os.path.join(ENGINES_DIR, f"{args.version}.exe")
-
-    #print(f"[BUILD] Moving {src_bin} -> {dest_bin}")
-    #shutil.move(src_bin, dest_bin)
     print("[BUILD] ✅ done")
 
 # ============================================================
