@@ -328,7 +328,7 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
         //std::cout << "------" << std::endl; m.PrintMove(); std::cout << "------" << std::endl;
 
         int eval; PV childPV;
-        STATS_NODE(depth, 1);
+        STATS_NODE(depth, 1);       // change to result.eval for proper alpha propogation
         eval = -negamax(depth - 1, -MATE_SCORE, MATE_SCORE, childPV, previousPV, limits, 1, true);
 
         // Undo
@@ -351,7 +351,6 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
             result.eval = eval;
             result.bestMove = m;
             result.best_line.set(m, childPV);
-            //std::cout << "depth: " << depth << "\n"; m.PrintMove(); std::cout<<eval<<std::endl;
         }
     }
 

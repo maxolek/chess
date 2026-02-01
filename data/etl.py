@@ -6,6 +6,7 @@ import glob
 import os
 import shutil
 import argparse
+import chess
 
 # paths
 DATA_DIR = Path(__file__).resolve().parent 
@@ -23,6 +24,37 @@ def safe_val(val):
     if isinstance(val, list) or isinstance(val, dict):
         return json.dumps(val)
     return val
+
+def get_opening_from_moves(moves):
+    """
+    moves: list of uci moves
+    returns the ECO name/code by iterating until the opening is stable
+    """
+
+    board = chess.Board()
+    last_eco = None
+    last_name = None
+
+    for move_uci in moves:
+        try:
+            board.push_uci(move_uci)
+        except ValueError:
+            break  # invalid move, stop here
+
+        matched = False
+        for opening in chess.openings.ENCODED:
+            if board.fen() in opening['positions']:
+                last_eco = opening['eco']
+                last_name = opening['name']
+                matched = True
+                break
+
+        if not matched:
+            # No openings match current position — we are out of book
+            break
+
+    return last_eco, last_name
+
 
 # --------------------------
 #        CLEAR LOGS
@@ -639,7 +671,8 @@ if __name__ == "__main__":
     #p.add_argument("--games_dir", type=str, default="logs/game_logs", help="Directory where game files are stored")
 
     args = p.parse_args()
-    cnxn = sqlite3.connect('F:/databases/chess.db')
+    #cnxn = sqlite3.connect('F:/databases/chess.db')
+    cnxn = sqlite3.connect(Path.home() / "Documents/databases/chess.db")
 
     if args.register_engine:
         register_engine(cnxn, {"name": args.name, "version": args.version, "description": args.description, "uci_options": args.uci_options})

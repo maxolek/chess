@@ -375,7 +375,7 @@ void Engine::computeSearchTime(const SearchSettings& settings) {
     // hard coded time/depth
     if (settings.movetime > 0 || settings.depth > 0) {
         limits = SearchLimits(
-            settings.movetime,
+            settings.movetime - options.moveOverhead,
             settings.depth
         );
         return;
@@ -395,7 +395,7 @@ void Engine::computeSearchTime(const SearchSettings& settings) {
 
     timeBudget = std::max(10, timeBudget - options.moveOverhead);
 
-    limits = timeBudget;
+    limits = SearchLimits(timeBudget);
 }
 
 
@@ -589,6 +589,7 @@ void Engine::iterativeDeepening() {
         logSearchStats(game_board.getBoardFEN());  // JSON written once at end
     }
     if (Logging::track_timers) {logTimingStats(game_board.getBoardFEN());}
+
 }
 
 

@@ -9,6 +9,12 @@
 #include <chrono>
 #include <fstream>
 
+#ifdef _MSC_VER
+    #define FORCEINLINE FORCEINLINE
+#else
+    #define FORCEINLINE inline __attribute__((always_inline))
+#endif
+
 // Timer IDs
 enum TimerID {
     T_MOVEGEN, T_MAKEMOVE, T_UNMAKE_MOVE,
@@ -35,9 +41,9 @@ struct Timer {
     using clock = std::chrono::high_resolution_clock;
     clock::time_point start;
 
-    __forceinline void begin() { start = clock::now(); }
+    FORCEINLINE void begin() { start = clock::now(); }
 
-    __forceinline uint64_t end() const {
+    FORCEINLINE uint64_t end() const {
         auto now = clock::now();
         return std::chrono::duration_cast<std::chrono::nanoseconds>(now - start).count();
     }
@@ -58,10 +64,10 @@ struct ScopedTimer {
     Timer t;
     bool active;
 
-    __forceinline ScopedTimer(TimerID tid) 
+    FORCEINLINE ScopedTimer(TimerID tid) 
         : id(tid), active(Logging::track_timers) { if (active) t.begin(); }
 
-    __forceinline ~ScopedTimer() {
+    FORCEINLINE ~ScopedTimer() {
         if (!active) return;
         g_timing.stats[id].cycles += t.end();
         g_timing.stats[id].calls++;

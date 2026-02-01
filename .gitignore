@@ -19,7 +19,6 @@ logs/
 # ignore engines
 engines/
 
-
 # py env
 __pycache__/
 tests/__pycache__/
@@ -30,3 +29,6 @@ build/
 
 # bin files (too large)
 bin/opening_books/UHO_Lichess_4852_v1.epd 
+
+# misc
+*.DS_STORE

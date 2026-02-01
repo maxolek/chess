@@ -81,6 +81,7 @@ public:
         bool overwritten = (!wasEmpty && entry->key != key);
 
         // Replace if new key or deeper horizon
+        // todo: switch to deeper depth
         if (entry->key != key || horizon >= entry->horizon) {
             if (overwritten)
                 stats.overwritten++;

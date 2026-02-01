@@ -111,11 +111,14 @@ bool MoveGenerator::isPinned(int square) {
                         ? getMSB(sliders_on_line & bitsBelow(square))
                         : getLSB(sliders_on_line & bitsAbove(square));
 
+    // square is not between king and enemy sliding piece
+    if (slider_sq < 0) {return false;}
+
     // Count pieces between king and slider
     U64 between_king_and_slider = PrecomputedMoveData::rayMasks[own_king_square][slider_sq] & (own | opp);
     // remove end points (slider + king)
     U64 between = between_king_and_slider & ~(1ULL << own_king_square | 1ULL << slider_sq);
-    
+
     return countBits(between) == 1;
 }
 

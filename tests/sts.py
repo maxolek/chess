@@ -24,7 +24,8 @@ STS_JSON = STS_LOGS_DIR / "sts_suite.jsonl"
 # --------------------------
 
 def upload_logs(args):
-    cnxn = sqlite3.connect("F:/databases/chess.db")
+    #cnxn = sqlite3.connect("F:/databases/chess.db")
+    cnxn = sqlite3.connect(Path.home() / "Documents/databases/chess.db")
     cnxn.row_factory = sqlite3.Row 
 
     # probe metadata
@@ -232,8 +233,7 @@ def run_sts_file(engine_path, epd_file, depth=8, time = None, log_file = None):
         [engine_path],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        cwd=engine_dir
+        stderr=subprocess.STDOUT
     )
     total, correct = 0, 0
     diffs = []

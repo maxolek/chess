@@ -5,10 +5,12 @@ import sys
 import os
 import time
 import sqlite3
+from pathlib import Path
 from data import etl
 from datetime import datetime, timezone
 
-STOCKFISH = r"C:\Users\maxol\chess\engines\stockfish\stockfish-windows-x86-64-avx2.exe"
+#STOCKFISH = r"C:\Users\maxol\chess\engines\stockfish\stockfish-windows-x86-64-avx2.exe"
+STOCKFISH = "engines/stockfish/stockfish-macos-m1-apple-silicon"
 
 # -----------------------------
 # Load positions
@@ -117,7 +119,8 @@ def main(args=None):
     # -----------------------------
     # DB setup
     # -----------------------------
-    cnxn = sqlite3.connect("F:/databases/chess.db")
+    #cnxn = sqlite3.connect("F:/databases/chess.db")
+    cnxn = sqlite3.connect(Path.home() / "Documents/databases/chess.db")
     cnxn.row_factory = sqlite3.Row
 
     engine_meta = etl.probe_engine_metadata(args.engine)

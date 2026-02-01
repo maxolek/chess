@@ -11,7 +11,10 @@
     #include <windows.h>
 #else
     #include <unistd.h>
+    #include <sched.h>
     #include <pthread.h>
+    #include <mach/mach.h>
+    #include <mach/thread_policy.h>
 #endif
 
 // version name set at compile time
@@ -31,15 +34,13 @@ void pin_to_pcores() {
     if (!SetProcessAffinityMask(hProc, mask)) 
         std::cerr << "Failed to set CPU affinity, error " << GetLastError() << "\n";
 #else
-    // macOS/Linux: pin to core 0 for now (more complex topologies need sysconf/CPU_SETSIZE)
-    cpu_set_t cpuset;
-    CPU_ZERO(&cpuset);
-    CPU_SET(0, &cpuset);
-
-    pthread_t thread = pthread_self();
-    int s = pthread_setaffinity_np(thread, sizeof(cpu_set_t), &cpuset);
-    if (s != 0)
-        std::cerr << "Failed to set CPU affinity\n";
+    thread_port_t thread = mach_thread_self();
+    // HIGH priority hint (scheduler may pick P-cores)
+    thread_precedence_policy_data_t policy = {63}; // max precedence
+    thread_policy_set(thread,
+                    THREAD_PRECEDENCE_POLICY,
+                    (thread_policy_t)&policy,
+                    THREAD_PRECEDENCE_POLICY_COUNT);
 #endif
 }
 
