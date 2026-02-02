@@ -5,8 +5,9 @@ project(tomahawk LANGUAGES CXX)
 # Version
 # -------------------
 # Usage:
-#   cmake -S . -B build -DVERSION=dev
-#   cmake -S . -B build -DVERSION=1.2.3
+#   cmake -S . -B build -G "MinGW Makefiles" -DCMAKE_C_COMPILER=g++ -DCMAKE_CXX_COMPILER=g++ -DVERSION=1.2.3
+#   cmake --build build
+#
 if (NOT DEFINED VERSION)
     set(VERSION dev)
 endif()
@@ -48,30 +49,24 @@ set(SOURCES
 )
 
 add_executable(tomahawk ${SOURCES})
+
 target_include_directories(tomahawk PRIVATE ${INCLUDE_DIR})
 
 # -------------------
-# Dependency tracking for GCC/Clang
+# Warnings
 # -------------------
-if (CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
-    # -MMD : generate .d files for headers
-    # -MP  : add phony targets
-    # -MF  : optional output file, usually handled automatically by CMake
-    target_compile_options(tomahawk PRIVATE -MMD -MP)
+if (MSVC)
+    target_compile_options(tomahawk PRIVATE /W4)
+else()
+    target_compile_options(tomahawk PRIVATE
+        -Wall
+        -Wextra
+        -Wshadow
+        -Wuninitialized
+        -Wconversion
+        -Wpedantic
+    )
 endif()
-
-
-# -------------------
-# Warnings & common flags
-# -------------------
-target_compile_options(tomahawk PRIVATE
-    -Wall
-    -Wextra
-    -Wshadow
-    -Wuninitialized
-    -Wconversion
-    -Wpedantic
-)
 
 # -------------------
 # Build type logic
@@ -81,7 +76,7 @@ if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
 endif()
 
-# Flags by build type
+# DEBUG
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     target_compile_options(tomahawk PRIVATE
         -O0
@@ -89,12 +84,16 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         -fno-optimize-sibling-calls
     )
     target_compile_definitions(tomahawk PRIVATE DEBUG)
+
+# PROFILE
 elseif (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
     target_compile_options(tomahawk PRIVATE
         -O1
         -g
     )
-else() # Release / MinSizeRel
+
+# RELEASE
+else()
     target_compile_options(tomahawk PRIVATE
         -O3
         -ffast-math
@@ -110,7 +109,14 @@ find_package(Threads REQUIRED)
 target_link_libraries(tomahawk PRIVATE Threads::Threads)
 
 # -------------------
-# Output directory
+# Platform-specific linking
+# -------------------
+if (WIN32)
+    target_link_libraries(tomahawk PRIVATE ole32)
+endif()
+
+# -------------------
+# Output name & location
 # -------------------
 set_target_properties(tomahawk PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${ENGINES_DIR}

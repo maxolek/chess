@@ -112,6 +112,7 @@ bool MoveGenerator::isPinned(int square) {
                         : getLSB(sliders_on_line & bitsAbove(square));
 
     // square is not between king and enemy sliding piece
+    // solves UB of rayMask[king_sq][-1]
     if (slider_sq < 0) {return false;}
 
     // Count pieces between king and slider

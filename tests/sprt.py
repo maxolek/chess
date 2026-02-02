@@ -217,6 +217,7 @@ def parse_args():
     p.add_argument("--book-depth", type=int, default=8)
 
     # Logging
+    p.add_argument('--log', action="store_true", help="Flag to turn on logging for candidate engine")
     p.add_argument(
         "--logroot",
         default=SPRT_LOG_DIR,
@@ -246,10 +247,10 @@ def main(args=None):
     ]
     log_a_block = [
         f"option.log_dir={args.logroot}",
-        "option.timer_logging=true",
-        "option.stats_logging=true",
-        "option.game_logging=true",
-        "option.uci_logging=true",
+        f"option.timer_logging={"true" if args.log else "false"}",
+        f"option.stats_logging={"true" if args.log else "false"}",
+        f"option.game_logging={"true" if args.log else "false"}",
+        f"option.uci_logging=false",
     ]
     log_b_block = [
         "option.timer_logging=false",

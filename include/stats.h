@@ -103,46 +103,51 @@ inline SearchStats g_stats{};
 #define STATS_ADD(field, val) \
     do { if (Logging::track_search_stats) g_stats.field += (val); } while(0)
 
-#define STATS_DEPTH_INIT(it_d, ply)                                  \
-    do {                                                            \
-        if (Logging::track_search_stats) {                          \
-            size_t it_size = it_d + 1;                              \
-            size_t ply_size = ply + 1;                               \
-            g_stats.it_depth_nodes.resize(std::max(it_size, g_stats.it_depth_nodes.size()), 0); \
-            g_stats.it_depth_qnodes.resize(std::max(it_size, g_stats.it_depth_qnodes.size()), 0); \
-            /*g_stats.it_depth_eval.resize(std::max(it_size, g_stats.it_depth_eval.size()), 0);*/ \
-            /*g_stats.it_depth_move.resize(std::max(it_size, g_stats.it_depth_move.size()), Move::NullMove());*/ \
-            g_stats.it_depth_ttstores.resize(std::max(it_size, g_stats.it_depth_ttstores.size()), 0); \
-            g_stats.it_depth_tthits.resize(std::max(it_size, g_stats.it_depth_tthits.size()), 0); \
-            g_stats.it_depth_fail_highs.resize(std::max(it_size, g_stats.it_depth_fail_highs.size()), 0); \
-            g_stats.it_depth_fail_lows.resize(std::max(it_size, g_stats.it_depth_fail_lows.size()), 0); \
-            g_stats.it_depth_fail_high_firsts.resize(std::max(it_size, g_stats.it_depth_fail_high_firsts.size()), 0); \
-            g_stats.it_depth_fail_high_lates.resize(std::max(it_size, g_stats.it_depth_fail_high_lates.size()), 0); \
-            g_stats.it_depth_aspiration_failhigh_researches.resize(std::max(it_size, g_stats.it_depth_aspiration_failhigh_researches.size()), 0); \
-            g_stats.it_depth_aspiration_faillow_researches.resize(std::max(it_size, g_stats.it_depth_aspiration_faillow_researches.size()), 0); \
-            g_stats.it_depth_see_prunes.resize(std::max(it_size, g_stats.it_depth_see_prunes.size()), 0); \
-            g_stats.it_depth_delta_prunes.resize(std::max(it_size, g_stats.it_depth_delta_prunes.size()), 0); \
-                                                                        \
-            g_stats.tree_depth_nodes.resize(std::max(ply_size, g_stats.tree_depth_nodes.size()), 0); \
-            g_stats.tree_depth_qnodes.resize(std::max(ply_size, g_stats.tree_depth_qnodes.size()), 0); \
-            g_stats.tree_depth_ttstores.resize(std::max(ply_size, g_stats.tree_depth_ttstores.size()), 0); \
-            g_stats.tree_depth_tthits.resize(std::max(ply_size, g_stats.tree_depth_tthits.size()), 0); \
-            g_stats.tree_depth_fail_highs.resize(std::max(ply_size, g_stats.tree_depth_fail_highs.size()), 0); \
-            g_stats.tree_depth_fail_lows.resize(std::max(ply_size, g_stats.tree_depth_fail_lows.size()), 0); \
-            g_stats.tree_depth_fail_high_firsts.resize(std::max(ply_size, g_stats.tree_depth_fail_high_firsts.size()), 0); \
-            g_stats.tree_depth_fail_high_lates.resize(std::max(ply_size, g_stats.tree_depth_fail_high_lates.size()), 0); \
-            g_stats.tree_depth_see_prunes.resize(std::max(ply_size, g_stats.tree_depth_see_prunes.size()), 0); \
-            g_stats.tree_depth_delta_prunes.resize(std::max(ply_size, g_stats.tree_depth_delta_prunes.size()), 0); \
-        }                                                           \
+
+
+template <typename T>
+inline void statsDepthInit(std::vector<T> &vec, size_t index) {
+    if (index >= vec.size())
+        vec.insert(vec.end(), index + 1 - vec.size(), T(0));
+}
+
+#define STATS_DEPTH_INIT(it_d, ply)                                    \
+    do {                                                                \
+        if (Logging::track_search_stats) {                              \
+            statsDepthInit(g_stats.it_depth_nodes, it_d);               \
+            statsDepthInit(g_stats.it_depth_qnodes, it_d);              \
+            statsDepthInit(g_stats.it_depth_ttstores, it_d);            \
+            statsDepthInit(g_stats.it_depth_tthits, it_d);              \
+            statsDepthInit(g_stats.it_depth_fail_highs, it_d);          \
+            statsDepthInit(g_stats.it_depth_fail_lows, it_d);           \
+            statsDepthInit(g_stats.it_depth_fail_high_firsts, it_d);    \
+            statsDepthInit(g_stats.it_depth_fail_high_lates, it_d);     \
+            statsDepthInit(g_stats.it_depth_aspiration_failhigh_researches, it_d); \
+            statsDepthInit(g_stats.it_depth_aspiration_faillow_researches, it_d); \
+            statsDepthInit(g_stats.it_depth_see_prunes, it_d);          \
+            statsDepthInit(g_stats.it_depth_delta_prunes, it_d);        \
+                                                                            \
+            statsDepthInit(g_stats.tree_depth_nodes, ply);              \
+            statsDepthInit(g_stats.tree_depth_qnodes, ply);             \
+            statsDepthInit(g_stats.tree_depth_ttstores, ply);           \
+            statsDepthInit(g_stats.tree_depth_tthits, ply);             \
+            statsDepthInit(g_stats.tree_depth_fail_highs, ply);         \
+            statsDepthInit(g_stats.tree_depth_fail_lows, ply);          \
+            statsDepthInit(g_stats.tree_depth_fail_high_firsts, ply);   \
+            statsDepthInit(g_stats.tree_depth_fail_high_lates, ply);    \
+            statsDepthInit(g_stats.tree_depth_see_prunes, ply);         \
+            statsDepthInit(g_stats.tree_depth_delta_prunes, ply);       \
+        }                                                               \
     } while (0)
+
 
 #define STATS_NODE(it_d, ply)                                \
     do {                                                    \
         if (Logging::track_search_stats) {                  \
-            STATS_DEPTH_INIT(it_d, ply);                    \
+            STATS_DEPTH_INIT(it_d, ply);                   \
             g_stats.nodes++;                                \
-            g_stats.it_depth_nodes[it_d]++;                 \
-            g_stats.tree_depth_nodes[ply]++;                \
+            g_stats.it_depth_nodes[it_d]++;                \
+            g_stats.tree_depth_nodes[ply]++;               \
         }                                                   \
     } while (0)
 
