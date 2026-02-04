@@ -7,6 +7,7 @@ import os
 import shutil
 import argparse
 import chess
+import platform
 
 # paths
 DATA_DIR = Path(__file__).resolve().parent 
@@ -97,10 +98,26 @@ def get_engine_id(cnxn, version=None):
     if row is None: return None 
     else: return row[0]
 
-def probe_engine_metadata(engine_path):
+
+import time
+
+def probe_engine_metadata(engine_path, timeout=10.0):
     """
-    Query engine via UCI and extract id name + id version.
+    Query a chess engine via UCI and extract version info.
+    Handles Windows .exe extension automatically.
+    Forces kill if engine hangs.
     """
+    system = platform.system()
+    engine_path = os.path.abspath(engine_path)
+
+    # Auto-append .exe on Windows if missing
+    if system == "Windows" and not engine_path.lower().endswith(".exe"):
+        if os.path.exists(engine_path + ".exe"):
+            engine_path += ".exe"
+
+    if not os.path.exists(engine_path):
+        raise FileNotFoundError(f"Engine not found at path: {engine_path}")
+
     p = subprocess.Popen(
         [engine_path],
         stdin=subprocess.PIPE,
@@ -111,27 +128,40 @@ def probe_engine_metadata(engine_path):
     )
 
     meta = {}
+    start = time.time()
+    try:
+        # Send UCI
+        p.stdin.write("uci\n")
+        p.stdin.flush()
 
-    p.stdin.write("uci\n")
-    p.stdin.flush()
+        while True:
+            if time.time() - start > timeout:
+                raise RuntimeError(f"Timeout waiting for UCI response from {engine_path}")
 
-    for line in p.stdout:
-        line = line.strip()
+            line = p.stdout.readline()
+            if not line:
+                time.sleep(0.01)
+                continue
 
-        #if line.startswith("id name"):
-        #    meta["name"] = line[len("id name"):].strip()
+            line = line.strip()
+            if line.startswith("id version"):
+                meta["version"] = line[len("id version"):].strip()
+            elif line == "uciok":
+                break
 
-        if line.startswith("id version"):
-            meta["version"] = line[len("id version"):].strip()
+        # Try to quit cleanly
+        try:
+            p.stdin.write("quit\n")
+            p.stdin.flush()
+            p.wait(timeout=1)
+        except subprocess.TimeoutExpired:
+            p.kill()
 
-        elif line == "uciok":
-            break
+    finally:
+        if p.poll() is None:
+            p.kill()
 
-    p.stdin.write("quit\n")
-    p.stdin.flush()
-    p.wait(timeout=1)
-
-    if "version" not in meta: # "name" not in meta or
+    if "version" not in meta:
         raise RuntimeError(f"Failed to probe engine metadata: {engine_path}")
 
     return meta
@@ -655,8 +685,11 @@ def bulk_log_search_and_timing(
 
 
 if __name__ == "__main__":
+    system = platform.system()
+    
     p = argparse.ArgumentParser(description="ETL functions for chess.db\nRegister engines, upload logs, clear directories")
     
+
     # register engine to database for use in experiments
     #   release pipeline automatically registers engine
     p.add_argument("--register_engine", action="store_true", help="Flag to register engine to chess.db")
@@ -671,8 +704,8 @@ if __name__ == "__main__":
     #p.add_argument("--games_dir", type=str, default="logs/game_logs", help="Directory where game files are stored")
 
     args = p.parse_args()
-    #cnxn = sqlite3.connect('F:/databases/chess.db')
-    cnxn = sqlite3.connect(Path.home() / "Documents/databases/chess.db")
+    if system == "Windows": cnxn = sqlite3.connect('F:/databases/chess.db')
+    elif system == "Darwin": cnxn = sqlite3.connect(Path.home() / "Documents/databases/chess.db")
 
     if args.register_engine:
         register_engine(cnxn, {"name": args.name, "version": args.version, "description": args.description, "uci_options": args.uci_options})

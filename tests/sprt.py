@@ -10,6 +10,9 @@ import re
 from pathlib import Path
 import time
 from datetime import datetime, timezone
+import platform
+
+system = platform.system()
 
 # paths
 TESTS_DIR = Path(__file__).resolve().parent
@@ -22,6 +25,7 @@ SEARCH_JSON = SPRT_LOG_DIR / "search.jsonl"
 TIMING_JSON = SPRT_LOG_DIR / "timing.jsonl"
 
 def parse_cutechess_output(output, candidate_name="Candidate"):
+
     def safe_int(x):
         try:
             return int(x)
@@ -84,6 +88,7 @@ def parse_cutechess_output(output, candidate_name="Candidate"):
 
     # We overwrite on every match → last one wins
     for line in output.splitlines():
+
         line = line.strip()
 
         if m := score_re.search(line):
@@ -134,10 +139,12 @@ def parse_cutechess_output(output, candidate_name="Candidate"):
 
 
 def upload_logs(args, cute_chess_stats, runtime=None):
-    cnxn = sqlite3.connect("F:/databases/chess.db")
+    if system == "Windows": cnxn = sqlite3.connect('F:/databases/chess.db')
+    elif system == "Darwin": cnxn = sqlite3.connect(Path.home() / "Documents/databases/chess.db")
+    print('sys')
     candidate_engine_version = etl.probe_engine_metadata(args.engine_a)['version']
     baseline_engine_version = etl.probe_engine_metadata(args.engine_b)['version']
-
+    print('vers')
     # get engine_id by probing db.engines via version
     candidate_engine_id = etl.get_engine_id(cnxn, version=candidate_engine_version)
     baseline_engine_id = etl.get_engine_id(cnxn, version=baseline_engine_version)
@@ -149,6 +156,7 @@ def upload_logs(args, cute_chess_stats, runtime=None):
         candidate_engine_id,
         comparison_engine_id = baseline_engine_id
     )
+
 
     # map search --> game
     game_map = etl.bulk_log_game(
@@ -213,7 +221,7 @@ def parse_args():
     p.add_argument("--max-games", type=int, default=1000)
 
     # Opening book
-    p.add_argument("--book",  help="Opening book file")
+    p.add_argument("--book", default= PROJECT_ROOT / "bin" / "opening_books" / "8moves_v3.pgn" , help="Opening book file")
     p.add_argument("--book-depth", type=int, default=8)
 
     # Logging
@@ -337,7 +345,7 @@ def main(args=None):
     run_time = time.time() - start_time
     output = "".join(output_lines)
     stats = parse_cutechess_output(output)
-
+    print('upload')
     upload_logs(args, cute_chess_stats=stats, runtime=run_time)
 
     print("[SPRT] Completed successfully")

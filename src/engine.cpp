@@ -286,8 +286,8 @@ void Engine::setPosition(const std::string& fen,
             switch (moveStr[4]) {
                 case 'q': flag = Move::promoteToQueenFlag;  break;
                 case 'r': flag = Move::promoteToRookFlag;   break;
-                case 'b': flag = Move::promoteToBishopFlag;break;
-                case 'n': flag = Move::promoteToKnightFlag;break;
+                case 'b': flag = Move::promoteToBishopFlag; break;
+                case 'n': flag = Move::promoteToKnightFlag; break;
             }
         }
 

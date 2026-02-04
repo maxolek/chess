@@ -9,6 +9,9 @@ from datetime import datetime
 from pathlib import Path
 from data import etl
 from tests import perft, sprt, sts
+import platform
+
+system = platform.system()
 
 # ============================================================
 # Project layout (run from /chess)
@@ -22,7 +25,9 @@ ENGINES_DIR = os.path.join(PROJECT_ROOT, "engines")
 LOGS_DIR    = os.path.join(PROJECT_ROOT, "logs")
 TESTS_DIR   = os.path.join(PROJECT_ROOT, "tests")
 BIN_DIR     = os.path.join(PROJECT_ROOT, "bin")
-DB_PATH     = "F:/databases/chess.db"
+if system == "Windows": DB_PATH = 'F:/databases/chess.db'
+elif system == "Darwin": DB_PATH = str(Path.home() / "Documents/databases/chess.db")
+
 
 SPRT_LOG_DIR  = os.path.join(LOGS_DIR, "sprt_logs")
 STS_LOG_DIR   = os.path.join(LOGS_DIR, "sts_logs")
@@ -136,8 +141,7 @@ def main():
     parser.add_argument("--version", required=True)
     parser.add_argument("--name")
     parser.add_argument("--description")
-    parser.add_argument("--makefile", default="makefile.mak")
-
+    
     parser.add_argument("--cutechess-cli", default=r"C:\Program Files (x86)\Cute Chess\cutechess-cli.exe", help="Full path to cutechess-cli.exe\nUsed for game testing")
 
     # SPRT
@@ -159,7 +163,7 @@ def main():
     parser.add_argument("--sts_depth", type=int)
 
     # PERFT
-    parser.add_argument("--perft", default=False)
+    parser.add_argument("--perft", action="store_true")
     parser.add_argument("--perft_positions", default=os.path.join(BIN_DIR, "test_positions", "perft.epd"))
     parser.add_argument("--perft_depth", type=int, default=5)
 

@@ -7,6 +7,9 @@ import sqlite3
 from data import etl
 from pathlib import Path
 from datetime import datetime, timezone
+import platform
+
+system = platform.system()
 
 # paths
 TESTS_DIR = Path(__file__).resolve().parent
@@ -24,8 +27,9 @@ STS_JSON = STS_LOGS_DIR / "sts_suite.jsonl"
 # --------------------------
 
 def upload_logs(args):
-    #cnxn = sqlite3.connect("F:/databases/chess.db")
-    cnxn = sqlite3.connect(Path.home() / "Documents/databases/chess.db")
+    if system == "Windows": cnxn = sqlite3.connect('F:/databases/chess.db')
+    elif system == "Darwin": cnxn = sqlite3.connect(Path.home() / "Documents/databases/chess.db")
+
     cnxn.row_factory = sqlite3.Row 
 
     # probe metadata

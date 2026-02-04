@@ -98,12 +98,14 @@ bool MoveGenerator::isPinned(int square) {
     // filtered to single direction @ slider_sq
     U64 full_line = PrecomputedMoveData::alignMasks[own_king_square][square];
 
+
     // Enemy sliders along this full line
     auto [dx, dy] = direction_map(own_king_square, square);
     bool ortho = (dx == 0 || dy == 0);
     U64 enemy_sliders = ortho ? (opp & (rooks | queens)) : (opp & (bishops | queens));
     U64 sliders_on_line = full_line & enemy_sliders;
     if (!sliders_on_line) return false;
+
 
     // Pick slider along the ray: MSB if candidate < king, LSB if candidate > king
     // pinning piece must be on 'more extreme' square idx than pinned_sq relative to king
@@ -120,7 +122,8 @@ bool MoveGenerator::isPinned(int square) {
     // remove end points (slider + king)
     U64 between = between_king_and_slider & ~(1ULL << own_king_square | 1ULL << slider_sq);
 
-    return countBits(between) == 1;
+    // iff the only bit on between is the square we are checking, then it is pinned
+    return (between == (1ULL << square));
 }
 
 

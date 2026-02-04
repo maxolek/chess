@@ -8,9 +8,15 @@ import sqlite3
 from pathlib import Path
 from data import etl
 from datetime import datetime, timezone
+import platform
 
-#STOCKFISH = r"C:\Users\maxol\chess\engines\stockfish\stockfish-windows-x86-64-avx2.exe"
-STOCKFISH = "engines/stockfish/stockfish-macos-m1-apple-silicon"
+system = platform.system()
+
+# paths
+TESTS_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = TESTS_DIR.parent
+if system == "Windows": STOCKFISH = r"C:\Users\maxol\chess\engines\stockfish\stockfish-windows-x86-64-avx2.exe"
+elif system == "Darwin": STOCKFISH = "engines/stockfish/stockfish-macos-m1-apple-silicon"
 
 # -----------------------------
 # Load positions
@@ -106,7 +112,7 @@ def main(args=None):
         parser = argparse.ArgumentParser(description="Perft verifier + DB logger")
         parser.add_argument("--engine", required=True, help="Path to engine binary")
         parser.add_argument("--stockfish", default=STOCKFISH, help="Path to Stockfish binary")
-        parser.add_argument("--positions", required=True, help="File containing FEN positions")
+        parser.add_argument("--positions", default=PROJECT_ROOT / "bin" / "test_positions" / "perft.epd", help="File containing FEN positions")
         parser.add_argument("--depth", type=int, required=True, help="Perft depth")
 
         args = parser.parse_args()
@@ -119,8 +125,9 @@ def main(args=None):
     # -----------------------------
     # DB setup
     # -----------------------------
-    #cnxn = sqlite3.connect("F:/databases/chess.db")
-    cnxn = sqlite3.connect(Path.home() / "Documents/databases/chess.db")
+    system = platform.system()
+    if system == "Windows": cnxn = sqlite3.connect('F:/databases/chess.db')
+    elif system == "Darwin": cnxn = sqlite3.connect(Path.home() / "Documents/databases/chess.db")
     cnxn.row_factory = sqlite3.Row
 
     engine_meta = etl.probe_engine_metadata(args.engine)

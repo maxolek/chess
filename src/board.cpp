@@ -351,7 +351,7 @@ bool Board::isThreefold() {
     for (int i = static_cast<int>(zobrist_history.size()) - lookback; i < static_cast<int>(zobrist_history.size()); ++i) {
         if (zobrist_history[i] == zobrist_hash)
             count++;
-        if (count >= 2)
+        if (count >= 3)
             return true;
     }
 
