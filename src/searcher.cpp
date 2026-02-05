@@ -144,14 +144,17 @@ int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int 
 
 
     // --- TT probe ---
+    /*
     TTEntry* ttEntry = engine.tt.probe(board.zobrist_hash);
     if (ttEntry && ttEntry->key == board.zobrist_hash) {
+        STATS_TT_HIT(search_depth, ply);
         if (ttEntry->flag == EXACT) return ttEntry->eval;
         else if (ttEntry->flag == UPPERBOUND && ttEntry->eval <= alpha) return alpha;
         else if (ttEntry->flag == LOWERBOUND && ttEntry->eval >= beta)  return beta;
 
-        if (alpha >= beta) return ttEntry->eval;
+        //if (alpha >= beta) return ttEntry->eval;
     }
+    */
 
     // Use incremental NNUE output (accumulators must be kept in sync)
     //boardallGameMoves.back().PrintMove();
@@ -207,8 +210,8 @@ int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int 
     }
 
     // store best capture or draw
-    engine.tt.store(board.zobrist_hash, depth, ply, bestEval, EXACT, bestMove);
-    STATS_TT_STORE(search_depth, search_depth);
+    //engine.tt.store(board.zobrist_hash, depth, ply, bestEval, EXACT, bestMove);
+    //STATS_TT_STORE(search_depth, search_depth);
 
     return bestEval;
 }
@@ -239,14 +242,12 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
     if (ttEntry && ttEntry->key == board.zobrist_hash && ttEntry->depth >= depth) {
         STATS_TT_HIT(depth+ply, ply);
         int ttScore = ttEntry->eval;
-        if (ttScore > MATE_SCORE - 1000) ttScore -= ply;
-        else if (ttScore < -MATE_SCORE + 1000) ttScore += ply;
 
         if (ttEntry->flag == EXACT) return ttScore;
         else if (ttEntry->flag == UPPERBOUND && ttScore <= alpha) return alpha;
         else if (ttEntry->flag == LOWERBOUND && ttScore >= beta)  return beta;
 
-        if (alpha >= beta) return ttScore;
+        //if (alpha >= beta) return ttScore;
     }
 
     Move moves[MAX_MOVES];
@@ -301,8 +302,11 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
     if (bestEval <= alphaOrig) { flag = UPPERBOUND; STATS_FAILLOW(depth+ply, ply); }
     else if (bestEval >= beta) { flag = LOWERBOUND; }
 
-    engine.tt.store(board.zobrist_hash, depth, ply, bestEval, flag, bestMove);
-    STATS_TT_STORE(depth+ply, ply);
+    if (flag == LOWERBOUND)
+        engine.tt.store(board.zobrist_hash, depth, ply, beta, LOWERBOUND, Move::NullMove);
+    else
+        engine.tt.store(board.zobrist_hash, depth, ply, bestEval, flag, bestMove);
+    //STATS_TT_STORE(depth+ply, ply);
 
     return bestEval;
 }

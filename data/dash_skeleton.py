@@ -11,6 +11,7 @@ import duckdb
 from pathlib import Path
 import platform
 import webbrowser
+import chess
 
 # --- Load Data ---
 system = platform.system()
@@ -23,6 +24,7 @@ con = duckdb.connect(DB_PATH)
 # Load your analytical tables into DataFrames for Dash
 # We pull from the pre-processed "features" tables we built earlier
 games_df = con.execute("SELECT * FROM game_stats").df()
+positions_df = con.execute("SELECT * from position_features").df()
 engines_df = con.execute("SELECT * FROM engines").df()
 search_df = con.execute("SELECT * FROM search_features").df()
 itdeep_df = con.execute("SELECT * FROM search_iteration_features").df()
@@ -67,7 +69,7 @@ else:
     search_df['result_label'] = None
 
 # --- Utility: Filtering ---
-def filter_data(engine_vals, result_vals, opening_vals):
+def filter_data(engine_vals, result_vals, opening_vals, side_vals, phase_vals, pos_type_vals):
     games_filt = games_df.copy()
     search_filt = search_df.copy()
 
@@ -89,14 +91,25 @@ def filter_data(engine_vals, result_vals, opening_vals):
         search_filt = search_filt[search_filt['result_label'].isin(result_vals)]
     if opening_vals and 'opening' in games_filt:
         games_filt = games_filt[games_filt['opening'].isin(opening_vals)]
+    if side_vals and 'engine_side' in search_filt:
+        search_filt = search_filt[search_filt['engine_side'].isin(side_vals)]
+    if phase_vals and 'game_phase' in search_filt:
+        search_filt = search_filt[search_filt['game_phase'].isin(phase_vals)]
+    if pos_type_vals and 'position_type' in search_filt:
+        search_filt = search_filt[search_filt['position_type'].isin(pos_type_vals)]
+    
     if 'game_id' in search_filt.columns and 'id' in games_filt.columns:
         search_filt = search_filt[search_filt['game_id'].isin(games_filt['id'].unique())]
+    
     return games_filt, search_filt
 
 # --- Options ---
 engine_options = [{"label": n, "value": i} for i, n in engines_df[['id', 'name']].drop_duplicates().values]
+side_options = [{"label": s, "value": s} for s in search_df['engine_side'].dropna().unique()]
 result_options = [{"label": r, "value": r} for r in search_df['result_label'].dropna().unique()]
 opening_options = [{"label": o, "value": o} for o in games_df['opening'].dropna().unique()] if 'opening' in games_df else []
+game_phase_options = [{"label": p, "value": p} for p in positions_df['game_phase'].dropna().unique()]
+position_type_options = [{"label": t, "value": t} for t in positions_df['position_type'].dropna().unique()]
 
 # --- LAYOUT ---
 app = dash.Dash(__name__, suppress_callback_exceptions=True)
@@ -108,15 +121,31 @@ app.layout = html.Div([
         # Sidebar
         html.Div([
             html.H3("Filters"),
+
             html.Label("Engine"),
             dcc.Dropdown(id='engine-filter', options=engine_options, multi=True, placeholder="All engines"),
             html.Br(),
+
+            html.Label("Side"),
+            dcc.Dropdown(id="side-filter", options=side_options, placeholder="Both sides"),
+            html.Br(),
+            
             html.Label("Result"),
             dcc.Dropdown(id='result-filter', options=result_options, multi=True, placeholder="All results"),
             html.Br(),
+            
             html.Label("Opening"),
             dcc.Dropdown(id='opening-filter', options=opening_options, multi=True, placeholder="All openings"),
             html.Br(),
+
+            html.Label("Game Phase"),
+            dcc.Dropdown(id="phase-filter", options=game_phase_options, multi=True, placeholder="All phases"),
+            html.Br(),
+
+            html.Label("Position Type"),
+            dcc.Dropdown(id="pos-type-filter", options=position_type_options, placeholder="All positions"),
+            html.Br(),
+            
             html.Hr(),
             html.Button("Reset Filters", id='reset-filters', n_clicks=0, style={'width': '100%'})
         ], style={'width': '20%', 'padding': '15px', 'borderRight': '1px solid #ddd',
@@ -143,7 +172,7 @@ app.layout = html.Div([
 
 # FILTER RESET
 @app.callback(
-    [Output('engine-filter', 'value'), Output('result-filter', 'value'), Output('opening-filter', 'value')],
+    [Output('engine-filter', 'value'), Output('result-filter', 'value'), Output('opening-filter', 'value'), Output('pos-type-filter', 'value'), Output('phase-filter', 'value'), Output('side-filter', 'value')],
     [Input('reset-filters', 'n_clicks')]
 )
 def reset_filters(n):
@@ -158,7 +187,10 @@ def reset_filters(n):
     Input('tabs', 'value'),
     Input('engine-filter', 'value'),
     Input('result-filter', 'value'),
-    Input('opening-filter', 'value')
+    Input('opening-filter', 'value'),
+    Input('pos-type-filter', 'value'),
+    Input('phase-filter', 'value'),
+    Input('side-filter', 'value')
 )
 def render_tab(tab, engine_filter, result_filter, opening_filter):
     games_filt, search_filt = filter_data(engine_filter, result_filter, opening_filter)
@@ -346,7 +378,10 @@ def render_tab(tab, engine_filter, result_filter, opening_filter):
     Input('search-y-axis', 'value'),
     Input('engine-filter', 'value'),
     Input('result-filter', 'value'),
-    Input('opening-filter', 'value')
+    Input('opening-filter', 'value'),
+    Input('pos-type-filter', 'value'),
+    Input('phase-filter', 'value'),
+    Input('side-filter', 'value')
 )
 def update_search_graph(x_col, y_col, engine_filter, result_filter, opening_filter):
     _, search_filt = filter_data(engine_filter, result_filter, opening_filter)
@@ -388,7 +423,10 @@ def update_search_graph(x_col, y_col, engine_filter, result_filter, opening_filt
     Input('fen-dropdown', 'value'),
     Input('engine-filter', 'value'),
     Input('result-filter', 'value'),
-    Input('opening-filter', 'value')
+    Input('opening-filter', 'value'),
+    Input('pos-type-filter', 'value'),
+    Input('phase-filter', 'value'),
+    Input('side-filter', 'value')
 )
 def analyze_fen(fen_value, engine_filter, result_filter, opening_filter):
     _, search_filt = filter_data(engine_filter, result_filter, opening_filter)

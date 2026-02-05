@@ -235,8 +235,8 @@ def init_engine_db(db_dir=dir) -> None:
             depth_per_move                  INTEGER,
             elo0                            INTEGER,
             elo1                            INTEGER,
-            alpha                           INTEGER,
-            beta                            INTEGER,
+            alpha                           REAL,
+            beta                            REAL,
         -- results
             result                          TEXT,    -- pass/fail/inconclusive
             elo_diff                        INTEGER,

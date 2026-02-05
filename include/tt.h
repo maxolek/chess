@@ -95,7 +95,8 @@ public:
             entry->bestMove = bestMove.Value();
             entry->age++;
 
-            stats.totalStores++;
+            //stats.totalStores++;
+            STATS_TT_STORE(depth+ply, ply);
         }
     }
 
