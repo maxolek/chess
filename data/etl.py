@@ -170,7 +170,7 @@ def probe_engine_metadata(engine_path, timeout=10.0):
 def extract_engine_id_from_search(search_path):
     with open(search_path, "r") as f:
         for line in f:
-            data = json.loads(line)
+            data = json.loads(line.strip())
             if "engine_id" in data:
                 return data["engine_id"]
     return None
@@ -353,7 +353,7 @@ def bulk_log_sts(cnxn, path, sts_id, **kwargs):
 
     with open(path, "r") as f:
         for line in f:
-            data = json.loads(line)
+            data = json.loads(line.strip())
 
             move = data.get('engine_move')
             # most STS has only 1 best move, some have 2
@@ -410,7 +410,7 @@ def bulk_log_game(cnxn, path, experiment_id=None, second_engine_id=None):
 
     with open(path, "r") as f:
         for line in f:
-            data = json.loads(line)
+            data = json.loads(line.strip())
 
             game_uuids.append(data["game_uuid"])
             if data.get('side') == "white":
@@ -495,7 +495,7 @@ def bulk_log_search_and_timing(
     # full search summary
     with open(search_path, "r") as f:
         for line in f:
-            data = json.loads(line)
+            data = json.loads(line.strip())
 
             if not sts_id or game_map == {}:
                 game_uuid = data["game_uuid"]
@@ -557,7 +557,7 @@ def bulk_log_search_and_timing(
     depth_rows = []
     with open(search_path, "r") as f:
         for line in f:
-            data = json.loads(line)
+            data = json.loads(line.strip())
             search_id = uuid_map[data["search_uuid"]]
 
             n = len(data.get("itdepth_nodes", []))
@@ -603,7 +603,7 @@ def bulk_log_search_and_timing(
     ply_rows = []
     with open(search_path, "r") as f:
         for line in f:
-            data = json.loads(line)
+            data = json.loads(line.strip())
             search_id = uuid_map[data["search_uuid"]]
 
             n = len(data.get("treedepth_nodes", []))
@@ -645,7 +645,7 @@ def bulk_log_search_and_timing(
     if timing_path:
         with open(timing_path, "r") as f:
             for line in f:
-                data = json.loads(line)
+                data = json.loads(line.strip())
                 if data.get("type") != "timing":
                     continue
 

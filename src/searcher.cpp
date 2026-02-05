@@ -147,8 +147,9 @@ int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int 
     TTEntry* ttEntry = engine.tt.probe(board.zobrist_hash);
     if (ttEntry && ttEntry->key == board.zobrist_hash) {
         if (ttEntry->flag == EXACT) return ttEntry->eval;
-        else if (ttEntry->flag == LOWERBOUND) alpha = std::max(alpha, (int)ttEntry->eval);
-        else if (ttEntry->flag == UPPERBOUND) beta = std::min(beta, (int)ttEntry->eval);
+        else if (ttEntry->flag == UPPERBOUND && ttEntry->eval <= alpha) return alpha;
+        else if (ttEntry->flag == LOWERBOUND && ttEntry->eval >= beta)  return beta;
+
         if (alpha >= beta) return ttEntry->eval;
     }
 
@@ -242,8 +243,8 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
         else if (ttScore < -MATE_SCORE + 1000) ttScore += ply;
 
         if (ttEntry->flag == EXACT) return ttScore;
-        else if (ttEntry->flag == LOWERBOUND && ttScore > alpha) alpha = ttScore;
-        else if (ttEntry->flag == UPPERBOUND && ttScore < beta)  beta = ttScore;
+        else if (ttEntry->flag == UPPERBOUND && ttScore <= alpha) return alpha;
+        else if (ttEntry->flag == LOWERBOUND && ttScore >= beta)  return beta;
 
         if (alpha >= beta) return ttScore;
     }

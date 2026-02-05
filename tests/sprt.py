@@ -141,10 +141,10 @@ def parse_cutechess_output(output, candidate_name="Candidate"):
 def upload_logs(args, cute_chess_stats, runtime=None):
     if system == "Windows": cnxn = sqlite3.connect('F:/databases/chess.db')
     elif system == "Darwin": cnxn = sqlite3.connect(Path.home() / "Documents/databases/chess.db")
-    print('sys')
+
     candidate_engine_version = etl.probe_engine_metadata(args.engine_a)['version']
     baseline_engine_version = etl.probe_engine_metadata(args.engine_b)['version']
-    print('vers')
+
     # get engine_id by probing db.engines via version
     candidate_engine_id = etl.get_engine_id(cnxn, version=candidate_engine_version)
     baseline_engine_id = etl.get_engine_id(cnxn, version=baseline_engine_version)
@@ -345,7 +345,7 @@ def main(args=None):
     run_time = time.time() - start_time
     output = "".join(output_lines)
     stats = parse_cutechess_output(output)
-    print('upload')
+
     upload_logs(args, cute_chess_stats=stats, runtime=run_time)
 
     print("[SPRT] Completed successfully")

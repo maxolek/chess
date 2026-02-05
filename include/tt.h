@@ -75,14 +75,13 @@ public:
                       BoundType flag, Move bestMove) {
         ScopedTimer timer(T_TT_STORE);
         TTEntry* entry = probe(key);
-        int horizon = ply + depth;
-
+        
         bool wasEmpty   = (entry->key == 0);
         bool overwritten = (!wasEmpty && entry->key != key);
 
         // Replace if new key or deeper horizon
         // todo: switch to deeper depth
-        if (entry->key != key || horizon >= entry->horizon) {
+        if (entry->key != key || depth >= entry->depth) {
             if (overwritten)
                 stats.overwritten++;
 
@@ -92,7 +91,6 @@ public:
             entry->key = key;
             entry->eval = static_cast<int16_t>(score);
             entry->depth = static_cast<int16_t>(depth);
-            entry->horizon = static_cast<int16_t>(horizon);
             entry->flag = flag;
             entry->bestMove = bestMove.Value();
             entry->age++;

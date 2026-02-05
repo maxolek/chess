@@ -12,6 +12,7 @@ piece_values = {
     'b': 3,
     'r': 5,
     'q': 9,
+    'k': 10000
 }
 
 # piece contributions to game phasing
@@ -20,7 +21,8 @@ phase_values = {
     'n': 1,
     'b': 1,
     'r': 2,
-    'q': 4
+    'q': 4,
+    'k': None
 }
 
 # HELPERS
@@ -271,7 +273,7 @@ def build_position_features(cnxn):
     """)
 
     # Fetch all positions (from your intermediate table)
-    rows = cnxn.execute("SELECT search_id, fen, game_id, sts_id FROM positions_features").fetchall()
+    rows = cnxn.execute("SELECT search_id, fen, game_id, sts_id FROM dim_positions").fetchall()
 
     for row in rows:
         search_id, fen, game_id, sts_id = row
@@ -331,3 +333,17 @@ def build_position_features(cnxn):
             f"INSERT INTO position_features ({cols}) VALUES ({placeholders})",
             list(features.values())
         )
+
+
+import duckdb
+import platform
+system = platform.system()
+
+if __name__ == "__main__":
+    if system == "Windows": DB = "F:/databases/chess_analytics.duckdb"
+
+    cnxn = duckdb.connect(DB)
+
+    build_position_features(cnxn)
+
+    cnxn.close()

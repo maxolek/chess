@@ -70,6 +70,11 @@ enum Result
 extern std::string file_char;
 extern std::string results_string[];
 
+inline double round_to_n_decimals(double value, int decimal_places) {
+    const double multiplier = std::pow(10.0, decimal_places);
+    return std::round(value * multiplier) / multiplier;
+}
+
 // uuid for keys in logging
 // UUID v4 generator (cross-platform)
 inline std::string generate_uuid() {

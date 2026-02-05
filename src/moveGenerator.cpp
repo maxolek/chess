@@ -123,6 +123,7 @@ bool MoveGenerator::isPinned(int square) {
     U64 between = between_king_and_slider & ~(1ULL << own_king_square | 1ULL << slider_sq);
 
     // iff the only bit on between is the square we are checking, then it is pinned
+    // !!! slow i think !!!
     return (between == (1ULL << square));
 }
 

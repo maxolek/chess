@@ -137,6 +137,12 @@ void UCI::handleCommand(const std::string& line) {
         std::cout << "--- End of Hash History ---\n";
         std::cout << "allgamemoves.size: " << engine->game_board.allGameMoves.size() << "\tzobrist_history.sum: " << sum << "\tzobrist_vec.size: " << engine->search_board.zobrist_history.size() << std::endl;
     }
+    else if (token == "dump_tt") {
+        std::cout << "\n(Last search) Stores:     " << g_stats.tt_stores << std::endl;
+        std::cout << "\n(Last search) Hits:       " << g_stats.tt_hits << std::endl;
+        std::cout << "\n(Last search) Overwrites: " << g_stats.tt_overwritten << std::endl;
+        std::cout << "\n(Full game)   Fill %:     " << round_to_n_decimals(100*engine->tt.fillRatio(),2) << " %" << std::endl;
+    }
     else if (token == "dumpstats") {
         //engine->dumpStats(); // you implement
     }

@@ -1,9 +1,16 @@
 import duckdb 
 from pathlib import Path 
-import etl
+import platform
+from . import etl
 
-RAW_DB = Path.home() / "Documents/databases/chess.db"
-ANALYTICS_DB = Path.home() / "Documents/databases/chess_analytics.duckdb"
+system = platform.system()
+
+if system == "Windows":
+    RAW_DB = 'F:/databases/chess.db'
+    ANALYTICS_DB = 'F:/databases/chess_analytics.duckdb'
+elif system == "Darwin":
+    RAW_DB = Path.home() / "Documents/databases/chess.db"
+    ANALYTICS_DB = Path.home() / "Documents/databases/chess_analytics.duckdb"
 
 # connect raw_db to analytics_db
 cnxn = duckdb.connect(ANALYTICS_DB)
@@ -13,7 +20,19 @@ cnxn.execute(f"""
 """)
 
 # udf helper functions
-duckdb.register('opening_eco', etl.get_opening_from_moves)
+def opening_eco_udf(moves_list: str):
+    # moves_list comes as a string from DuckDB
+    moves = moves_list.split()
+    eco, name = etl.get_opening_from_moves(moves)
+    return [eco, name]  # return as a list of two strings
+
+# Use DuckDB ListType for return
+cnxn.create_function(
+    "get_opening_from_moves",
+    opening_eco_udf,
+    parameters=["VARCHAR"],
+    return_type="VARCHAR[]"
+)
 
 # copy tables
 
@@ -32,7 +51,7 @@ cnxn.execute("""
 cnxn.execute("""
     CREATE OR REPLACE TABLE sprt_runs AS
     SELECT * REPLACE (
-                list_extract(string_split(opening_book, '\\'), -1)
+                list_extract(string_split(opening_book, '\\'), -1) AS opening_book
             )
     FROM raw.sprt    
 """)
@@ -91,7 +110,7 @@ cnxn.execute("""
 """)
 
 cnxn.execute("""
-    CREATE OR REPLACE TABLE searches_by_tree_depth AS
+    CREATE OR REPLACE TABLE search_tree_stats AS
     SELECT *
     FROM raw.searches_by_tree_depth
 """)
@@ -103,8 +122,10 @@ cnxn.execute("""
 """)
 
 cnxn.execute("""
-    CREATE OR REPLACE TABLE position_features AS
+    CREATE OR REPLACE TABLE dim_positions AS
     SELECT 
-        search_id, fen, game_id, sts_id
-    FROM searches       
+        id as search_id, fen, game_id, sts_id
+    FROM raw.searches       
 """)
+
+cnxn.close()
