@@ -1,79 +1,111 @@
 import duckdb 
 from pathlib import Path 
 import platform
+import os
 from . import etl
 
 system = platform.system()
 
 if system == "Windows":
-    RAW_DB = 'F:/databases/chess.db'
-    ANALYTICS_DB = 'F:/databases/chess_analytics.duckdb'
+    RAW_DB = Path('F:/databases/chess.db')
+    DEFAULT_ANALYTICS_DB = Path('F:/databases/chess_analytics.duckdb')
 elif system == "Darwin":
     RAW_DB = Path.home() / "Documents/databases/chess.db"
-    ANALYTICS_DB = Path.home() / "Documents/databases/chess_analytics.duckdb"
+    DEFAULT_ANALYTICS_DB = Path.home() / "Documents/databases/chess_analytics.duckdb"
+else:
+    RAW_DB = Path.home() / "Documents/databases/chess.db"
+    DEFAULT_ANALYTICS_DB = Path.home() / "Documents/databases/chess_analytics.duckdb"
+
+# Allow overriding the analytics DB path via environment variable to avoid locked file.
+ANALYTICS_DB = Path(os.environ.get('CHESS_ANALYTICS_DB') or DEFAULT_ANALYTICS_DB)
 
 # connect raw_db to analytics_db
-cnxn = duckdb.connect(ANALYTICS_DB)
+cnxn = duckdb.connect(str(ANALYTICS_DB))
 
 cnxn.execute(f"""
     ATTACH '{RAW_DB}' AS raw (TYPE SQLITE)
 """)
 
-# udf helper functions
-def opening_eco_udf(moves_list: str):
-    # moves_list comes as a string from DuckDB
-    moves = moves_list.split()
-    eco, name = etl.get_opening_from_moves(moves)
-    return [eco, name]  # return as a list of two strings
 
-# Use DuckDB ListType for return
+# udf helper functions
+def opening_name_udf(moves_list: str):
+    try:
+        eco, name = etl.get_opening_from_moves(moves_list)
+        return name or ""
+    except Exception:
+        return ""
+
+
+def opening_code_udf(moves_list: str):
+    try:
+        eco, name = etl.get_opening_from_moves(moves_list)
+        return eco or ""
+    except Exception:
+        return ""
+
+# Register scalar UDFs for opening name and ECO code
 cnxn.create_function(
-    "get_opening_from_moves",
-    opening_eco_udf,
+    "get_opening_name",
+    opening_name_udf,
     parameters=["VARCHAR"],
-    return_type="VARCHAR[]"
+    return_type="VARCHAR"
+)
+cnxn.create_function(
+    "get_opening_code",
+    opening_code_udf,
+    parameters=["VARCHAR"],
+    return_type="VARCHAR"
 )
 
 # copy tables
 
+cnxn.execute("DROP TABLE IF EXISTS engines")
 cnxn.execute("""
-    CREATE OR REPLACE TABLE engines AS 
+    CREATE TABLE engines AS 
     SELECT * 
     FROM raw.engines    
 """)
 
+cnxn.execute("DROP TABLE IF EXISTS experiments")
 cnxn.execute("""
-    CREATE OR REPLACE TABLE experiments AS 
+    CREATE TABLE experiments AS 
     SELECT *
     FROM raw.experiments
 """)
 
+cnxn.execute("DROP TABLE IF EXISTS sprt_runs")
 cnxn.execute("""
-    CREATE OR REPLACE TABLE sprt_runs AS
+    CREATE TABLE sprt_runs AS
     SELECT * REPLACE (
-                list_extract(string_split(opening_book, '\\'), -1) AS opening_book
+                CAST(alpha AS DOUBLE) AS alpha,
+                CAST(beta AS DOUBLE) AS beta,
+                list_extract(string_split(opening_book, '\\'), -1) AS opening_book,
+                CAST((COALESCE(elo1,0) - COALESCE(elo0,0)) AS DOUBLE) AS elo_diff
             )
     FROM raw.sprt    
 """)
 
+cnxn.execute("DROP TABLE IF EXISTS sts_runs")
 cnxn.execute("""
-    CREATE OR REPLACE TABLE sts_runs AS
+    CREATE TABLE sts_runs AS
     SELECT * REPLACE (
                 list_extract(string_split(suite, '\\'), -1) AS suite 
-            ),
+            ) ,
             trim(split_part(position_name, '-', 2)) as position_type
     FROM raw.sts          
 """)
 
 # not creating a PERFT table as analytics will focus on searches not testing
 
+cnxn.execute("DROP TABLE IF EXISTS game_stats")
 cnxn.execute("""
-    CREATE OR REPLACE TABLE game_stats AS 
+    CREATE TABLE game_stats AS 
              
     WITH openings AS (
         SELECT *,
              -- (eco_code , name)
-             get_opening_from_moves(moves) as opening_tuple
+             get_opening_name(moves) as opening,
+             get_opening_code(moves) as opening_eco
         FROM raw.games         
     )
 
@@ -90,39 +122,53 @@ cnxn.execute("""
                     WHEN termination = 4 THEN 'fiftymove'
                     WHEN termination = 5 THEN 'time'
                     WHEN termination = 6 THEN 'resign'
-                END as termination,
-                opening_tuple[1] as opening
-            ),
-        opening_tuple[0] as opening_eco 
-    FROM openings
+                END as termination
+            )
+        -- opening and opening_eco are provided by the UDFs in the CTE
+        FROM openings
 """)
 
+# Ensure opening columns are populated (compute directly from `moves` if necessary).
 cnxn.execute("""
-    CREATE OR REPLACE TABLE search_stats AS 
+UPDATE game_stats
+SET opening = get_opening_name(moves),
+    opening_eco = get_opening_code(moves)
+WHERE opening IS NULL OR opening = ''
+""")
+
+# NOTE: opening/opening_eco are created directly by the UDFs in the CTE above.
+
+cnxn.execute("DROP TABLE IF EXISTS search_stats")
+cnxn.execute("""
+    CREATE TABLE search_stats AS 
     SELECT *
     FROM raw.searches          
 """)
 
+cnxn.execute("DROP TABLE IF EXISTS iterative_deepening_stats")
 cnxn.execute("""
-    CREATE OR REPLACE TABLE iterative_deepening_stats AS
+    CREATE TABLE iterative_deepening_stats AS
     SELECT *
     FROM raw.searches_by_iteration
 """)
 
+cnxn.execute("DROP TABLE IF EXISTS search_tree_stats")
 cnxn.execute("""
-    CREATE OR REPLACE TABLE search_tree_stats AS
+    CREATE TABLE search_tree_stats AS
     SELECT *
     FROM raw.searches_by_tree_depth
 """)
 
+cnxn.execute("DROP TABLE IF EXISTS search_timings")
 cnxn.execute("""
-    CREATE OR REPLACE TABLE search_timings AS
+    CREATE TABLE search_timings AS
     SELECT *
     FROM raw.timing          
 """)
 
+cnxn.execute("DROP TABLE IF EXISTS dim_positions")
 cnxn.execute("""
-    CREATE OR REPLACE TABLE dim_positions AS
+    CREATE TABLE dim_positions AS
     SELECT 
         id as search_id, fen, game_id, sts_id
     FROM raw.searches       

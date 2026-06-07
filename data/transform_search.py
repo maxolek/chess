@@ -1,6 +1,9 @@
 """
 function(s) that perform ETL on raw database 
 to turn raw data into analytics ready data
+
+single wide fact table for dashboarding and analysis: 
+`search_features` which denormalizes search_stats with position features, iterative deepening features, and timing breakdown features.
 """
 
 ASPIRATION_START_DEPTH = 6
@@ -9,29 +12,27 @@ def build_search_iterations_features(cnxn):
     rolling_window = 5
     window_spec = "(PARTITION BY search_id ORDER BY depth ASC)"
     rolling_window_spec = f"(PARTITION BY search_id ORDER BY depth ASC ROWS BETWEEN {rolling_window} PRECEDING AND CURRENT ROW)"
-
+    # Use source numeric columns directly now that SQLite schema was fixed.
     cnxn.execute(f"""
         CREATE OR REPLACE TABLE search_iteration_features AS
-                 
+
         WITH base_metrics AS (
-            SELECT 
-                *,
-                nodes + qnodes AS total_nodes,
-                -- We calculate the group identifier here
-                ROW_NUMBER() OVER (PARTITION BY search_id ORDER BY depth) - 
+            SELECT *,
+                -- total nodes and move grouping come from original numeric columns
+                (nodes + qnodes) AS total_nodes,
+                ROW_NUMBER() OVER (PARTITION BY search_id ORDER BY depth) -
                 ROW_NUMBER() OVER (PARTITION BY search_id, move ORDER BY depth) as move_grp
             FROM iterative_deepening_stats
         )
         SELECT
-            -- base metrics / keys
             search_id, depth, qdepth,
-            time_ms, SUM(time_ms) OVER {window_spec} as running_time_ms,
-            eval, move, 
-            nodes, qnodes, 
-            tt_stores, tt_hits,
-            fail_highs, fail_lows, fail_high_first, fail_high_late,
+            time_ms AS time_ms, SUM(time_ms) OVER {window_spec} as running_time_ms,
+            eval AS eval, move,
+            nodes AS nodes, qnodes AS qnodes,
+            tt_stores AS tt_stores, tt_hits AS tt_hits,
+            fail_highs AS fail_highs, fail_lows AS fail_lows, fail_high_first AS fail_high_first, fail_high_late AS fail_high_late,
             fail_high_researches, fail_low_researches,
-            see_prunes, delta_prunes,
+            see_prunes AS see_prunes, delta_prunes AS delta_prunes,
 
             -- within iteration derived metrics
             total_nodes,
@@ -44,14 +45,14 @@ def build_search_iterations_features(cnxn):
             fail_high_first / NULLIF(fail_highs, 0) AS fail_high_first_ratio,
             see_prunes / NULLIF(qnodes, 0) AS see_prune_ratio,
             delta_prunes / NULLIF(qnodes, 0) AS delta_prune_ratio,
-            (see_prunes + delta_prunes) / NULLIF(qnodes, 0) AS prune_ratio,         
+            (see_prunes + delta_prunes) / NULLIF(qnodes, 0) AS prune_ratio,
 
             -- across iterations derived metrics
             time_ms / LAG(time_ms) OVER {window_spec} as time_increase_ratio,
             total_nodes / LAG(total_nodes) OVER {window_spec} as ebf,
             qnodes / LAG(qnodes) OVER {window_spec} as qebf,
 
-            -- stability metrics
+            -- stability metrics (use numeric eval)
             eval - LAG(eval) OVER {window_spec} as prior_eval_delta,
             eval - FIRST_VALUE(eval) OVER {window_spec} as first_eval_delta,
             CASE
@@ -61,8 +62,7 @@ def build_search_iterations_features(cnxn):
             END as eval_sign_flips,
             STDDEV(eval) OVER {window_spec} AS stddev_eval,
             STDDEV(eval) OVER {rolling_window_spec} AS stddev_last5_eval,
-            
-            -- Final move stability calculation using the pre-calculated group
+
             ROW_NUMBER() OVER (PARTITION BY search_id, move_grp ORDER BY depth) - 1 AS move_stability
 
         FROM base_metrics
@@ -70,43 +70,41 @@ def build_search_iterations_features(cnxn):
 
 def build_search_tree_features(cnxn):
     window_spec = "(PARTITION BY search_id ORDER BY depth asc)"
-    
+    # Cast numeric-like columns to DOUBLE in a temporary view to avoid
+    # arithmetic errors when source columns are stored as VARCHAR (from
+    # `sqlite_all_varchar=true` in the import step).
+    # Use original columns directly now that schema is fixed
     cnxn.execute(f"""
         CREATE OR REPLACE TABLE search_tree_features AS
         SELECT
-                 
-        -- base metrics / keys
-        search_id, depth, 
-        -- qnodes are called from depth (i.e. the 'true ply' since qsearch makes moves, is not what is represented here. these are the qnodes from when depth==0 was achieved at <-- depth)
-        -- nodes are multi-counted across iteration deepening depths (e.g. i_d=3 and 4 both will search at tree depth 2)
-        tt_stores, tt_hits,
-        nodes, qnodes, 
-        fail_highs, fail_lows, 
-        fail_high_first, fail_high_late,
-        see_prunes, delta_prunes,
-                 
-        -- within iteration derived metrics
-        nodes + qnodes AS total_nodes,
-        qnodes / nodes as qratio, -- also a slightly different definition than iterations 
-        tt_hits / total_nodes AS tt_hit_ratio,
-        tt_stores / total_nodes AS tt_store_ratio,
-        fail_highs / total_nodes AS fail_high_ratio,
-        fail_lows / total_nodes AS fail_low_ratio,
-        fail_high_first / fail_highs AS fail_high_first_ratio,
-        see_prunes / qnodes AS see_prune_ratio,     -- denom is qnodes as pruning only happens in qnodes
-        delta_prunes / qnodes AS delta_prune_ratio, -- qnodes are tracked before pruning is applied
-        (see_prunes + delta_prunes) / qnodes AS prune_ratio,  
-                 
-        -- across depth derived metrics
-        total_nodes / LAG(total_nodes) OVER {window_spec} as ebf,
-        qnodes / LAG(qnodes) OVER {window_spec} as qebf,
-                 
-                 
+            search_id, depth,
+            tt_stores AS tt_stores, tt_hits AS tt_hits,
+            nodes AS nodes, qnodes AS qnodes,
+            fail_highs AS fail_highs, fail_lows AS fail_lows,
+            fail_high_first AS fail_high_first, fail_high_late AS fail_high_late,
+            see_prunes AS see_prunes, delta_prunes AS delta_prunes,
+
+            nodes + qnodes AS total_nodes,
+            qnodes / NULLIF(nodes, 0) as qratio,
+            tt_hits / NULLIF(nodes + qnodes, 0) AS tt_hit_ratio,
+            tt_stores / NULLIF(nodes + qnodes, 0) AS tt_store_ratio,
+            fail_highs / NULLIF(nodes + qnodes, 0) AS fail_high_ratio,
+            fail_lows / NULLIF(nodes + qnodes, 0) AS fail_low_ratio,
+            fail_high_first / NULLIF(fail_highs, 0) AS fail_high_first_ratio,
+            see_prunes / NULLIF(qnodes, 0) AS see_prune_ratio,
+            delta_prunes / NULLIF(qnodes, 0) AS delta_prune_ratio,
+            (see_prunes + delta_prunes) / NULLIF(qnodes, 0) AS prune_ratio,
+
+            (nodes + qnodes) / NULLIF(LAG(nodes + qnodes) OVER {window_spec}, 0) as ebf,
+            qnodes / NULLIF(LAG(qnodes) OVER {window_spec}, 0) as qebf
+
         FROM search_tree_stats
     """)
     
 def build_search_features(cnxn):
     ASPIRATION_START_DEPTH = 6
+    # Ensure numeric search-level columns for arithmetic
+    # Use search tables' original numeric columns directly
     cnxn.execute(f"""
         CREATE OR REPLACE TABLE search_features AS
                  
@@ -114,8 +112,8 @@ def build_search_features(cnxn):
             SELECT
                 search_id, 
                 -- We define the total search time once here
-                MAX(CASE WHEN function = 'ROOT' THEN total_time_ms END) AS total_search_time,
-                
+                    MAX(CASE WHEN function = 'ROOT' THEN total_time_ms END) AS total_search_time,
+
                 -- MakeMove
                 MAX(CASE WHEN function = 'MakeMove' THEN total_time_ms END) AS make_move_total_ms,
                 MAX(CASE WHEN function = 'MakeMove' THEN total_time_ms / NULLIF(num_calls, 0) END) AS make_move_avg_ms,
@@ -134,11 +132,11 @@ def build_search_features(cnxn):
                 MAX(CASE WHEN function = 'Movegen' THEN total_time_ms END) / 
                     NULLIF(MAX(CASE WHEN function = 'ROOT' THEN total_time_ms END), 0) AS movegen_perc_total_ms,
 
-                -- Score_Order (Move Order)
-                MAX(CASE WHEN function = 'Score_Order' THEN total_time_ms END) AS move_order_total_ms,
-                MAX(CASE WHEN function = 'Score_Order' THEN total_time_ms / NULLIF(num_calls, 0) END) AS move_order_avg_ms,
-                MAX(CASE WHEN function = 'Score_Order' THEN total_time_ms END) / 
-                    NULLIF(MAX(CASE WHEN function = 'ROOT' THEN total_time_ms END), 0) AS move_order_perc_total_ms,
+                    -- Score_Order (Move Order)
+                    MAX(CASE WHEN function = 'Score_Order' THEN total_time_ms END) AS move_order_total_ms,
+                    MAX(CASE WHEN function = 'Score_Order' THEN total_time_ms / NULLIF(num_calls, 0) END) AS move_order_avg_ms,
+                    MAX(CASE WHEN function = 'Score_Order' THEN total_time_ms END) / 
+                        NULLIF(MAX(CASE WHEN function = 'ROOT' THEN total_time_ms END), 0) AS move_order_perc_total_ms,
 
                 -- NNUE
                 MAX(CASE WHEN function = 'NNUE' THEN total_time_ms END) AS nnue_total_ms,
@@ -196,7 +194,7 @@ def build_search_features(cnxn):
 
             AVG(itdeep.qebf) AS avg_qebf,
             MAX(itdeep.qebf) AS max_qebf,
-            exp(avg(log(CASE WHEN itdeep.qebf > 0 THEN itdeep.ebf ELSE 1 END))) AS geo_mean_qebf,
+            exp(avg(log(CASE WHEN itdeep.qebf > 0 THEN itdeep.qebf ELSE 1 END))) AS geo_mean_qebf,
 
             AVG(itdeep.tt_hit_ratio) AS avg_tt_hit_ratio,
             MAX(itdeep.tt_hit_ratio) AS max_tt_hit_ratio,
@@ -254,13 +252,32 @@ def build_search_features(cnxn):
             s.tt_stores AS total_tt_stores,
             s.tt_hits AS total_tt_hits,
             s.fail_highs AS total_fail_highs,
-            s.fail_lows AS total_fail_lows,
+            s.fail_lows AS total_fail_low,
             s.fail_high_first AS total_fail_high_first,
             s.fail_high_late AS total_fail_high_late,
             s.fail_high_researches AS total_fail_high_researches,
             s.fail_low_researches AS total_fail_low_researches,
             s.see_prunes AS total_see_prunes,
             s.delta_prunes AS total_delta_prunes,
+
+            -- stockfish ground-truth (added by transform_positions)
+            s.sf_eval AS sf_eval,
+            s.sf_best_move AS sf_best_move,
+            s.sf_pv AS sf_pv,
+            s.eval AS eval,
+            s.depth AS depth,
+            CASE WHEN s.eval IS NOT NULL AND s.sf_eval IS NOT NULL THEN s.eval - s.sf_eval ELSE NULL END AS eval_diff,
+            -- engine_move_rank: 1..5 if engine's move matches Stockfish PV position, 0 if present but not top-5, NULL if no data
+            CASE
+                WHEN s.move IS NOT NULL AND s.sf_pv IS NOT NULL AND json_extract(s.sf_pv, '$[0]') = '"' || s.move || '"' THEN 1
+                WHEN s.move IS NOT NULL AND s.sf_pv IS NOT NULL AND json_extract(s.sf_pv, '$[1]') = '"' || s.move || '"' THEN 2
+                WHEN s.move IS NOT NULL AND s.sf_pv IS NOT NULL AND json_extract(s.sf_pv, '$[2]') = '"' || s.move || '"' THEN 3
+                WHEN s.move IS NOT NULL AND s.sf_pv IS NOT NULL AND json_extract(s.sf_pv, '$[3]') = '"' || s.move || '"' THEN 4
+                WHEN s.move IS NOT NULL AND s.sf_pv IS NOT NULL AND json_extract(s.sf_pv, '$[4]') = '"' || s.move || '"' THEN 5
+                WHEN s.move IS NOT NULL AND s.sf_pv IS NOT NULL AND (json_extract(s.sf_pv, '$[0]') IS NOT NULL OR json_extract(s.sf_pv, '$[1]') IS NOT NULL OR json_extract(s.sf_pv, '$[2]') IS NOT NULL OR json_extract(s.sf_pv, '$[3]') IS NOT NULL OR json_extract(s.sf_pv, '$[4]') IS NOT NULL) THEN 0
+                ELSE NULL
+            END AS engine_move_rank,
+            CASE WHEN s.move IS NOT NULL AND s.sf_pv IS NOT NULL AND json_extract(s.sf_pv, '$[0]') = '"' || s.move || '"' THEN 1 WHEN s.move IS NULL OR s.sf_pv IS NULL THEN NULL ELSE 0 END AS best_move_match,
 
             -- total ratios
             (s.nodes + s.qnodes) / NULLIF(s.time_ms / 1000,0) AS nps,
@@ -299,6 +316,12 @@ def build_search_features(cnxn):
             t.static_eval_perc_total_ms AS static_eval_perc_total_time,
             
             -- position features
+            pf.position_type AS pos_label,
+            pf.game_phase AS game_phase,
+            pf.position_type AS position_type,
+            pf.pos_tactical AS position_tactical_score,
+            pf.pos_positional AS position_positional_score,
+            pf.pos_endgame AS position_endgame_score,
             pf.balance AS position_balance,
             pf.white_backwards AS position_white_backwards,
             pf.white_doubled AS position_white_doubled,
@@ -335,15 +358,32 @@ def build_search_features(cnxn):
 
 import duckdb
 import platform
+from pathlib import Path
 system = platform.system()
 
 if __name__ == "__main__":
-    if system == "Windows": DB = "F:/databases/chess_analytics.duckdb"
+    if system == "Windows":
+        DB = "F:/databases/chess_analytics.duckdb"
+    elif system == "Darwin":
+        DB = Path.home() / "Documents/databases/chess_analytics.duckdb"
 
     cnxn = duckdb.connect(DB)
 
     build_search_tree_features(cnxn)
     build_search_iterations_features(cnxn)
     build_search_features(cnxn)
+
+    # Persist eval_diff into `search_stats` so downstream tools (dashboard, queries)
+    # can read it directly from the table instead of recomputing client-side.
+    try:
+        cur = cnxn.execute("PRAGMA table_info('search_stats')").fetchall()
+        cols = {r[1] for r in cur}
+        if 'eval_diff' not in cols:
+            cnxn.execute("ALTER TABLE search_stats ADD COLUMN eval_diff DOUBLE")
+        # populate eval_diff from existing eval and sf_eval values
+        cnxn.execute("UPDATE search_stats SET eval_diff = CASE WHEN eval IS NOT NULL AND sf_eval IS NOT NULL THEN eval - sf_eval ELSE NULL END")
+    except Exception:
+        # non-fatal: leave as-is if ALTER/UPDATE unsupported for some DB backends
+        pass
 
     cnxn.close()

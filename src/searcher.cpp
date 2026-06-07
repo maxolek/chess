@@ -303,7 +303,7 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
     else if (bestEval >= beta) { flag = LOWERBOUND; }
 
     if (flag == LOWERBOUND)
-        engine.tt.store(board.zobrist_hash, depth, ply, beta, LOWERBOUND, Move::NullMove);
+        engine.tt.store(board.zobrist_hash, depth, ply, beta, LOWERBOUND, Move::NullMove());
     else
         engine.tt.store(board.zobrist_hash, depth, ply, bestEval, flag, bestMove);
     //STATS_TT_STORE(depth+ply, ply);
