@@ -145,7 +145,7 @@ void UCI::handleCommand(const std::string& line) {
         std::cout << "\n(Full game)   Fill %:     " << round_to_n_decimals(100*engine->tt.fillRatio(),2) << " %" << std::endl;
     }
     else if (token == "dumpstats") {
-        //engine->dumpStats(); // you implement
+        //engine->dumpStats(); // print collected stats to console for last search
     }
     else if (token == "bench") {
         //engine->bench(depth);  // implement bench mode

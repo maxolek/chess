@@ -200,6 +200,7 @@ void Engine::setOption(const std::string& name, const std::string& value) {
     }
     else if (name == "stats_nodes_only") {
         if (Logging::track_search_nodes != boolFromString(value)) {Logging::setTrackSearchNodes(boolFromString(value));}
+        if (Logging::track_search_stats == true && Logging::track_search_nodes == true) {Logging::setTrackSearchStats(false);}
     }
     else if (name == "game_logging") {
         if (Logging::track_game_log != boolFromString(value)) {Logging::setTrackGameLog(boolFromString(value));}
@@ -561,9 +562,9 @@ void Engine::iterativeDeepening() {
 
         if (Logging::track_search_stats) {
             //g_stats.max_completed_depth = depth;
-            g_stats.it_depth_eval.push_back(result.eval);
-            g_stats.it_depth_move.push_back(result.bestMove);
-            g_stats.it_depth_time_ms.push_back( std::chrono::duration<double, std::milli>(depth_end - depth_start).count());
+            g_stats.it_depth_eval[depth] = result.eval;
+            g_stats.it_depth_move[depth] = result.bestMove;
+            g_stats.it_depth_time_ms[depth] = std::chrono::duration<double, std::milli>(depth_end - depth_start).count();
             //if (Move::SameMove(bestMove, prevBest)) g_stats.bestmoveStable++;
         }
 
@@ -573,7 +574,7 @@ void Engine::iterativeDeepening() {
     }
 
     // --- finalize cumulative stats ---
-    if (Logging::track_search_stats) {
+    if (Logging::track_search_stats || Logging::track_search_nodes) {
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
                         std::chrono::steady_clock::now() - start_time).count();
         g_stats.game_ply = ply;
@@ -628,11 +629,9 @@ void Engine::sendBestMove(Move best, Move ponder) {
     game_board.MakeMove(best);
     game_over = checkGameEnd();
 
-    if (mode == EngineMode::GAME) {
-        trackGame();
-        resetSearchStats();
-    }
+    if (mode == EngineMode::GAME) {trackGame();}
 
+    //resetSearchStats();
     Logging::logUCIout(best.uci());
 }
 

@@ -111,6 +111,7 @@ struct Logging {
     static inline void disableAll() {
         track_timers        = false;
         track_search_stats  = false;
+        track_search_nodes  = false;
         track_game_log      = false;
         track_uci           = true;
     }
@@ -118,6 +119,7 @@ struct Logging {
     static inline void enableAll() {
         track_timers        = true;
         track_search_stats  = true;
+        track_search_nodes  = false; // search stats covers the nodes
         track_game_log      = true;
         track_uci           = true;
     }

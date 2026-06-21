@@ -10,11 +10,22 @@
 #include "session.h"
 #include "logging.h"
 #include <vector>
+#include <array>
 #include <cstdint>
 #include <fstream>
 #include <sstream>
 #include <string>
 #include <cmath>
+
+constexpr int STATS_MAX_PLY = 64;
+constexpr int STATS_MAX_ITER_DEPTH = 32;
+
+#define STATS_BOUNDS_CHECK(it_d, ply) \
+    assert((it_d) >= 0 && (it_d) < STATS_MAX_ITER_DEPTH && \
+            (ply) >= 0 && (ply) < STATS_MAX_PLY)
+
+#define STATS_BOUNDS_CHECK_1D(d) \
+    assert((d) >= 0 && (d) < STATS_MAX_ITER_DEPTH)
 
 // -------------------------
 //      search stats
@@ -59,42 +70,50 @@ struct SearchStats {
 
     // iterative depth (stats per depth of single search)
     // tracks performance improvements across depths
-    std::vector<uint64_t> it_depth_time_ms;
-    std::vector<int> it_depth_eval;
-    std::vector<Move> it_depth_move;
+    std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_time_ms{};
+    std::array<int, STATS_MAX_ITER_DEPTH> it_depth_eval{};
+    std::array<Move, STATS_MAX_ITER_DEPTH> it_depth_move{};
     //std::vector<std::vector<Move>> it_depth_pv;
-    std::vector<uint64_t> it_depth_nodes;
-    std::vector<uint64_t> it_depth_qnodes;
-    std::vector<uint64_t> it_depth_ttstores;
-    std::vector<uint64_t> it_depth_tthits;
-    std::vector<uint64_t> it_depth_ttfill;
-    std::vector<uint64_t> it_depth_fail_highs;
-    std::vector<uint64_t> it_depth_fail_lows;
-    std::vector<uint64_t> it_depth_fail_high_firsts;
-    std::vector<uint64_t> it_depth_fail_high_lates;
-    std::vector<uint64_t> it_depth_aspiration_failhigh_researches;
-    std::vector<uint64_t> it_depth_aspiration_faillow_researches;
-    std::vector<uint64_t> it_depth_see_prunes;
-    std::vector<uint64_t> it_depth_delta_prunes;
+    std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_nodes{};
+    std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_qnodes{};
+    std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_ttstores{};
+    std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_tthits{};
+    std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_ttfill{};
+    std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_fail_highs{};
+    std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_fail_lows{};
+    std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_fail_high_firsts{};
+    std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_fail_high_lates{};
+    std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_aspiration_failhigh_researches{};
+    std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_aspiration_faillow_researches{};
+    std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_see_prunes{};
+    std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_delta_prunes{};
 
     // tree depth (stats per depth of search tree for single search)
     //  this leads to multi-counting as it_depth searches d=1..it_depth tree depths
     //  but this is where the actual work is done
     //      so search improvements based on data may begin here
-    std::vector<uint64_t> tree_depth_nodes; 
-    std::vector<uint64_t> tree_depth_qnodes;
-    std::vector<uint64_t> tree_depth_ttstores;
-    std::vector<uint64_t> tree_depth_tthits;
-    std::vector<uint64_t> tree_depth_fail_highs;
-    std::vector<uint64_t> tree_depth_fail_lows;
-    std::vector<uint64_t> tree_depth_fail_high_firsts;
-    std::vector<uint64_t> tree_depth_fail_high_lates;
-    std::vector<uint64_t> tree_depth_see_prunes;
-    std::vector<uint64_t> tree_depth_delta_prunes;
+    std::array<uint64_t, STATS_MAX_PLY> tree_depth_nodes{}; 
+    std::array<uint64_t, STATS_MAX_PLY> tree_depth_qnodes{};
+    std::array<uint64_t, STATS_MAX_PLY> tree_depth_ttstores{};
+    std::array<uint64_t, STATS_MAX_PLY> tree_depth_tthits{};
+    std::array<uint64_t, STATS_MAX_PLY> tree_depth_fail_highs{};
+    std::array<uint64_t, STATS_MAX_PLY> tree_depth_fail_lows{};
+    std::array<uint64_t, STATS_MAX_PLY> tree_depth_fail_high_firsts{};
+    std::array<uint64_t, STATS_MAX_PLY> tree_depth_fail_high_lates{};
+    std::array<uint64_t, STATS_MAX_PLY> tree_depth_see_prunes{};
+    std::array<uint64_t, STATS_MAX_PLY> tree_depth_delta_prunes{};
 };
 
 // --- single header-only global instance ---
 inline SearchStats g_stats{};
+
+// -------------------------
+//      Reset
+// -------------------------
+inline void resetSearchStats() {
+    g_stats = SearchStats{};
+}
+
 
 // --- macros for tracking ---
 #define STATS_INC(field) \
@@ -104,47 +123,10 @@ inline SearchStats g_stats{};
     do { if (Logging::track_search_stats) g_stats.field += (val); } while(0)
 
 
-
-template <typename T>
-inline void statsDepthInit(std::vector<T> &vec, size_t index) {
-    if (index >= vec.size())
-        vec.insert(vec.end(), index + 1 - vec.size(), T(0));
-}
-
-#define STATS_DEPTH_INIT(it_d, ply)                                    \
-    do {                                                                \
-        if (Logging::track_search_stats) {                              \
-            statsDepthInit(g_stats.it_depth_nodes, it_d);               \
-            statsDepthInit(g_stats.it_depth_qnodes, it_d);              \
-            statsDepthInit(g_stats.it_depth_ttstores, it_d);            \
-            statsDepthInit(g_stats.it_depth_tthits, it_d);              \
-            statsDepthInit(g_stats.it_depth_fail_highs, it_d);          \
-            statsDepthInit(g_stats.it_depth_fail_lows, it_d);           \
-            statsDepthInit(g_stats.it_depth_fail_high_firsts, it_d);    \
-            statsDepthInit(g_stats.it_depth_fail_high_lates, it_d);     \
-            statsDepthInit(g_stats.it_depth_aspiration_failhigh_researches, it_d); \
-            statsDepthInit(g_stats.it_depth_aspiration_faillow_researches, it_d); \
-            statsDepthInit(g_stats.it_depth_see_prunes, it_d);          \
-            statsDepthInit(g_stats.it_depth_delta_prunes, it_d);        \
-                                                                            \
-            statsDepthInit(g_stats.tree_depth_nodes, ply);              \
-            statsDepthInit(g_stats.tree_depth_qnodes, ply);             \
-            statsDepthInit(g_stats.tree_depth_ttstores, ply);           \
-            statsDepthInit(g_stats.tree_depth_tthits, ply);             \
-            statsDepthInit(g_stats.tree_depth_fail_highs, ply);         \
-            statsDepthInit(g_stats.tree_depth_fail_lows, ply);          \
-            statsDepthInit(g_stats.tree_depth_fail_high_firsts, ply);   \
-            statsDepthInit(g_stats.tree_depth_fail_high_lates, ply);    \
-            statsDepthInit(g_stats.tree_depth_see_prunes, ply);         \
-            statsDepthInit(g_stats.tree_depth_delta_prunes, ply);       \
-        }                                                               \
-    } while (0)
-
-
 #define STATS_NODE(it_d, ply)                                \
     do {                                                    \
         if (Logging::track_search_stats || Logging::track_search_nodes) {                  \
-            STATS_DEPTH_INIT(it_d, ply);                   \
+            STATS_BOUNDS_CHECK(it_d, ply);                   \
             g_stats.nodes++;                                \
             g_stats.it_depth_nodes[it_d]++;                \
             g_stats.tree_depth_nodes[ply]++;               \
@@ -154,10 +136,10 @@ inline void statsDepthInit(std::vector<T> &vec, size_t index) {
 #define STATS_QNODE(it_d, ply)                               \
     do {                                                    \
         if (Logging::track_search_stats || Logging::track_search_nodes) {                  \
-            STATS_DEPTH_INIT(it_d, it_d);                    \
+            STATS_BOUNDS_CHECK(it_d, ply);                    \
             g_stats.qnodes++;                               \
             g_stats.it_depth_qnodes[it_d]++;                \
-            g_stats.tree_depth_qnodes[it_d]++;               \
+            g_stats.tree_depth_qnodes[ply]++;               \
             g_stats.max_qdepth = std::max(g_stats.max_qdepth, ply); \
         }                                                   \
     } while (0)
@@ -165,7 +147,7 @@ inline void statsDepthInit(std::vector<T> &vec, size_t index) {
 #define STATS_ASPIRATION_FAILLOW(depth) \
     do { \
         if (Logging::track_search_stats) { \
-            STATS_DEPTH_INIT(depth, 0); \
+            STATS_BOUNDS_CHECK_1D(depth); \
             g_stats.aspiration_fail_low_researches++; \
             g_stats.it_depth_aspiration_faillow_researches[depth]++; \
         } \
@@ -174,7 +156,7 @@ inline void statsDepthInit(std::vector<T> &vec, size_t index) {
 #define STATS_ASPIRATION_FAILHIGH(depth) \
     do { \
         if (Logging::track_search_stats) { \
-            STATS_DEPTH_INIT(depth, 0); \
+            STATS_BOUNDS_CHECK_1D(depth); \
             g_stats.aspiration_fail_high_researches++; \
             g_stats.it_depth_aspiration_failhigh_researches[depth]++; \
         } \
@@ -183,7 +165,7 @@ inline void statsDepthInit(std::vector<T> &vec, size_t index) {
 #define STATS_FAILHIGH(it_d, ply, first)                     \
     do {                                                    \
         if (Logging::track_search_stats) {                  \
-            STATS_DEPTH_INIT(it_d, ply);                    \
+            STATS_BOUNDS_CHECK(it_d, ply);                    \
             g_stats.fail_highs++;                           \
             g_stats.it_depth_fail_highs[it_d]++;            \
             g_stats.tree_depth_fail_highs[ply]++;           \
@@ -202,7 +184,7 @@ inline void statsDepthInit(std::vector<T> &vec, size_t index) {
 #define STATS_FAILLOW(it_d, ply)                             \
     do {                                                    \
         if (Logging::track_search_stats) {                  \
-            STATS_DEPTH_INIT(it_d, ply);                    \
+            STATS_BOUNDS_CHECK(it_d, ply);                    \
             g_stats.fail_lows++;                            \
             g_stats.it_depth_fail_lows[it_d]++;             \
             g_stats.tree_depth_fail_lows[ply]++;            \
@@ -212,7 +194,7 @@ inline void statsDepthInit(std::vector<T> &vec, size_t index) {
 #define STATS_TT_HIT(it_d, ply)                              \
     do {                                                    \
         if (Logging::track_search_stats) {                  \
-            STATS_DEPTH_INIT(it_d, ply);                    \
+            STATS_BOUNDS_CHECK(it_d, ply);                    \
             g_stats.tt_hits++;                              \
             g_stats.it_depth_tthits[it_d]++;                \
             g_stats.tree_depth_tthits[ply]++;               \
@@ -222,7 +204,7 @@ inline void statsDepthInit(std::vector<T> &vec, size_t index) {
 #define STATS_TT_STORE(it_d, ply)                            \
     do {                                                    \
         if (Logging::track_search_stats) {                  \
-            STATS_DEPTH_INIT(it_d, ply);                    \
+            STATS_BOUNDS_CHECK(it_d, ply);                    \
             g_stats.tt_stores++;                            \
             g_stats.it_depth_ttstores[it_d]++;              \
             g_stats.tree_depth_ttstores[ply]++;             \
@@ -232,7 +214,7 @@ inline void statsDepthInit(std::vector<T> &vec, size_t index) {
 #define STATS_SEE_PRUNE(it_d, ply)                           \
     do {                                                    \
         if (Logging::track_search_stats) {                  \
-            STATS_DEPTH_INIT(it_d, ply);                    \
+            STATS_BOUNDS_CHECK(it_d, ply);                    \
             g_stats.see_prunes++;                           \
             g_stats.it_depth_see_prunes[it_d]++;            \
             g_stats.tree_depth_see_prunes[ply]++;           \
@@ -242,7 +224,7 @@ inline void statsDepthInit(std::vector<T> &vec, size_t index) {
 #define STATS_DELTA_PRUNE(it_d, ply)                         \
     do {                                                    \
         if (Logging::track_search_stats) {                  \
-            STATS_DEPTH_INIT(it_d, ply);                    \
+            STATS_BOUNDS_CHECK(it_d, ply);                    \
             g_stats.delta_prunes++;                         \
             g_stats.it_depth_delta_prunes[it_d]++;          \
             g_stats.tree_depth_delta_prunes[ply]++;         \
@@ -253,43 +235,51 @@ inline void statsDepthInit(std::vector<T> &vec, size_t index) {
 //      Logging Functions
 // -------------------------
 
+template <typename T, size_t N>
+std::string array_to_json(const std::array<T, N>& v, size_t len)
+{
+    std::ostringstream oss;
+    oss << "[";
+    for (size_t i = 1; i < len; ++i) // start from 1 to skip depth 0 which is init to 0
+    {
+        if (i-1) oss << ",";
+        oss << v[i];
+    }
+    oss << "]";
+    return oss.str();
+};
+
+template <size_t N>
+std::string moves_to_json(const std::array<Move, N>& v, size_t len)
+{
+    std::ostringstream oss;
+    oss << "[";
+    for (size_t i = 1; i < len; ++i) // start from 1 to skip depth 0 which is init to null_move
+    {
+        if (i-1) oss << ",";
+        oss << "\"" << v[i].uci() << "\"";
+    }
+    oss << "]";
+    return oss.str();
+};
+
 inline void logSearchStats(const std::string& fen = "") {
-    if (!Logging::track_search_stats) return;
+    if (!(Logging::track_search_stats || Logging::track_search_nodes)) return;
 
     static std::ofstream out(Logging::log_dir / "search.jsonl", std::ios::app);
     if (!out.is_open()) return;
 
-    auto vec_to_json = [](const auto& v) {
-        std::ostringstream oss;
-        oss << "[";
-        for (size_t i = 1; i < v.size(); ++i) {
-            if (i > 1) oss << ",";
-            oss << v[i];
-        }
-        oss << "]";
-        return oss.str();
-    };
+    size_t n = g_stats.max_completed_depth + 1;
+    size_t q_n = g_stats.max_qdepth + 1;
 
-    auto vec_to_json_itdp_summary = [](const auto& v) {
-        std::ostringstream oss;
-        oss << "[";
-        for (size_t i = 0; i < v.size(); ++i) {
-            if (i) oss << ",";
-            oss << v[i];
-        }
-        oss << "]";
-        return oss.str();
-    };
-
-    auto moves_to_json = [](const std::vector<Move>& v) {
-        std::ostringstream oss;
-        oss << "[";
-        for (size_t i = 0; i < v.size(); ++i) {
-            if (i) oss << ",";
-            oss << "\"" << v[i].uci() << "\"";
-        }
-        oss << "]";
-        return oss.str();
+    auto moves_list_to_json = [](const std::vector<Move>& v) { 
+        std::ostringstream oss; 
+        oss << "["; 
+        for (size_t i = 0; i < v.size(); ++i) { 
+            if (i) oss << ","; 
+            oss << "\"" << v[i].uci() << "\""; 
+        } oss << "]"; 
+        return oss.str(); 
     };
 
     out << "{"
@@ -325,49 +315,44 @@ inline void logSearchStats(const std::string& fen = "") {
         << "\"time_ms\":" << g_stats.time_ms << ","
         << "\"root_eval\":" << g_stats.eval << ","
         << "\"best_move\":\"" << g_stats.move.uci() << "\","
-        << "\"principal_variation\":" << moves_to_json(g_stats.principal_variation) << ","
+        << "\"principal_variation\":" << moves_list_to_json(g_stats.principal_variation) << ","
 
         // iteration stats
-        << "\"itdepth_time_ms\":" << vec_to_json_itdp_summary(g_stats.it_depth_time_ms) << ","
-        << "\"itdepth_eval\":" << vec_to_json_itdp_summary(g_stats.it_depth_eval) << ","
-        << "\"itdepth_move\":" << moves_to_json(g_stats.it_depth_move) << ","
-        << "\"itdepth_nodes\":" << vec_to_json(g_stats.it_depth_nodes) << ","
-        << "\"itdepth_qnodes\":" << vec_to_json(g_stats.it_depth_qnodes) << ","
-        << "\"itdepth_tthits\":" << vec_to_json(g_stats.it_depth_tthits) << ","
-        << "\"itdepth_ttstores\":" << vec_to_json(g_stats.it_depth_ttstores) << ","
-        << "\"itdepth_fail_highs\":" << vec_to_json(g_stats.it_depth_fail_highs) << ","
-        << "\"itdepth_fail_lows\":" << vec_to_json(g_stats.it_depth_fail_lows) << ","
-        << "\"itdepth_fail_high_firsts\":" << vec_to_json(g_stats.it_depth_fail_high_firsts) << ","
-        << "\"itdepth_fail_high_lates\":" << vec_to_json(g_stats.it_depth_fail_high_lates) << ","
-        << "\"itdepth_aspiration_failhigh_researches\":" << vec_to_json(g_stats.it_depth_aspiration_failhigh_researches) << ","
-        << "\"itdepth_aspiration_faillow_researches\":" << vec_to_json(g_stats.it_depth_aspiration_faillow_researches) << ","
-        << "\"itdepth_see_prunes\":" << vec_to_json(g_stats.it_depth_see_prunes) << ","
-        << "\"itdepth_delta_prunes\":" << vec_to_json(g_stats.it_depth_delta_prunes) << ","
+        << "\"itdepth_time_ms\":" << array_to_json(g_stats.it_depth_time_ms, n) << ","
+        << "\"itdepth_eval\":" << array_to_json(g_stats.it_depth_eval, n) << ","
+        << "\"itdepth_move\":" << moves_to_json(g_stats.it_depth_move, n) << ","
+        << "\"itdepth_nodes\":" << array_to_json(g_stats.it_depth_nodes, n) << ","
+        << "\"itdepth_qnodes\":" << array_to_json(g_stats.it_depth_qnodes, n) << ","
+        << "\"itdepth_tthits\":" << array_to_json(g_stats.it_depth_tthits, n) << ","
+        << "\"itdepth_ttstores\":" << array_to_json(g_stats.it_depth_ttstores, n) << ","
+        << "\"itdepth_fail_highs\":" << array_to_json(g_stats.it_depth_fail_highs, n) << ","
+        << "\"itdepth_fail_lows\":" << array_to_json(g_stats.it_depth_fail_lows, n) << ","
+        << "\"itdepth_fail_high_firsts\":" << array_to_json(g_stats.it_depth_fail_high_firsts, n) << ","
+        << "\"itdepth_fail_high_lates\":" << array_to_json(g_stats.it_depth_fail_high_lates, n) << ","
+        << "\"itdepth_aspiration_failhigh_researches\":" << array_to_json(g_stats.it_depth_aspiration_failhigh_researches, n) << ","
+        << "\"itdepth_aspiration_faillow_researches\":" << array_to_json(g_stats.it_depth_aspiration_faillow_researches, n) << ","
+        << "\"itdepth_see_prunes\":" << array_to_json(g_stats.it_depth_see_prunes, n) << ","
+        << "\"itdepth_delta_prunes\":" << array_to_json(g_stats.it_depth_delta_prunes, n) << ","
 
         // tree ply stats
-        << "\"treedepth_nodes\":" << vec_to_json(g_stats.tree_depth_nodes) << ","
-        << "\"treedepth_qnodes\":" << vec_to_json(g_stats.tree_depth_qnodes) << ","
-        << "\"treedepth_tt_hits\":" << vec_to_json(g_stats.tree_depth_tthits) << ","
-        << "\"treedepth_tt_stores\":" << vec_to_json(g_stats.tree_depth_ttstores) << ","
-        << "\"treedepth_fail_highs\":" << vec_to_json(g_stats.tree_depth_fail_highs) << ","
-        << "\"treedepth_fail_lows\":" << vec_to_json(g_stats.tree_depth_fail_lows) << ","
-        << "\"treedepth_fail_high_firsts\":" << vec_to_json(g_stats.tree_depth_fail_high_firsts) << ","
-        << "\"treedepth_fail_high_lates\":" << vec_to_json(g_stats.tree_depth_fail_high_lates) << ","
-        << "\"treedepth_see_prunes\":" << vec_to_json(g_stats.tree_depth_see_prunes) << ","
-        << "\"treedepth_delta_prunes\":" << vec_to_json(g_stats.tree_depth_delta_prunes)
+        << "\"treedepth_nodes\":" << array_to_json(g_stats.tree_depth_nodes, q_n) << ","
+        << "\"treedepth_qnodes\":" << array_to_json(g_stats.tree_depth_qnodes, q_n) << ","
+        << "\"treedepth_tt_hits\":" << array_to_json(g_stats.tree_depth_tthits, q_n) << ","
+        << "\"treedepth_tt_stores\":" << array_to_json(g_stats.tree_depth_ttstores, q_n) << ","
+        << "\"treedepth_fail_highs\":" << array_to_json(g_stats.tree_depth_fail_highs, q_n) << ","
+        << "\"treedepth_fail_lows\":" << array_to_json(g_stats.tree_depth_fail_lows, q_n) << ","
+        << "\"treedepth_fail_high_firsts\":" << array_to_json(g_stats.tree_depth_fail_high_firsts, q_n) << ","
+        << "\"treedepth_fail_high_lates\":" << array_to_json(g_stats.tree_depth_fail_high_lates, q_n) << ","
+        << "\"treedepth_see_prunes\":" << array_to_json(g_stats.tree_depth_see_prunes, q_n) << ","
+        << "\"treedepth_delta_prunes\":" << array_to_json(g_stats.tree_depth_delta_prunes, q_n)
 
         << "}\n";
 
     out.flush();
+
+    resetSearchStats();
 }
 
 
-
-// -------------------------
-//      Reset
-// -------------------------
-inline void resetSearchStats() {
-    g_stats = SearchStats{};
-}
 
 #endif // STATS_H

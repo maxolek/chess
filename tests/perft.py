@@ -89,12 +89,8 @@ def my_perft(engine_proc, fen, depth):
 
         line = line.strip()
 
-        if line.isdigit():
-            nodes = int(line)
-            break
-
-        if "nodes" in line.lower():
-            nodes = int(line.split()[-1])
+        if line.startswith("Nodes searched:"):
+            nodes = int(line.split(":")[1].strip())
             break
 
     if nodes is None:
@@ -154,8 +150,20 @@ def main(args=None):
     )
 
     engine.stdin.write("uci\n")
+    engine.stdin.flush()
+    while True:
+        line = engine.stdout.readline()
+        if line.strip() == "uciok":
+            break
+
     engine.stdin.write("isready\n")
     engine.stdin.flush()
+    while True:
+        line = engine.stdout.readline()
+        if line.strip() == "readyok":
+            break
+
+    time.sleep(.5)  # Give engine time to initialize
 
     # -----------------------------
     # Run tests

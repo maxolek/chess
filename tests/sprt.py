@@ -293,6 +293,7 @@ def main(args=None):
         "-engine",
         "name=Candidate",
         f"cmd={engine_a}",
+        #"option.stats_nodes_only=true",
         f"dir={os.path.dirname(engine_a)}",
     ] + log_a_block + [
 

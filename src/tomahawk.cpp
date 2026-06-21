@@ -29,7 +29,7 @@ void pin_to_pcores() {
 #ifdef _WIN32
     // Windows example: P-cores (0,1,6,7,8,9,18,19)
     DWORD_PTR mask = 0;
-    mask |= (1ULL << 0) | (1ULL << 6) | (1ULL << 8);
+    mask |= (1ULL << 0) | (1ULL << 6) | (1ULL << 8); // star cores
     HANDLE hProc = GetCurrentProcess();
     if (!SetProcessAffinityMask(hProc, mask)) 
         std::cerr << "Failed to set CPU affinity, error " << GetLastError() << "\n";
