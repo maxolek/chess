@@ -198,6 +198,9 @@ void Engine::setOption(const std::string& name, const std::string& value) {
     else if (name == "stats_logging") {
         if (Logging::track_search_stats != boolFromString(value)) {Logging::setTrackSearchStats(boolFromString(value));}
     }
+    else if (name == "stats_nodes_only") {
+        if (Logging::track_search_nodes != boolFromString(value)) {Logging::setTrackSearchNodes(boolFromString(value));}
+    }
     else if (name == "game_logging") {
         if (Logging::track_game_log != boolFromString(value)) {Logging::setTrackGameLog(boolFromString(value));}
     }

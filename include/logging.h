@@ -16,6 +16,7 @@ struct Logging {
     // ---- toggles ----
     static inline bool track_timers        = false;
     static inline bool track_search_stats  = true;
+    static inline bool track_search_nodes  = false; // node/qnode counts only
     static inline bool track_game_log      = true;
     static inline bool track_uci           = false;
 
@@ -35,7 +36,7 @@ struct Logging {
 
         if (track_uci)
             uci_file.open(log_dir / "uci.log", std::ios::app);
-        if (track_search_stats)
+        if (track_search_stats || track_search_nodes)
             search_file.open(log_dir / "search.jsonl", std::ios::app);
         if (track_game_log)
             game_file.open(log_dir / "game.jsonl", std::ios::app);
@@ -86,6 +87,12 @@ struct Logging {
     static void setTrackSearchStats(bool v) {
         if (track_search_stats == v) return;
         track_search_stats = v;
+        reopenFiles();
+    }
+
+    static void setTrackSearchNodes(bool v) {
+        if (track_search_nodes == v) return;
+        track_search_nodes = v;
         reopenFiles();
     }
 

@@ -143,7 +143,7 @@ inline void statsDepthInit(std::vector<T> &vec, size_t index) {
 
 #define STATS_NODE(it_d, ply)                                \
     do {                                                    \
-        if (Logging::track_search_stats) {                  \
+        if (Logging::track_search_stats || Logging::track_search_nodes) {                  \
             STATS_DEPTH_INIT(it_d, ply);                   \
             g_stats.nodes++;                                \
             g_stats.it_depth_nodes[it_d]++;                \
@@ -153,7 +153,7 @@ inline void statsDepthInit(std::vector<T> &vec, size_t index) {
 
 #define STATS_QNODE(it_d, ply)                               \
     do {                                                    \
-        if (Logging::track_search_stats) {                  \
+        if (Logging::track_search_stats || Logging::track_search_nodes) {                  \
             STATS_DEPTH_INIT(it_d, it_d);                    \
             g_stats.qnodes++;                               \
             g_stats.it_depth_qnodes[it_d]++;                \

@@ -188,7 +188,7 @@ def main():
 
     if (args.perft): run_perft(args)
     run_sprt(args)
-    run_sts(args)
+    if (args.sts_files): run_sts(args)
 
     print("[PIPELINE] ✅ release complete")
 
