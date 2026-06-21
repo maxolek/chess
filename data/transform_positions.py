@@ -4,6 +4,8 @@ get characteristics of a position
 
 import chess
 from collections import Counter
+from pathlib import Path
+import pandas as pd
 
 # pawn value of pieces (approx)
 piece_values = {
@@ -108,19 +110,246 @@ def get_game_phase(fen):
     else:
         return "endgame"
 
-def get_position_type(fen):
-    board = chess.Board(fen)
-    legal_moves = list(board.legal_moves)
-    
-    # Tactical proxy: ratio of captures/checks
-    capture_moves = sum(board.is_capture(move) for move in legal_moves)
-    check_moves = sum(board.gives_check(move) for move in legal_moves)
-    tactical_ratio = (capture_moves + check_moves) / max(len(legal_moves), 1)
-    
-    if tactical_ratio > 0.2:  # heuristic threshold
-        return "tactical"
-    else:
-        return "strategic"
+# Classifies positions purely from the FEN string — no engine metrics required.
+# Returns a dict of sub-scores and a final label: Tactical / Positional / Endgame
+ 
+import re
+ 
+# Piece values for material counting (centipawns)
+_PIECE_VALUES = {"p": 100, "n": 320, "b": 330, "r": 500, "q": 900, "k": 0}
+ 
+def _parse_fen_board(fen: str) -> dict:
+    """Extract structured info from a FEN string."""
+    parts = fen.strip().split()
+    board_str = parts[0]
+    side_to_move = parts[1] if len(parts) > 1 else "w"
+    castling = parts[2] if len(parts) > 2 else "-"
+    ep_square = parts[3] if len(parts) > 3 else "-"
+ 
+    # Build piece lists
+    pieces = {"w": {}, "b": {}}
+    file_, rank_ = 0, 7
+    for ch in board_str:
+        if ch == "/":
+            file_ = 0
+            rank_ -= 1
+        elif ch.isdigit():
+            file_ += int(ch)
+        else:
+            color = "w" if ch.isupper() else "b"
+            ptype = ch.lower()
+            sq = rank_ * 8 + file_
+            pieces[color].setdefault(ptype, []).append(sq)
+            file_ += 1
+ 
+    return {
+        "pieces": pieces,
+        "side": side_to_move,
+        "castling": castling,
+        "ep": ep_square,
+    }
+ 
+ 
+def _material_score(pieces: dict) -> dict:
+    """Total material for each side and imbalance."""
+    totals = {}
+    for color in ("w", "b"):
+        totals[color] = sum(
+            _PIECE_VALUES.get(p, 0) * len(sqs)
+            for p, sqs in pieces[color].items()
+        )
+    imbalance = abs(totals["w"] - totals["b"])
+    total = totals["w"] + totals["b"]
+    return {"white": totals["w"], "black": totals["b"],
+            "imbalance": imbalance, "total": total}
+ 
+ 
+def _pawn_structure(pieces: dict) -> dict:
+    """Doubled, isolated, and passed pawn counts (approximate from squares)."""
+    result = {}
+    for color in ("w", "b"):
+        pawns = pieces[color].get("p", [])
+        files = [sq % 8 for sq in pawns]
+        file_counts = {}
+        for f in files:
+            file_counts[f] = file_counts.get(f, 0) + 1
+        doubled  = sum(1 for c in file_counts.values() if c > 1)
+        isolated = sum(1 for f in file_counts
+                       if (f - 1) not in file_counts and (f + 1) not in file_counts)
+        result[color] = {"count": len(pawns), "doubled": doubled, "isolated": isolated,
+                          "files": set(file_counts.keys())}
+    return result
+ 
+ 
+def _piece_mobility_proxy(pieces: dict) -> dict:
+    """
+    Very rough mobility proxy: count of non-pawn, non-king pieces.
+    More pieces = more potential moves = richer positional play.
+    """
+    active = {}
+    for color in ("w", "b"):
+        active[color] = sum(
+            len(sqs) for p, sqs in pieces[color].items() if p not in ("p", "k")
+        )
+    return active
+ 
+ 
+def _king_safety(pieces: dict) -> dict:
+    """
+    Rough king safety: is the king still on its starting square / near a corner?
+    Kings on e1/e8 (squares 4 / 60) are likely uncasled = slightly exposed.
+    """
+    safety = {}
+    start_squares = {"w": 4, "b": 60}
+    for color in ("w", "b"):
+        king_sqs = pieces[color].get("k", [])
+        if not king_sqs:
+            safety[color] = "unknown"
+            continue
+        ksq = king_sqs[0]
+        rank = ksq // 8
+        file_ = ksq % 8
+        # Cornered = safer; central = exposed
+        corner_dist = min(file_, 7 - file_)   # 0 at a/h file, 3.5 at centre
+        safety[color] = "exposed" if corner_dist >= 2 and rank in (0, 7) else "sheltered"
+    return safety
+ 
+ 
+def classify_position(fen: str) -> dict:
+    """
+    Classify a position purely from its FEN.
+ 
+    Returns
+    -------
+    dict with keys:
+        label       : "Tactical" | "Positional" | "Endgame"
+        tactical_score   : 0–1 float
+        positional_score : 0–1 float
+        endgame_score    : 0–1 float
+        features    : sub-feature breakdown dict
+    """
+    if not fen or not isinstance(fen, str):
+        return {"label": "Unknown", "tactical_score": 0, "positional_score": 0,
+                "endgame_score": 0, "features": {}}
+ 
+    try:
+        info    = _parse_fen_board(fen)
+        board   = chess.Board(fen)
+        pieces  = info["pieces"]
+        mat     = _material_score(pieces)
+        pawns   = _pawn_structure(pieces)
+        mob     = _piece_mobility_proxy(pieces)
+        king_s  = _king_safety(pieces)
+ 
+        # ── Endgame signals ──────────────────────────────────────────────────
+        total_mat   = mat["total"]
+        # Endgame threshold: less than ~26cp worth of non-pawn material each
+        # (roughly rook + minor piece or less)
+        minor_mat = {c: sum(_PIECE_VALUES.get(p, 0) * len(sqs)
+                            for p, sqs in pieces[c].items() if p not in ("p", "k"))
+                     for c in ("w", "b")}
+        endgame_score = max(0.0, 1.0 - (minor_mat["w"] + minor_mat["b"]) / 3000)
+ 
+        # ── Tactical signals ─────────────────────────────────────────────────
+        # Use immediate tactical indicators (captures/checks/hanging pieces/pawn tension)
+        # rather than material imbalance which is often a consequence of tactics.
+        # 1) captures & checks available for side-to-move
+        captures_side = 0
+        checks_side = 0
+        try:
+            for mv in board.legal_moves:
+                if board.is_capture(mv):
+                    captures_side += 1
+                if board.gives_check(mv):
+                    checks_side += 1
+        except Exception:
+            captures_side = 0
+            checks_side = 0
+        cap_score = min(captures_side / 6.0, 1.0) * 0.4
+        check_score = min(checks_side / 2.0, 1.0) * 0.25
+
+        # 2) hanging pieces: pieces attacked and undefended
+        hanging = 0
+        try:
+            for color_key, items in pieces.items():
+                color_bool = chess.WHITE if color_key == 'w' else chess.BLACK
+                for ptype, sqs in items.items():
+                    for sq in sqs:
+                        attackers = board.attackers(not color_bool, sq)
+                        defenders = board.attackers(color_bool, sq)
+                        if attackers and not defenders:
+                            hanging += 1
+        except Exception:
+            hanging = 0
+        hang_score = min(hanging / 4.0, 1.0) * 0.25
+
+        # 3) En passant / castling / pawn-structure (retain small signals)
+        ep_score = 0.15 if info["ep"] != "-" else 0.0
+        castling = info["castling"]
+        castling_lost = sum(1 for c in "KQkq" if c not in castling)
+        castling_score = castling_lost / 4 * 0.1
+        pawn_damage = (
+            pawns["w"]["doubled"] + pawns["w"]["isolated"] +
+            pawns["b"]["doubled"] + pawns["b"]["isolated"]
+        )
+        pawn_score = min(pawn_damage / 8, 1.0) * 0.1
+
+        tactical_score = cap_score + check_score + hang_score + ep_score + castling_score + pawn_score
+        tactical_score = min(max(tactical_score, 0.0), 1.0)
+        # Discount tactics somewhat in endgames
+        tactical_score *= (1.0 - endgame_score * 0.4)
+ 
+        # ── Positional signals ───────────────────────────────────────────────
+        # High piece count, balanced material, intact pawn structure = positional
+        piece_richness  = min((mob["w"] + mob["b"]) / 10, 1.0)
+        # use a normalized material-imbalance for positional weighting only
+        max_imbalance = 900.0
+        imbalance_score = min(mat.get("imbalance", 0) / max_imbalance, 1.0)
+        balance_score = 1.0 - imbalance_score
+        structure_score = 1.0 - min(pawn_damage / 8, 1.0)
+        positional_score = (piece_richness * 0.4 + balance_score * 0.35 + structure_score * 0.25)
+        positional_score *= (1.0 - endgame_score * 0.6)
+ 
+        # ── Normalise and label ──────────────────────────────────────────────
+        scores = {"Tactical": tactical_score, "Positional": positional_score, "Endgame": endgame_score}
+        label  = max(scores, key=scores.get)
+ 
+        return {
+            "label":            label,
+            "tactical_score":   round(tactical_score,   3),
+            "positional_score": round(positional_score, 3),
+            "endgame_score":    round(endgame_score,    3),
+            "features": {
+                "total_material":   total_mat,
+                "material_imbalance": mat["imbalance"],
+                "ep_available":     info["ep"] != "-",
+                "castling_rights_lost": castling_lost,
+                "white_doubled_pawns":  pawns["w"]["doubled"],
+                "white_isolated_pawns": pawns["w"]["isolated"],
+                "black_doubled_pawns":  pawns["b"]["doubled"],
+                "black_isolated_pawns": pawns["b"]["isolated"],
+                "active_pieces_white":  mob["w"],
+                "active_pieces_black":  mob["b"],
+                "king_safety_white":    king_s["w"],
+                "king_safety_black":    king_s["b"],
+            }
+        }
+    except Exception as e:
+        return {"label": "Unknown", "tactical_score": 0, "positional_score": 0,
+                "endgame_score": 0, "features": {"error": str(e)}}
+ 
+ 
+def classify_df(df: pd.DataFrame, fen_col: str = "fen") -> pd.DataFrame:
+    """Vectorised classification: adds pos_label / pos_tactical / pos_positional / pos_endgame columns."""
+    if fen_col not in df.columns or df.empty:
+        return df
+    results = df[fen_col].map(classify_position)
+    df = df.copy()
+    df["pos_label"]      = results.map(lambda r: r["label"])
+    df["pos_tactical"]   = results.map(lambda r: r["tactical_score"])
+    df["pos_positional"] = results.map(lambda r: r["positional_score"])
+    df["pos_endgame"]    = results.map(lambda r: r["endgame_score"])
+    return df
 
 def get_position_balance(fen):
     board = chess.Board(fen)
@@ -206,8 +435,7 @@ def get_mobility_characteristics(fen):
     
     for color in [chess.WHITE, chess.BLACK]:
         legal_moves = list(board.legal_moves)
-        # Only consider moves by this color
-        legal_moves = [m for m in legal_moves if board.piece_at(m.from_square).color == color]
+        if board.turn != color: legal_moves = []
         capture_moves = sum(board.is_capture(m) for m in legal_moves)
         check_moves = sum(board.gives_check(m) for m in legal_moves)
 
@@ -246,6 +474,9 @@ def build_position_features(cnxn):
             fen         TEXT,
             game_phase  TEXT,
             position_type TEXT,
+            pos_tactical FLOAT,
+            pos_positional FLOAT,
+            pos_endgame FLOAT,
             balance     INTEGER,
             white_backwards INTEGER,
             white_doubled INTEGER,
@@ -280,8 +511,13 @@ def build_position_features(cnxn):
 
         # Extract features
         game_phase = get_game_phase(fen)
-        position_type = get_position_type(fen)
+        classification = classify_position(fen)
         balance = get_position_balance(fen)
+
+        tactical_score   = classification["tactical_score"]
+        positional_score = classification["positional_score"]
+        endgame_score    = classification["endgame_score"]
+        position_type    = classification["label"]
 
         # Pawns
         wp, bp = get_pawn_characteristics(fen)
@@ -301,6 +537,9 @@ def build_position_features(cnxn):
             'fen': fen,
             'game_phase': game_phase,
             'position_type': position_type,
+            'pos_tactical': tactical_score,
+            'pos_positional': positional_score,
+            'pos_endgame': endgame_score,
             'balance': balance,
             'white_backwards': w_backward,
             'white_doubled': w_doubled,
@@ -337,12 +576,126 @@ def build_position_features(cnxn):
 
 import duckdb
 import platform
+import shutil
+import time
+import datetime
+from pathlib import Path
 system = platform.system()
 
 if __name__ == "__main__":
-    if system == "Windows": DB = "F:/databases/chess_analytics.duckdb"
+    if system == "Windows":
+        DB = "F:/databases/chess_analytics.duckdb"
+    elif system == "Darwin":
+        DB = Path.home() / "Documents/databases/chess_analytics.duckdb"
 
     cnxn = duckdb.connect(DB)
+
+    # Inline: compute Stockfish eval + best move and store in `search_stats` columns
+    def find_engine(path_arg: str | None) -> str:
+        if path_arg:
+            p = Path(path_arg)
+            if p.exists():
+                return str(p)
+            raise SystemExit(f"Engine not found at {path_arg}")
+        for name in ("stockfish", "stockfish_15", "stockfish_14"):
+            p = shutil.which(name)
+            if p:
+                return p
+        raise SystemExit("Stockfish binary not found; pass engine path or install stockfish on PATH")
+
+    def cp_from_score(score, board):
+        try:
+            sc = score.white()
+            val = sc.score(mate_score=100000)
+            return int(val) if val is not None else None
+        except Exception:
+            try:
+                val = score.score(mate_score=100000)
+                return int(val) if val is not None else None
+            except Exception:
+                return None
+
+    def ensure_search_stats_columns(conn, N=3):
+        cur = conn.execute("PRAGMA table_info('search_stats')").fetchall()
+        cols = {r[1] for r in cur}
+        if 'sf_eval' not in cols:
+            conn.execute("ALTER TABLE search_stats ADD COLUMN sf_eval INTEGER")
+        if 'sf_best_move' not in cols:
+            conn.execute("ALTER TABLE search_stats ADD COLUMN sf_best_move TEXT")
+        if 'sf_time_ms' not in cols:
+            conn.execute("ALTER TABLE search_stats ADD COLUMN sf_time_ms DOUBLE")
+        if 'sf_computed_at' not in cols:
+            conn.execute("ALTER TABLE search_stats ADD COLUMN sf_computed_at TIMESTAMP")
+        if 'sf_pv' not in cols:
+            conn.execute("ALTER TABLE search_stats ADD COLUMN sf_pv TEXT")
+        # per-ply `sf_pv_#` columns deprecated: we only store full PV in `sf_pv` JSON
+
+    def update_search_stats_with_stockfish(conn, engine_path=None, depth=12, mpv=3, limit=None, skip_existing=True):
+        engine_path = find_engine(engine_path)
+        ensure_search_stats_columns(conn, mpv)
+        q = "SELECT id, fen FROM search_stats WHERE fen IS NOT NULL"
+        if limit and limit > 0:
+            q += f" LIMIT {limit}"
+        rows = conn.execute(q).fetchall()
+
+        import chess
+        import chess.engine
+
+        engine = chess.engine.SimpleEngine.popen_uci(engine_path)
+        # request MultiPV from engine so `info` contains multiple principal variations
+        N = int(mpv or 1)
+        try:
+            engine.configure({"MultiPV": N})
+        except Exception:
+            # some engine builds may not expose configure or MultiPV; continue
+            pass
+        updates = []
+        try:
+            for sid, fen in rows:
+                if skip_existing:
+                    existing = conn.execute("SELECT sf_eval FROM search_stats WHERE id=? AND sf_eval IS NOT NULL LIMIT 1", (sid,)).fetchone()
+                    if existing:
+                        continue
+                board = chess.Board(fen)
+                t0 = time.time()
+                try:
+                    info = engine.analyse(board, chess.engine.Limit(depth=depth))
+                    t1 = time.time()
+                    sf_time_ms = (t1 - t0) * 1000.0
+                    sf_eval = cp_from_score(info.get("score"), board)
+                    # extract PV moves (if present) and best move
+                    pv = info.get("pv") or []
+                    pv_uci = [m.uci() for m in pv]
+                    mv = engine.play(board, chess.engine.Limit(depth=depth))
+                    sf_best = mv.move.uci() if mv and mv.move else (pv_uci[0] if pv_uci else None)
+                    # we store the full PV as JSON in `sf_pv`; per-ply columns are deprecated
+                    pv_cols = []
+                except Exception as e:
+                    print(f"[WARN] Engine failed for search_id={sid}: {e}")
+                    sf_time_ms = None
+                    sf_eval = None
+                    sf_best = None
+                    pv_cols = [None] * N
+
+                import json
+                # build tuple: sf_eval, sf_best, sf_time_ms, sf_computed_at, sf_pv(JSON), id
+                rowvals = [sf_eval, sf_best, sf_time_ms, datetime.datetime.utcnow(), json.dumps(pv_uci), sid]
+                updates.append(tuple(rowvals))
+        finally:
+            engine.quit()
+
+        # Apply updates in bulk (sf_eval, sf_best_move, sf_time_ms, sf_computed_at, sf_pv_1, sf_pv_2, sf_pv_3, sf_pv)
+        if updates:
+            sql = "UPDATE search_stats SET sf_eval = ?, sf_best_move = ?, sf_time_ms = ?, sf_computed_at = ?, sf_pv = ? WHERE id = ?"
+            conn.executemany(sql, updates)
+            print(f"Updated {len(updates)} search_stats rows with Stockfish ground truth (sf_pv JSON)")
+        else:
+            print("No updates performed")
+
+    try:
+        update_search_stats_with_stockfish(cnxn, engine_path=None, depth=12, mpv=5, limit=None, skip_existing=True)
+    except Exception as e:
+        print(f"[WARN] Ground-truth computation failed or skipped: {e}")
 
     build_position_features(cnxn)
 
