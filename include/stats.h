@@ -67,6 +67,8 @@ struct SearchStats {
     uint64_t aspiration_fail_high_researches = 0;
     uint64_t see_prunes = 0;
     uint64_t delta_prunes = 0;
+    uint64_t nmp = 0;
+    uint64_t nmp_fail = 0;
 
     // iterative depth (stats per depth of single search)
     // tracks performance improvements across depths
@@ -85,8 +87,11 @@ struct SearchStats {
     std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_fail_high_lates{};
     std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_aspiration_failhigh_researches{};
     std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_aspiration_faillow_researches{};
+    std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_pvs_researches{};
     std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_see_prunes{};
     std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_delta_prunes{};
+    std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_nmp{};
+    std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_nmp_fail{};
 
     // tree depth (stats per depth of search tree for single search)
     //  this leads to multi-counting as it_depth searches d=1..it_depth tree depths
@@ -102,6 +107,9 @@ struct SearchStats {
     std::array<uint64_t, STATS_MAX_PLY> tree_depth_fail_high_lates{};
     std::array<uint64_t, STATS_MAX_PLY> tree_depth_see_prunes{};
     std::array<uint64_t, STATS_MAX_PLY> tree_depth_delta_prunes{};
+    std::array<uint64_t, STATS_MAX_PLY> tree_depth_pvs_researches{};
+    std::array<uint64_t, STATS_MAX_PLY> tree_depth_nmp{};
+    std::array<uint64_t, STATS_MAX_PLY> tree_depth_nmp_fail{};
 };
 
 // --- single header-only global instance ---
@@ -159,6 +167,15 @@ inline void resetSearchStats() {
             STATS_BOUNDS_CHECK_1D(depth); \
             g_stats.aspiration_fail_high_researches++; \
             g_stats.it_depth_aspiration_failhigh_researches[depth]++; \
+        } \
+    } while(0)
+
+#define STATS_PVS_RESEARCH(it_d, ply) \
+    do { \
+        if (Logging::track_search_stats) { \
+            STATS_BOUNDS_CHECK(it_d, ply); \
+            g_stats.it_depth_pvs_researches[it_d]++; \
+            g_stats.tree_depth_pvs_researches[ply]++; \
         } \
     } while(0)
 
@@ -230,6 +247,26 @@ inline void resetSearchStats() {
             g_stats.tree_depth_delta_prunes[ply]++;         \
         }                                                   \
     } while (0)
+
+#define STATS_NMP(it_d, ply) \
+    do { \
+        if (Logging::track_search_stats) { \
+            STATS_BOUNDS_CHECK(it_d, ply); \
+            g_stats.nmp++; \
+            g_stats.it_depth_nmp[it_d]++; \
+            g_stats.tree_depth_nmp[ply]++; \
+        } \
+    } while(0)
+
+#define STATS_NMP_FAIL(it_d, ply) \
+    do { \
+        if (Logging::track_search_stats) { \
+            STATS_BOUNDS_CHECK(it_d, ply); \
+            g_stats.nmp_fail++; \
+            g_stats.it_depth_nmp_fail[it_d]++; \
+            g_stats.tree_depth_nmp_fail[ply]++; \
+        } \
+    } while(0)
 
 // -------------------------
 //      Logging Functions
@@ -333,6 +370,7 @@ inline void logSearchStats(const std::string& fen = "") {
         << "\"itdepth_aspiration_faillow_researches\":" << array_to_json(g_stats.it_depth_aspiration_faillow_researches, n) << ","
         << "\"itdepth_see_prunes\":" << array_to_json(g_stats.it_depth_see_prunes, n) << ","
         << "\"itdepth_delta_prunes\":" << array_to_json(g_stats.it_depth_delta_prunes, n) << ","
+        << "\"itdepth_pvs_researches\":" << array_to_json(g_stats.it_depth_pvs_researches, n) << ","
 
         // tree ply stats
         << "\"treedepth_nodes\":" << array_to_json(g_stats.tree_depth_nodes, q_n) << ","
@@ -344,7 +382,8 @@ inline void logSearchStats(const std::string& fen = "") {
         << "\"treedepth_fail_high_firsts\":" << array_to_json(g_stats.tree_depth_fail_high_firsts, q_n) << ","
         << "\"treedepth_fail_high_lates\":" << array_to_json(g_stats.tree_depth_fail_high_lates, q_n) << ","
         << "\"treedepth_see_prunes\":" << array_to_json(g_stats.tree_depth_see_prunes, q_n) << ","
-        << "\"treedepth_delta_prunes\":" << array_to_json(g_stats.tree_depth_delta_prunes, q_n)
+        << "\"treedepth_delta_prunes\":" << array_to_json(g_stats.tree_depth_delta_prunes, q_n) << ","
+        << "\"treedepth_pvs_researches\":" << array_to_json(g_stats.tree_depth_pvs_researches, q_n)
 
         << "}\n";
 

@@ -17,6 +17,7 @@ struct RootMove {
     int eval;
 };
 
+// ---- principal variation tracking ----
 struct PV {
     std::vector<Move> line;
     void clear() { line.clear(); }
@@ -28,6 +29,7 @@ struct PV {
     }
 };
 
+// ---- search returns move / eval / PV ----
 struct SearchResult {
     Move bestMove = Move::NullMove();
     int eval = -MATE_SCORE;
@@ -46,6 +48,10 @@ class Searcher {
 public:
     static constexpr int KILL_SEARCH_RETURN = -5 * MATE_SCORE;
     static constexpr int MAX_DELTA = 1000;
+
+    // --- Search Reduction Parameters ---
+    const int R_nmp = 3; // null move pruning reduction
+    int R_lmr(int depth, int move_order);
 
     // Object-owned state
     Engine& engine;

@@ -444,7 +444,6 @@ void Engine::startSearch() {
 
     computeSearchTime(settings);
     iterativeDeepening();
-
     sendBestMove(bestMove);
 }
 
@@ -488,6 +487,13 @@ void Engine::iterativeDeepening() {
     Move first_moves[MAX_MOVES];
     int count = movegen->generateMoves(game_board, false);
     std::copy_n(movegen->moves, count, first_moves);
+
+    // play only-legal-move immediately
+    if (count == 1) {
+        bestMove = first_moves[0];
+        bestEval = -MATE_SCORE-100; // not concerned with eval here
+        return;
+    }
 
     int aspiration_start_depth = 6;
     int delta = 50;

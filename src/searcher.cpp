@@ -226,6 +226,7 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
     ScopedTimer timer(T_SEARCH);
     if (limits.out_of_time()) return alpha;
 
+    // --- end of search conditions ---
 
     if (board.isThreefold() || board.currentGameState.fiftyMoveCounter >= 50) {
         //engine.tt.store(board.zobrist_hash, depth, ply, 0, EXACT, Move::NullMove());
@@ -235,6 +236,8 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
     if (depth == 0) {
         return use_quiescence ? quiescence(alpha, beta, pv, limits, ply, depth, ply) : nnue.evaluate(board.is_white_move);
     }
+
+    // --- TT probe ---
 
     int alphaOrig = alpha;
     TTEntry* ttEntry = engine.tt.probe(board.zobrist_hash);
@@ -250,6 +253,37 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
         //if (alpha >= beta) return ttScore;
     }
 
+    // -----------------------------
+    // Null Move Pruning
+    // -----------------------------
+    // making a move is almost always better than passing
+    // so we pass the move (null move) and perform a null-window search with reduced depth around beta
+    // if the null move fails high then we can assume the best move will also fail high
+    // certain position restrictions must be used for the assumptions to hold
+    if ( // not in check, and not only king-pawn endgame (zugzwang prevention)
+        !(
+            board.is_in_check 
+        || (board.colorBitboards[board.move_color] & (board.pieceBitboards[bishop] | board.pieceBitboards[queen] | board.pieceBitboards[rook] | board.pieceBitboards[knight])) 
+        )
+    ) {
+        STATS_NMP(depth+ply, ply);
+        PV emptyPV;
+
+        // null moves just change the side to move (and last-move cache)
+        board.MakeNullMove();
+        int null_score = -negamax(depth - 1 - R_nmp, -beta, -(beta - 1), emptyPV, previousPV, limits, ply + 1, use_quiescence);
+        board.UnmakeNullMove();
+
+        // null window around beta so if if null move fails high 
+        // then so should the real move with a full window search
+        if (null_score >= beta) {
+            STATS_NMP_FAIL(depth+ply, ply);
+            return beta;
+        }
+    }
+
+    // --- search ---
+
     Move moves[MAX_MOVES];
     int count = generateAndOrderMoves(moves, ply, previousPV);
     if (count == 0) return board.is_in_check ? -(MATE_SCORE - ply) : 0;
@@ -257,10 +291,17 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
     int bestEval = -MATE_SCORE;
     Move bestMove = Move::NullMove();
 
+    int _lmr_R = 0;
+
     for (int i = 0; i < count; i++) {
         if (limits.out_of_time()) break;
 
         Move m = moves[i];
+
+        // current board state info
+        bool in_check = board.is_in_check;
+        bool is_pawn_endgame = board.pawn_endgame;
+        bool was_capture = board.currentGameState.capturedPieceType != -1;
 
         // Apply NNUE/update & board
         U64 pre_hash = board.zobrist_hash;
@@ -269,7 +310,45 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
         U64 mid_hash = board.zobrist_hash;
 
         int score; PV childPV;
-        score = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply + 1, use_quiescence);
+
+        // -----------------------------
+        // Late Move Reduction
+        // -----------------------------
+        // if a move is late in the move ordering and non-tactical then we can reduce its search depth
+        // if the reduced search returns > alpha then we can re-search it with full depth
+        // integration with PVS: use PVS+LMR concurrently
+        //    if the move returns > alpha then do full-search (depth+window)
+        if (
+            // positional conditions apply
+            board.currentGameState.capturedPieceType == -1
+            && !m.IsPromotion()
+            && !board.is_in_check
+            && !in_check
+        ) {
+            // obsidian log formula
+            _lmr_R = R_lmr(depth, i);
+        } else {
+            _lmr_R = 0;
+        }
+
+        // -----------------------------
+        // principal variation search 
+        // -----------------------------
+        // run a null-window search around alpha
+        // after generating a PV move (and thus alpha=eval) from a full-window search
+        // if a move fails high then we can re-search it with a full window 
+        // else it fails low and is not going to be a better move than what has been found
+        // null window searches are cheap and so the re-searches are worth the speedup
+        if (!i) score = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply + 1, use_quiescence);
+        else {
+            score = -negamax(depth - 1 - _lmr_R, -(alpha+1), -alpha, childPV, previousPV, limits, ply + 1, use_quiescence);
+            // fail-high --> re-search with full window
+            // beta-alpha>1 is a redudancy check
+            if (score > alpha && beta-alpha > 1) {
+                STATS_PVS_RESEARCH(depth+ply, ply);
+                score = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply + 1, use_quiescence);
+            }
+        }
 
         nnue.on_unmake_move(board, m);
         board.UnmakeMove(m);
@@ -417,4 +496,25 @@ void Searcher::undo_move(const Move& move, const Board& before) {
     // board currently contains the position AFTER the move, so Unmake it then call on_unmake_move
     nnue.on_unmake_move(board, move);
     board.UnmakeMove(move);
+}
+
+// -----------------------
+// LMR reduction formula
+// -----------------------
+// log formula: constant + [log(depth) * log(move_order)] / denominator
+int Searcher::R_lmr(int depth, int move_order) {
+    int MOVE_ORDER_THRESHOLD = 3;
+    int DEPTH_THRESHOLD = 2;
+    int MAX_REDUCTION = 4;
+
+    float _const = 0.99f;
+    float _denom = 3.14f;
+
+    if (move_order <= MOVE_ORDER_THRESHOLD) return 0; // no reduction for first 3 moves
+    if (depth <= DEPTH_THRESHOLD) return 0;      // no reduction for shallow depths
+
+    // logarithmic reduction formula
+    float log_depth = std::log(static_cast<float>(depth));
+    float log_order = std::log(static_cast<float>(move_order));
+    return min(MAX_REDUCTION, static_cast<int>(_const + (log_depth * log_order) / _denom));
 }

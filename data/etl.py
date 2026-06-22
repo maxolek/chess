@@ -26,6 +26,9 @@ def safe_val(val):
         return json.dumps(val)
     return val
 
+def safe(arr, i):
+    return arr[i] if i < len(arr) else 0
+
 def get_opening_from_moves(moves):
     """
     Accepts either a list of move tokens or a space-separated moves string.
@@ -718,23 +721,23 @@ def bulk_log_search_and_timing(
                 depth_rows.append((
                     search_id,
                     d + 1,
-                    data.get("itdepth_time_ms", [0]*n)[d],
-                    data.get("itdepth_eval", [0]*n)[d],
-                    data.get("itdepth_move", [None]*n)[d],
-                    data.get("itdepth_qdepth", [0]*n)[d],
-                    data.get("itdepth_nodes", [0]*n)[d],
-                    data.get("itdepth_qnodes", [0]*n)[d],
-                    data.get("itdepth_ttstores", [0]*n)[d],
-                    data.get("itdepth_tthits", [0]*n)[d],
-                    data.get("itdepth_ttfill", [0]*n)[d],
-                    data.get("itdepth_fail_highs", [0]*n)[d],
-                    data.get("itdepth_fail_lows", [0]*n)[d],
-                    data.get("itdepth_fail_high_firsts", [0]*n)[d],
-                    data.get("itdepth_fail_high_lates", [0]*n)[d],
-                    data.get("itdepth_aspiration_failhigh_researches", [0]*n)[d],
-                    data.get("itdepth_aspiration_faillow_researches", [0]*n)[d],
-                    data.get("itdepth_see_prunes", [0]*n)[d], 
-                    data.get("itdepth_delta_prunes", [0]*n)[d]
+                    safe(data.get("itdepth_time_ms", []), d),
+                    safe(data.get("itdepth_eval", []), d),
+                    safe(data.get("itdepth_move", []), d),
+                    safe(data.get("itdepth_qdepth", []), d),
+                    safe(data.get("itdepth_nodes", []), d),
+                    safe(data.get("itdepth_qnodes", []), d),
+                    safe(data.get("itdepth_ttstores", []), d),
+                    safe(data.get("itdepth_tthits", []), d),
+                    safe(data.get("itdepth_ttfill", []), d),
+                    safe(data.get("itdepth_fail_highs", []), d),
+                    safe(data.get("itdepth_fail_lows", []), d),
+                    safe(data.get("itdepth_fail_high_firsts", []), d),
+                    safe(data.get("itdepth_fail_high_lates", []), d),
+                    safe(data.get("itdepth_aspiration_failhigh_researches", []), d),
+                    safe(data.get("itdepth_aspiration_faillow_researches", []), d),
+                    safe(data.get("itdepth_see_prunes", []), d),
+                    safe(data.get("itdepth_delta_prunes", []), d)
                 ))
 
     cursor.executemany(
@@ -765,17 +768,17 @@ def bulk_log_search_and_timing(
                     search_id,
                     d + 1, 
                     #data.get("ply_time_ms", [0]*n)[d],
-                    data.get("treedepth_nodes", [0]*n)[d],
-                    data.get("treedepth_qnodes", [0]*n)[d],
-                    data.get("treedepth_tt_stores", [0]*n)[d],
-                    data.get("treedepth_tt_hits", [0]*n)[d],
+                    safe(data.get("treedepth_nodes", []), d),
+                    safe(data.get("treedepth_qnodes", []), d),
+                    safe(data.get("treedepth_tt_stores", []), d),
+                    safe(data.get("treedepth_tt_hits", []), d),
                     #data.get("ply_tt_fill", [0]*n)[d],
-                    data.get("treedepth_fail_highs", [0]*n)[d],
-                    data.get("treedepth_fail_lows", [0]*n)[d],
-                    data.get("treedepth_fail_high_firsts", [0]*n)[d],
-                    data.get("treedepth_fail_high_lates", [0]*n)[d],
-                    data.get("treedepth_see_prunes", [0]*n)[d],
-                    data.get("treedepth_delta_prunes", [0]*n)[d],
+                    safe(data.get("treedepth_fail_highs", []), d),
+                    safe(data.get("treedepth_fail_lows", []), d),
+                    safe(data.get("treedepth_fail_high_firsts", []), d),
+                    safe(data.get("treedepth_fail_high_lates", []), d),
+                    safe(data.get("treedepth_see_prunes", []), d),
+                    safe(data.get("treedepth_delta_prunes", []), d),
                 ))
 
     cursor.executemany(

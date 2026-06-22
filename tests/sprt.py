@@ -258,7 +258,7 @@ def main(args=None):
         f"option.timer_logging={"true" if args.log else "false"}",
         f"option.stats_logging={"true" if args.log else "false"}",
         f"option.game_logging={"true" if args.log else "false"}",
-        f"option.uci_logging=false",
+        f"option.uci_logging=true",
     ]
     log_b_block = [
         "option.timer_logging=false",
@@ -271,7 +271,7 @@ def main(args=None):
     if args.depth is not None:
         each_block.append(f"depth={args.depth}")
     elif args.time is not None:
-        each_block += [f"st={args.time}", "timemargin=100"]
+        each_block += [f"st={args.time}", "timemargin=30"]
     else:
         each_block.append(f"tc={args.tc}")
 
@@ -326,19 +326,48 @@ def main(args=None):
     output_lines = []
     start_time = time.time()
 
+    stdout_log_path = Path(args.logroot) / "cutechess_stdout.log"
+    stderr_log_path = Path(args.logroot) / "cutechess_stderr.log"
+
+    #stdout_f = open(stdout_log_path, "w", encoding="utf-8")
+    #stderr_f = open(stderr_log_path, "w", encoding="utf-8")
+
     with subprocess.Popen(
         cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
+        #stderr=subprocess.PIPE,   # IMPORTANT: do NOT merge streams
         text=True,
         bufsize=1  # line-buffered
     ) as proc:
-
+        
         for line in proc.stdout:
             print(line, end="")      # live console output
             output_lines.append(line)
 
+        """
+        # read both streams until process ends
+        while True:
+            out_line = proc.stdout.readline() if proc.stdout else ""
+            err_line = proc.stderr.readline() if proc.stderr else ""
+
+            if out_line:
+                print(out_line, end="")
+                stdout_f.write(out_line)
+                output_lines.append(out_line)
+
+            if err_line:
+                print("[ERR]", err_line, end="")
+                stderr_f.write(err_line)
+
+            if not out_line and not err_line and proc.poll() is not None:
+                break
+        """
+
         ret = proc.wait()
+
+    #stdout_f.close()
+    #stderr_f.close()
 
     if ret != 0:
         raise subprocess.CalledProcessError(ret, cmd)
