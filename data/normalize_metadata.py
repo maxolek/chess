@@ -7,10 +7,14 @@ Normalize engine and game metadata in the analytics DuckDB and create helper col
 import duckdb
 from pathlib import Path
 import os
+import platform
 
 if __name__ == '__main__':
-    system = os.uname().sysname
-    db = Path.home() / 'Documents' / 'databases' / 'chess_analytics.duckdb'
+    system = platform.system()
+    if system == "Windows":
+        db = Path('F:/databases/chess_analytics.duckdb')
+    else:
+        db = Path.home() / 'Documents' / 'databases' / 'chess_analytics.duckdb'
     con = duckdb.connect(str(db))
 
     # engines.normalized_version

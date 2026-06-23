@@ -98,6 +98,9 @@ def init_engine_db(db_dir=dir) -> None:
             fail_low_researches         INTEGER,
             see_prunes                  INTEGER,
             delta_prunes                INTEGER,
+            nmp                         INTEGER,
+            nmp_fail                    INTEGER,
+            tt_overwritten              INTEGER,
 
             ingestion_timestamp_utc     DATETIME DEFAULT CURRENT_TIMESTAMP,
             
@@ -133,6 +136,9 @@ def init_engine_db(db_dir=dir) -> None:
             fail_low_researches         INTEGER,
             see_prunes                  INTEGER,
             delta_prunes                INTEGER,
+            pvs_researches              INTEGER,
+            nmp                         INTEGER,
+            nmp_fail                    INTEGER,
 
             ingestion_timestamp_utc     DATETIME DEFAULT CURRENT_TIMESTAMP,
             
@@ -160,6 +166,9 @@ def init_engine_db(db_dir=dir) -> None:
             fail_high_late              INTEGER,
             see_prunes                  INTEGER,
             delta_prunes                INTEGER,
+            pvs_researches              INTEGER,
+            nmp                         INTEGER,
+            nmp_fail                    INTEGER,
 
             ingestion_timestamp_utc     DATETIME DEFAULT CURRENT_TIMESTAMP,
 

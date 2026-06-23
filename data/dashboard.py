@@ -336,20 +336,21 @@ ACCENT    = "#00d2ff"
 ACCENT2   = "#ff6b35"
 
 _sidebar_label = {
-    "fontSize": "10px",
+    "fontSize": "9px",
     "fontWeight": "700",
-    "letterSpacing": "0.12em",
+    "letterSpacing": "0.14em",
     "textTransform": "uppercase",
     "color": TEXT_SEC,
-    "marginBottom": "4px",
-    "marginTop": "12px",
+    "marginBottom": "3px",
+    "marginTop": "10px",
 }
 
 _dropdown_style = {
     "backgroundColor": "#1a1f2e",
     "borderColor": BORDER,
     "color": TEXT_PRI,
-    "fontSize": "13px",
+    "fontSize": "12px",
+    "borderRadius": "6px",
 }
 
 app = dash.Dash(__name__, suppress_callback_exceptions=True)
@@ -372,31 +373,43 @@ app.index_string = """
             color: #e8eaf0;
             font-family: 'Syne', sans-serif;
             min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
         }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: #141720; }
-        ::-webkit-scrollbar-thumb { background: #252a38; border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: #00d2ff44; }
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #252a3866; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #00d2ff55; }
 
-        .Select-control { background-color: #1a1f2e !important; border-color: #252a38 !important; color: #e8eaf0 !important; }
-        .Select-menu-outer { background-color: #1a1f2e !important; border-color: #252a38 !important; }
-        .Select-option { background-color: #1a1f2e !important; color: #e8eaf0 !important; }
-        .Select-option:hover, .Select-option.is-focused { background-color: #00d2ff22 !important; }
+        /* Dropdown overrides */
+        .Select-control { background-color: #1a1f2e !important; border-color: #252a38 !important; color: #e8eaf0 !important; border-radius: 6px !important; min-height: 32px !important; }
+        .Select-menu-outer { background-color: #1a1f2e !important; border-color: #252a38 !important; border-radius: 0 0 6px 6px !important; }
+        .Select-option { background-color: #1a1f2e !important; color: #e8eaf0 !important; padding: 6px 10px !important; }
+        .Select-option:hover, .Select-option.is-focused { background-color: #00d2ff18 !important; }
         .Select-value-label { color: #e8eaf0 !important; }
-        .Select-placeholder { color: #8892a4 !important; }
+        .Select-placeholder { color: #8892a4 !important; font-size: 12px !important; }
         .Select-arrow { border-top-color: #8892a4 !important; }
         .VirtualizedSelectOption { background-color: #1a1f2e !important; color: #e8eaf0 !important; }
+        .Select-multi-value-wrapper .Select-value { background-color: #00d2ff18 !important; border-color: #00d2ff44 !important; border-radius: 4px !important; }
+        .Select-multi-value-wrapper .Select-value-label { color: #00d2ff !important; font-size: 11px !important; }
 
-        .tab-content { animation: fadeIn 0.2s ease; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        /* Tab animation */
+        .tab-content { animation: fadeIn 0.18s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 
+        /* Metric cards */
         .metric-card {
-            background: #141720;
+            background: linear-gradient(135deg, #141720 0%, #181d2a 100%);
             border: 1px solid #252a38;
-            border-radius: 8px;
-            padding: 16px 20px;
+            border-radius: 10px;
+            padding: 18px 20px 14px;
             position: relative;
             overflow: hidden;
+            transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+        }
+        .metric-card:hover {
+            border-color: #00d2ff44;
+            box-shadow: 0 4px 20px rgba(0, 210, 255, 0.06);
+            transform: translateY(-1px);
         }
         .metric-card::before {
             content: '';
@@ -404,51 +417,70 @@ app.index_string = """
             top: 0; left: 0; right: 0;
             height: 2px;
             background: linear-gradient(90deg, #00d2ff, #ff6b35);
+            opacity: 0.7;
         }
         .metric-val {
             font-family: 'JetBrains Mono', monospace;
-            font-size: 28px;
+            font-size: 24px;
             font-weight: 700;
             color: #00d2ff;
+            line-height: 1.2;
         }
         .metric-lbl {
-            font-size: 10px;
+            font-size: 9px;
             font-weight: 700;
-            letter-spacing: 0.1em;
+            letter-spacing: 0.12em;
             text-transform: uppercase;
             color: #8892a4;
-            margin-top: 4px;
+            margin-top: 6px;
         }
 
+        /* Section titles */
         .section-title {
             font-family: 'JetBrains Mono', monospace;
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 700;
-            letter-spacing: 0.15em;
+            letter-spacing: 0.18em;
             text-transform: uppercase;
             color: #00d2ff;
             border-bottom: 1px solid #252a38;
-            padding-bottom: 8px;
-            margin-bottom: 16px;
+            padding-bottom: 6px;
+            margin-bottom: 12px;
         }
 
+        /* Panel cards */
+        .panel {
+            background: #141720;
+            border: 1px solid #252a38;
+            border-radius: 10px;
+            padding: 16px 18px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .panel:hover {
+            border-color: #252a3888;
+            box-shadow: 0 2px 16px rgba(0, 0, 0, 0.25);
+        }
+
+        /* Data tables */
         .dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner td,
         .dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner th {
             background-color: #141720 !important;
             color: #e8eaf0 !important;
-            border-color: #252a38 !important;
+            border-color: #1e2333 !important;
             font-family: 'JetBrains Mono', monospace !important;
-            font-size: 12px !important;
+            font-size: 11px !important;
+            padding: 5px 8px !important;
         }
         .dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner th {
-            background-color: #0d0f14 !important;
-            color: #8892a4 !important;
+            background-color: #0f1118 !important;
+            color: #6b7a8d !important;
             font-weight: 700 !important;
-            letter-spacing: 0.06em !important;
+            font-size: 10px !important;
+            letter-spacing: 0.08em !important;
             text-transform: uppercase !important;
         }
         .dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner tr:hover td {
-            background-color: #00d2ff11 !important;
+            background-color: #00d2ff08 !important;
         }
         .dash-table-container .previous-next-container button,
         .dash-table-container .previous-page, .dash-table-container .next-page,
@@ -456,15 +488,27 @@ app.index_string = """
             background-color: #1a1f2e !important;
             color: #e8eaf0 !important;
             border-color: #252a38 !important;
+            border-radius: 4px !important;
+            font-size: 11px !important;
         }
         input[type="text"] {
             background-color: #1a1f2e !important;
             color: #e8eaf0 !important;
             border-color: #252a38 !important;
+            border-radius: 4px !important;
         }
 
         .rc-slider-track { background-color: #00d2ff !important; }
         .rc-slider-handle { border-color: #00d2ff !important; background-color: #00d2ff !important; }
+
+        /* Plotly modebar */
+        .modebar { opacity: 0; transition: opacity 0.2s; }
+        .js-plotly-plot:hover .modebar { opacity: 1; }
+        .modebar-btn path { fill: #8892a4 !important; }
+        .modebar-btn:hover path { fill: #00d2ff !important; }
+
+        /* Tabs */
+        .tab--selected { position: relative; }
     </style>
 </head>
 <body>
@@ -481,13 +525,13 @@ app.index_string = """
 def make_sidebar():
     return html.Div([
         html.Div([
-            html.Div("⬡", style={"fontSize": "22px", "color": ACCENT, "lineHeight": "1"}),
-            html.Div("CHESS", style={"fontFamily": "'JetBrains Mono'", "fontSize": "11px", "fontWeight": "700", "letterSpacing": "0.2em", "color": TEXT_PRI}),
-            html.Div("ANALYTICS", style={"fontFamily": "'JetBrains Mono'", "fontSize": "9px", "fontWeight": "400", "letterSpacing": "0.25em", "color": TEXT_SEC}),
-        ], style={"padding": "20px 16px 16px", "borderBottom": f"1px solid {BORDER}"}),
+            html.Div("⬡", style={"fontSize": "20px", "color": ACCENT, "lineHeight": "1"}),
+            html.Div("CHESS", style={"fontFamily": "'JetBrains Mono'", "fontSize": "10px", "fontWeight": "700", "letterSpacing": "0.22em", "color": TEXT_PRI, "marginTop": "2px"}),
+            html.Div("ANALYTICS", style={"fontFamily": "'JetBrains Mono'", "fontSize": "8px", "fontWeight": "400", "letterSpacing": "0.28em", "color": TEXT_SEC}),
+        ], style={"padding": "16px 14px 12px", "borderBottom": f"1px solid {BORDER}"}),
 
         html.Div([
-            html.Div("FILTERS", style={**_sidebar_label, "marginTop": "20px"}),
+            html.Div("FILTERS", style={**_sidebar_label, "marginTop": "14px", "color": ACCENT, "fontSize": "8px", "letterSpacing": "0.2em"}),
 
             html.Div("Engine", style=_sidebar_label),
             dcc.Dropdown(
@@ -524,28 +568,28 @@ def make_sidebar():
                 style=_dropdown_style,
             ),
 
-            html.Hr(style={"borderColor": BORDER, "margin": "20px 0"}),
+            html.Hr(style={"borderColor": BORDER, "margin": "16px 0", "opacity": "0.5"}),
 
             html.Button(
                 "↺  RESET", id="btn-reset", n_clicks=0,
                 style={
-                    "width": "100%", "padding": "10px",
+                    "width": "100%", "padding": "8px",
                     "background": "transparent",
                     "border": f"1px solid {BORDER}",
                     "borderRadius": "6px",
                     "color": TEXT_SEC,
                     "fontFamily": "'JetBrains Mono'",
-                    "fontSize": "11px",
+                    "fontSize": "10px",
                     "fontWeight": "700",
-                    "letterSpacing": "0.12em",
+                    "letterSpacing": "0.14em",
                     "cursor": "pointer",
-                    "transition": "all 0.15s",
+                    "transition": "all 0.2s",
                 }
             ),
-        ], style={"padding": "0 16px 20px", "overflowY": "auto", "flex": "1"}),
+        ], style={"padding": "0 14px 16px", "overflowY": "auto", "flex": "1"}),
     ], style={
-        "width": "220px",
-        "minWidth": "220px",
+        "width": "200px",
+        "minWidth": "200px",
         "backgroundColor": PANEL_BG,
         "borderRight": f"1px solid {BORDER}",
         "display": "flex",
@@ -558,20 +602,20 @@ def make_sidebar():
 
 _tab_style = {
     "fontFamily": "'JetBrains Mono', monospace",
-    "fontSize": "11px",
+    "fontSize": "10px",
     "fontWeight": "700",
-    "letterSpacing": "0.1em",
-    "padding": "10px 16px",
-    "backgroundColor": PANEL_BG,
+    "letterSpacing": "0.08em",
+    "padding": "8px 12px",
+    "backgroundColor": "transparent",
     "color": TEXT_SEC,
     "border": "none",
-    "borderBottom": f"2px solid {BORDER}",
+    "borderBottom": f"2px solid transparent",
 }
 _tab_selected_style = {
     **_tab_style,
     "color": ACCENT,
     "borderBottom": f"2px solid {ACCENT}",
-    "backgroundColor": DARK_BG,
+    "backgroundColor": "transparent",
 }
 
 TABS = [
@@ -602,7 +646,8 @@ app.layout = html.Div([
                 ],
                 style={"borderBottom": f"1px solid {BORDER}"},
             ),
-            html.Div(id="tab-content", className="tab-content", style={"padding": "24px", "overflowY": "auto"}),
+            html.Div(id="tab-content", className="tab-content",
+                     style={"padding": "20px 24px", "overflowY": "auto", "flex": "1"}),
         ], style={"flex": "1", "display": "flex", "flexDirection": "column", "overflow": "hidden"}),
     ], style={"display": "flex", "flexDirection": "row", "height": "100vh", "overflow": "hidden"}),
 ], style={"backgroundColor": DARK_BG, "minHeight": "100vh"})
@@ -615,17 +660,20 @@ app.layout = html.Div([
 _PLOTLY_THEME = dict(
     template="plotly_dark",
     paper_bgcolor="rgba(0,0,0,0)",
-    plot_bgcolor="#141720",
-    font=dict(family="JetBrains Mono, monospace", color=TEXT_PRI, size=12),
-    legend=dict(bgcolor="rgba(0,0,0,0)", bordercolor=BORDER, borderwidth=1),
-    margin=dict(l=48, r=24, t=40, b=40),
+    plot_bgcolor="rgba(20,23,32,0.6)",
+    font=dict(family="JetBrains Mono, monospace", color=TEXT_PRI, size=11),
+    legend=dict(bgcolor="rgba(0,0,0,0)", bordercolor="rgba(0,0,0,0)", borderwidth=0,
+                font=dict(size=10), orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5),
+    margin=dict(l=44, r=16, t=36, b=32),
     colorway=_PALETTE,
 )
 
 def apply_theme(fig) -> go.Figure:
     fig.update_layout(**_PLOTLY_THEME)
-    fig.update_xaxes(gridcolor=BORDER, zerolinecolor=BORDER)
-    fig.update_yaxes(gridcolor=BORDER, zerolinecolor=BORDER)
+    fig.update_xaxes(gridcolor="#1e2333", zerolinecolor="#252a38", gridwidth=1,
+                     tickfont=dict(size=10), title_font=dict(size=11))
+    fig.update_yaxes(gridcolor="#1e2333", zerolinecolor="#252a38", gridwidth=1,
+                     tickfont=dict(size=10), title_font=dict(size=11))
     return fig
 
 
@@ -641,6 +689,13 @@ def section(title: str) -> html.Div:
     return html.Div(title, className="section-title")
 
 
+def panel(*children, flex=None, **style_kwargs) -> html.Div:
+    """Wrap children in a styled panel card."""
+    style = {"flex": flex} if flex else {}
+    style.update(style_kwargs)
+    return html.Div(list(children), className="panel", style=style)
+
+
 def metric_card(value, label: str, accent=ACCENT) -> html.Div:
     return html.Div([
         html.Div(str(value), className="metric-val", style={"color": accent}),
@@ -648,11 +703,12 @@ def metric_card(value, label: str, accent=ACCENT) -> html.Div:
     ], className="metric-card")
 
 
-def graph(fig, height=400, **kwargs) -> dcc.Graph:
+def graph(fig, height=380, **kwargs) -> dcc.Graph:
     return dcc.Graph(
         figure=fig,
-        style={"height": f"{height}px"},
-        config={"displayModeBar": True, "displaylogo": False},
+        style={"height": f"{height}px", "width": "100%"},
+        config={"displayModeBar": "hover", "displaylogo": False,
+                "modeBarButtonsToRemove": ["lasso2d", "select2d"]},
         **kwargs
     )
 
@@ -715,9 +771,13 @@ def table(df: pd.DataFrame, page_size=15, max_rows=MAX_TABLE_ROWS) -> dash_table
         page_size=page_size,
         sort_action="native",
         filter_action="native",
-        style_table={"overflowX": "auto"},
-        style_cell={"textAlign": "left", "padding": "6px 10px"},
-        style_header={"fontWeight": "700"},
+        style_table={"overflowX": "auto", "maxHeight": "480px", "overflowY": "auto"},
+        style_cell={"textAlign": "left", "padding": "4px 8px", "maxWidth": "200px",
+                    "overflow": "hidden", "textOverflow": "ellipsis", "whiteSpace": "nowrap"},
+        style_header={"fontWeight": "700", "position": "sticky", "top": 0},
+        style_data_conditional=[
+            {"if": {"row_index": "odd"}, "backgroundColor": "#0f1118"},
+        ],
         tooltip_data=tooltip_data,
         tooltip_duration=None,
     )
@@ -739,7 +799,20 @@ def tab_overview(gf: pd.DataFrame, sf: pd.DataFrame) -> html.Div:
         metric_card(f"{total_searches:,}", "TOTAL SEARCHES", accent=ACCENT2),
         metric_card(engine_count,          "ENGINE VERSIONS", accent="#7fff6b"),
         metric_card(avg_depth,             "AVG SEARCH DEPTH", accent="#f7b731"),
-    ], style={"display": "grid", "gridTemplateColumns": "repeat(4,1fr)", "gap": "16px", "marginBottom": "24px"})
+    ], style={"display": "grid", "gridTemplateColumns": "repeat(4,1fr)", "gap": "10px", "marginBottom": "10px"})
+
+    # Second KPI row: pruning / NMP efficiency
+    avg_nmp_ratio = round(sf["nmp_ratio"].mean() * 100, 2) if "nmp_ratio" in sf.columns and not sf.empty else "—"
+    avg_nmp_fail = round(sf["nmp_fail_ratio"].mean() * 100, 1) if "nmp_fail_ratio" in sf.columns and not sf.empty else "—"
+    avg_fh_first = round(sf["fail_high_first_ratio"].mean() * 100, 1) if "fail_high_first_ratio" in sf.columns and not sf.empty else "—"
+    avg_tt_hit = round(sf["tt_hit_ratio"].mean() * 100, 1) if "tt_hit_ratio" in sf.columns and not sf.empty else "—"
+
+    kpis2 = html.Div([
+        metric_card(f"{avg_nmp_ratio}%", "NMP ATTEMPT RATE", accent="#a29bfe"),
+        metric_card(f"{avg_nmp_fail}%", "NMP FAIL RATE", accent="#fd79a8"),
+        metric_card(f"{avg_fh_first}%", "FAIL-HIGH FIRST", accent="#55efc4"),
+        metric_card(f"{avg_tt_hit}%", "TT HIT RATE", accent="#fdcb6e"),
+    ], style={"display": "grid", "gridTemplateColumns": "repeat(4,1fr)", "gap": "10px", "marginBottom": "14px"})
 
     # Win/draw/loss by engine
     if "engine_name" in sf.columns and "result_label" in sf.columns and "game_id" in sf.columns:
@@ -782,14 +855,31 @@ def tab_overview(gf: pd.DataFrame, sf: pd.DataFrame) -> html.Div:
     else:
         ev_fig = empty_fig("No eval data")
 
+    # Pruning efficiency by engine (NMP, SEE, Delta)
+    prune_metrics = [c for c in ["nmp_ratio", "nmp_fail_ratio", "avg_see_prune_ratio", "avg_delta_prune_ratio",
+                                  "see_prune_ratio", "delta_prune_ratio", "avg_pvs_research_ratio", "pvs_research_ratio"]
+                     if c in sf.columns]
+    if prune_metrics and "engine_name" in sf.columns and not sf.empty:
+        prune_agg = sf.groupby("engine_name")[prune_metrics].mean().reset_index()
+        prune_melt = prune_agg.melt(id_vars="engine_name", var_name="metric", value_name="value")
+        prune_fig = px.bar(prune_melt, x="engine_name", y="value", color="metric",
+                           barmode="group", color_discrete_sequence=_PALETTE,
+                           labels={"engine_name": "Engine", "value": "Ratio", "metric": "Pruning Metric"})
+        prune_fig.update_layout(title="Pruning & NMP Efficiency by Engine")
+        apply_theme(prune_fig)
+    else:
+        prune_fig = empty_fig("No pruning data available")
+
     return html.Div([
         kpis,
+        kpis2,
         html.Div([
-            html.Div([section("PERFORMANCE"), graph(bar_fig, 360)],
-                     style={"flex": "1", "background": PANEL_BG, "border": f"1px solid {BORDER}", "borderRadius": "8px", "padding": "16px"}),
-            html.Div([section("EVAL SPREAD"), graph(ev_fig, 360)],
-                     style={"flex": "1", "background": PANEL_BG, "border": f"1px solid {BORDER}", "borderRadius": "8px", "padding": "16px"}),
-        ], style={"display": "flex", "gap": "16px"}),
+            panel(section("PERFORMANCE"), graph(bar_fig, 320), flex="1"),
+            panel(section("EVAL SPREAD"), graph(ev_fig, 320), flex="1"),
+        ], style={"display": "grid", "gridTemplateColumns": "1fr 1fr", "gap": "12px", "marginBottom": "12px"}),
+        html.Div([
+            panel(section("PRUNING & NMP EFFICIENCY"), graph(prune_fig, 320), flex="1"),
+        ], style={"display": "grid", "gridTemplateColumns": "1fr", "gap": "12px"}),
     ])
 
 
@@ -813,16 +903,14 @@ def tab_games(gf: pd.DataFrame) -> html.Div:
                         color_discrete_sequence=_PALETTE, labels={"engine": "Engine", "count": "Games"})
             rf.update_layout(title="Games by Engine & Result")
             apply_theme(rf)
-            figs.append(html.Div([section("GAME RESULTS"), graph(rf, 340)],
-                                 style={"flex": "1", "background": PANEL_BG, "border": f"1px solid {BORDER}", "borderRadius": "8px", "padding": "16px"}))
+            figs.append(panel(section("GAME RESULTS"), graph(rf, 300), flex="1"))
 
         if "run_time_s" in gf.columns:
             rt_fig = px.histogram(gf, x="run_time_s", nbins=40, color_discrete_sequence=[ACCENT],
                                   labels={"run_time_s": "Run time (s)"})
             rt_fig.update_layout(title="Game Duration Distribution")
             apply_theme(rt_fig)
-            figs.append(html.Div([section("GAME DURATION"), graph(rt_fig, 340)],
-                                 style={"flex": "1", "background": PANEL_BG, "border": f"1px solid {BORDER}", "borderRadius": "8px", "padding": "16px"}))
+            figs.append(panel(section("GAME DURATION"), graph(rt_fig, 300), flex="1"))
 
     display_cols = [c for c in gf.columns if c not in {"moves", "start_fen"}]
 
@@ -848,13 +936,12 @@ def tab_games(gf: pd.DataFrame) -> html.Div:
     ], style={"width": "360px", "marginBottom": "12px"})
 
     return html.Div([
-        html.Div(figs, style={"display": "flex", "gap": "16px", "marginBottom": "24px"}),
+        html.Div(figs, style={"display": "grid", "gridTemplateColumns": "1fr 1fr", "gap": "12px", "marginBottom": "16px"}),
         selector,
-        html.Div(id="game-progress-container", style={"marginBottom": "16px"}),
-        html.Div([section("GAME TABLE"), table(gf[display_cols])],
-                 style={"background": PANEL_BG, "border": f"1px solid {BORDER}", "borderRadius": "8px", "padding": "16px"}),
+        html.Div(id="game-progress-container", style={"marginBottom": "12px"}),
+        panel(section("GAME TABLE"), table(gf[display_cols])),
         html.Div(f"Showing {min(len(gf), MAX_TABLE_ROWS):,} of {len(gf):,} rows",
-                 style={"color": TEXT_SEC, "fontSize": "11px", "marginTop": "8px", "fontFamily": "'JetBrains Mono'"}),
+                 style={"color": TEXT_SEC, "fontSize": "10px", "marginTop": "6px", "fontFamily": "'JetBrains Mono'"}),
     ])
 
 
@@ -892,14 +979,18 @@ def tab_search(sf: pd.DataFrame) -> html.Div:
     ], style={"display": "flex", "gap": "16px", "marginBottom": "16px"})
 
     return html.Div([
-        section("SEARCH SCATTER"),
-        axis_row,
-        html.Div(id="srch-graph-container"),
-        html.Br(),
-        section("SEARCH TABLE"),
-        table(sf),
-        html.Div(f"Showing {min(len(sf), MAX_TABLE_ROWS):,} of {len(sf):,} rows",
-                 style={"color": TEXT_SEC, "fontSize": "11px", "marginTop": "8px", "fontFamily": "'JetBrains Mono'"}),
+        panel(
+            section("SEARCH SCATTER"),
+            axis_row,
+            html.Div(id="srch-graph-container"),
+        ),
+        html.Div(style={"height": "12px"}),
+        panel(
+            section("SEARCH TABLE"),
+            table(sf),
+            html.Div(f"Showing {min(len(sf), MAX_TABLE_ROWS):,} of {len(sf):,} rows",
+                     style={"color": TEXT_SEC, "fontSize": "10px", "marginTop": "6px", "fontFamily": "'JetBrains Mono'"}),
+        ),
     ])
 
 
@@ -916,25 +1007,26 @@ def tab_iter(sf: pd.DataFrame) -> html.Div:
     y_opts = [{"label": c, "value": c} for c in nums]
 
     return html.Div([
-        section("METRIC vs ITERATION DEPTH"),
-        html.Div([
+        panel(
+            section("METRIC vs ITERATION DEPTH"),
             html.Div([
-                html.Div("Y METRIC", style=_sidebar_label),
-                dcc.Dropdown(id="iter-y", options=y_opts,
-                             value="eval" if "eval" in nums else (nums[0] if nums else None),
-                             clearable=False, style=_dropdown_style),
-            ], style={"flex": "1"}),
-            html.Div([
-                html.Div("AGGREGATION", style=_sidebar_label),
-                dcc.Dropdown(id="iter-agg",
-                             options=[{"label": a, "value": a} for a in ["mean", "median", "std"]],
-                             value="mean", clearable=False, style=_dropdown_style),
-            ], style={"flex": "1"}),
-        ], style={"display": "flex", "gap": "16px", "marginBottom": "16px"}),
-        html.Div(id="iter-graph-container"),
-        html.Br(),
-        section("RAW ITERATION DATA"),
-        table(idf),
+                html.Div([
+                    html.Div("Y METRIC", style=_sidebar_label),
+                    dcc.Dropdown(id="iter-y", options=y_opts,
+                                 value="eval" if "eval" in nums else (nums[0] if nums else None),
+                                 clearable=False, style=_dropdown_style),
+                ], style={"flex": "1"}),
+                html.Div([
+                    html.Div("AGGREGATION", style=_sidebar_label),
+                    dcc.Dropdown(id="iter-agg",
+                                 options=[{"label": a, "value": a} for a in ["mean", "median", "std"]],
+                                 value="mean", clearable=False, style=_dropdown_style),
+                ], style={"flex": "1"}),
+            ], style={"display": "flex", "gap": "12px", "marginBottom": "12px"}),
+            html.Div(id="iter-graph-container"),
+        ),
+        html.Div(style={"height": "12px"}),
+        panel(section("RAW ITERATION DATA"), table(idf)),
     ])
 
 
@@ -950,26 +1042,27 @@ def tab_tree(sf: pd.DataFrame) -> html.Div:
     y_opts = [{"label": c, "value": c} for c in nums]
 
     return html.Div([
-        section("STAT vs TREE PLY"),
-        html.Div([
+        panel(
+            section("STAT vs TREE PLY"),
             html.Div([
-                html.Div("Y METRIC", style=_sidebar_label),
-                dcc.Dropdown(id="tree-y", options=y_opts,
-                             value="nodes" if "nodes" in nums else (nums[0] if nums else None),
-                             clearable=False, style=_dropdown_style),
-            ], style={"flex": "1"}),
-            html.Div([
-                html.Div("SCALE", style=_sidebar_label),
-                dcc.Dropdown(id="tree-scale",
-                             options=[{"label": "Linear", "value": "linear"},
-                                      {"label": "Log", "value": "log"}],
-                             value="linear", clearable=False, style=_dropdown_style),
-            ], style={"flex": "1"}),
-        ], style={"display": "flex", "gap": "16px", "marginBottom": "16px"}),
-        html.Div(id="tree-graph-container"),
-        html.Br(),
-        section("RAW TREE DEPTH DATA"),
-        table(tdf),
+                html.Div([
+                    html.Div("Y METRIC", style=_sidebar_label),
+                    dcc.Dropdown(id="tree-y", options=y_opts,
+                                 value="nodes" if "nodes" in nums else (nums[0] if nums else None),
+                                 clearable=False, style=_dropdown_style),
+                ], style={"flex": "1"}),
+                html.Div([
+                    html.Div("SCALE", style=_sidebar_label),
+                    dcc.Dropdown(id="tree-scale",
+                                 options=[{"label": "Linear", "value": "linear"},
+                                          {"label": "Log", "value": "log"}],
+                                 value="linear", clearable=False, style=_dropdown_style),
+                ], style={"flex": "1"}),
+            ], style={"display": "flex", "gap": "12px", "marginBottom": "12px"}),
+            html.Div(id="tree-graph-container"),
+        ),
+        html.Div(style={"height": "12px"}),
+        panel(section("RAW TREE DEPTH DATA"), table(tdf)),
     ])
 
 
@@ -984,43 +1077,53 @@ def tab_compare(sf: pd.DataFrame) -> html.Div:
     metric_opts = [{"label": c, "value": c} for c in nums]
 
     return html.Div([
-        section("ENGINE COMPARISON"),
-        html.Div([
+        panel(
+            section("ENGINE COMPARISON"),
             html.Div([
-                html.Div("ENGINE A (baseline)", style=_sidebar_label),
-                dcc.Dropdown(id="cmp-eng-a", options=eng_opts,
-                             value=eng_names[0] if eng_names else None,
-                             clearable=False, style=_dropdown_style),
-            ], style={"flex": "1"}),
+                html.Div([
+                    html.Div("ENGINE A (baseline)", style=_sidebar_label),
+                    dcc.Dropdown(id="cmp-eng-a", options=eng_opts,
+                                 value=eng_names[0] if eng_names else None,
+                                 clearable=False, style=_dropdown_style),
+                ], style={"flex": "1"}),
+                html.Div([
+                    html.Div("ENGINE B (candidate)", style=_sidebar_label),
+                    dcc.Dropdown(id="cmp-eng-b", options=eng_opts,
+                                 value=eng_names[1] if len(eng_names) > 1 else (eng_names[0] if eng_names else None),
+                                 clearable=False, style=_dropdown_style),
+                ], style={"flex": "1"}),
+                html.Div([
+                    html.Div("METRIC", style=_sidebar_label),
+                    dcc.Dropdown(id="cmp-metric", options=metric_opts,
+                                 value="eval" if "eval" in nums else (nums[0] if nums else None),
+                                 clearable=False, style=_dropdown_style),
+                ], style={"flex": "1"}),
+                html.Div([
+                    html.Div("CHART TYPE", style=_sidebar_label),
+                    dcc.Dropdown(id="cmp-chart",
+                                 options=[{"label": t, "value": t} for t in
+                                          ["Box", "Violin", "Histogram", "Delta (A-B)"]],
+                                 value="Box", clearable=False, style=_dropdown_style),
+                ], style={"flex": "1"}),
+            ], style={"display": "flex", "gap": "12px", "marginBottom": "12px"}),
             html.Div([
-                html.Div("ENGINE B (candidate)", style=_sidebar_label),
-                dcc.Dropdown(id="cmp-eng-b", options=eng_opts,
-                             value=eng_names[1] if len(eng_names) > 1 else (eng_names[0] if eng_names else None),
-                             clearable=False, style=_dropdown_style),
-            ], style={"flex": "1"}),
-            html.Div([
-                html.Div("METRIC", style=_sidebar_label),
-                dcc.Dropdown(id="cmp-metric", options=metric_opts,
-                             value="eval" if "eval" in nums else (nums[0] if nums else None),
-                             clearable=False, style=_dropdown_style),
-            ], style={"flex": "1"}),
-            html.Div([
-                html.Div("CHART TYPE", style=_sidebar_label),
-                dcc.Dropdown(id="cmp-chart",
-                             options=[{"label": t, "value": t} for t in
-                                      ["Box", "Violin", "Histogram", "Delta (A-B)"]],
-                             value="Box", clearable=False, style=_dropdown_style),
-            ], style={"flex": "1"}),
-        ], style={"display": "flex", "gap": "16px", "marginBottom": "16px"}),
-        html.Div([
-            html.Button("Export Anomalies CSV", id="cmp-export-anomalies", n_clicks=0, style={"marginRight": "8px"}),
-            html.Button("Export Comparison Report", id="cmp-export-report", n_clicks=0),
-            html.Div(id="cmp-export-link", style={"marginLeft": "12px", "display": "inline-block"}),
-        ], style={"marginBottom": "12px"}),
-        html.Div(id="cmp-graph-container"),
-        html.Br(),
-        section("MULTI-METRIC SUMMARY (ALL ENGINES)"),
-        html.Div(id="cmp-summary-container"),
+                html.Button("Export Anomalies CSV", id="cmp-export-anomalies", n_clicks=0,
+                            style={"padding": "6px 12px", "background": "transparent", "border": f"1px solid {BORDER}",
+                                   "borderRadius": "5px", "color": TEXT_SEC, "fontSize": "10px", "fontFamily": "'JetBrains Mono'",
+                                   "cursor": "pointer", "marginRight": "8px"}),
+                html.Button("Export Comparison Report", id="cmp-export-report", n_clicks=0,
+                            style={"padding": "6px 12px", "background": "transparent", "border": f"1px solid {BORDER}",
+                                   "borderRadius": "5px", "color": TEXT_SEC, "fontSize": "10px", "fontFamily": "'JetBrains Mono'",
+                                   "cursor": "pointer"}),
+                html.Div(id="cmp-export-link", style={"marginLeft": "12px", "display": "inline-block"}),
+            ], style={"marginBottom": "12px"}),
+            html.Div(id="cmp-graph-container"),
+        ),
+        html.Div(style={"height": "12px"}),
+        panel(
+            section("MULTI-METRIC SUMMARY (ALL ENGINES)"),
+            html.Div(id="cmp-summary-container"),
+        ),
     ])
 
 
@@ -1058,19 +1161,16 @@ def tab_timing() -> html.Div:
                            labels={"color": "Total ms"})
         hm_fig.update_layout(title="Time Heatmap: Function × Engine")
         apply_theme(hm_fig)
-        extra.append(html.Div([section("HEATMAP: FUNCTION × ENGINE"), graph(hm_fig, 480)],
-                              style={"background": PANEL_BG, "border": f"1px solid {BORDER}", "borderRadius": "8px", "padding": "16px", "marginTop": "16px"}))
+        extra.append(panel(section("HEATMAP: FUNCTION × ENGINE"), graph(hm_fig, 400)))
 
     return html.Div([
         html.Div([
-            html.Div([section("TOTAL TIME"), graph(bar_fig, 360)],
-                     style={"flex": "1", "background": PANEL_BG, "border": f"1px solid {BORDER}", "borderRadius": "8px", "padding": "16px"}),
-            html.Div([section("AVG TIME / CALL"), graph(call_fig, 360)],
-                     style={"flex": "1", "background": PANEL_BG, "border": f"1px solid {BORDER}", "borderRadius": "8px", "padding": "16px"}),
-        ], style={"display": "flex", "gap": "16px"}),
+            panel(section("TOTAL TIME"), graph(bar_fig, 320), flex="1"),
+            panel(section("AVG TIME / CALL"), graph(call_fig, 320), flex="1"),
+        ], style={"display": "grid", "gridTemplateColumns": "1fr 1fr", "gap": "12px"}),
         *extra,
-        html.Div([section("TIMING TABLE"), table(tsum)],
-                 style={"background": PANEL_BG, "border": f"1px solid {BORDER}", "borderRadius": "8px", "padding": "16px", "marginTop": "16px"}),
+        html.Div(style={"height": "12px"}),
+        panel(section("TIMING TABLE"), table(tsum)),
     ])
 
 
@@ -1093,8 +1193,7 @@ def tab_sprt() -> html.Div:
         llr_fig.add_hline(y=0, line_dash="dot", line_color=TEXT_SEC)
         llr_fig.update_layout(title="LLR by SPRT")
         apply_theme(llr_fig)
-        figs.append(html.Div([section("LLR"), graph(llr_fig, 360)],
-                              style={"flex": "1", "background": PANEL_BG, "border": f"1px solid {BORDER}", "borderRadius": "8px", "padding": "16px"}))
+        figs.append(panel(section("LLR"), graph(llr_fig, 320), flex="1"))
 
     # Elo diff per SPRT (scalar per run: candidate - baseline)
     if "elo_diff" in sprt_df.columns:
@@ -1110,8 +1209,7 @@ def tab_sprt() -> html.Div:
         elo_fig.add_hline(y=0, line_dash="dot", line_color=TEXT_SEC)
         elo_fig.update_layout(title="Elo Diff per SPRT (candidate - baseline)")
         apply_theme(elo_fig)
-        figs.append(html.Div([section("ELO DIFF"), graph(elo_fig, 360)],
-                              style={"flex": "1", "background": PANEL_BG, "border": f"1px solid {BORDER}", "borderRadius": "8px", "padding": "16px"}))
+        figs.append(panel(section("ELO DIFF"), graph(elo_fig, 320), flex="1"))
 
     # WDL breakdown
     wdl_cols = [c for c in ["candidate_wins", "candidate_draws", "candidate_losses"] if c in sprt_df.columns]
@@ -1128,16 +1226,16 @@ def tab_sprt() -> html.Div:
                          labels={id_col: "SPRT", "count": "Games", "outcome": "Outcome"})
         wdl_fig.update_layout(title="Candidate W/D/L per SPRT")
         apply_theme(wdl_fig)
-        figs_bottom = [html.Div([section("W/D/L PER SPRT"), graph(wdl_fig, 340)],
-                                 style={"background": PANEL_BG, "border": f"1px solid {BORDER}", "borderRadius": "8px", "padding": "16px", "marginTop": "16px"})]
+        figs_bottom = [panel(section("W/D/L PER SPRT"), graph(wdl_fig, 300))]
     else:
         figs_bottom = []
 
     return html.Div([
-        html.Div(figs, style={"display": "flex", "gap": "16px"}),
+        html.Div(figs, style={"display": "grid", "gridTemplateColumns": "1fr 1fr", "gap": "12px"}),
+        html.Div(style={"height": "12px"}),
         *figs_bottom,
-        html.Div([section("SPRT TABLE"), table(sprt_df)],
-                 style={"background": PANEL_BG, "border": f"1px solid {BORDER}", "borderRadius": "8px", "padding": "16px", "marginTop": "16px"}),
+        html.Div(style={"height": "12px"}),
+        panel(section("SPRT TABLE"), table(sprt_df)),
     ])
 
 
@@ -1155,8 +1253,7 @@ def tab_sts() -> html.Div:
                     text_auto=".1f", labels={"engine_name": "Engine", "accuracy": "Accuracy (%)"})
         af.update_layout(title="STS Accuracy by Engine")
         apply_theme(af)
-        figs.append(html.Div([section("ACCURACY"), graph(af, 340)],
-                              style={"flex": "1", "background": PANEL_BG, "border": f"1px solid {BORDER}", "borderRadius": "8px", "padding": "16px"}))
+        figs.append(panel(section("ACCURACY"), graph(af, 300), flex="1"))
 
     # Score by suite
     if "suite" in sts_df.columns and "engine_score" in sts_df.columns and "engine_name" in sts_df.columns:
@@ -1166,13 +1263,12 @@ def tab_sts() -> html.Div:
                      labels={"suite": "Suite", "engine_score": "Avg Score", "engine_name": "Engine"})
         sf2.update_layout(title="Avg Score by Suite & Engine")
         apply_theme(sf2)
-        figs.append(html.Div([section("SUITE SCORES"), graph(sf2, 340)],
-                              style={"flex": "1", "background": PANEL_BG, "border": f"1px solid {BORDER}", "borderRadius": "8px", "padding": "16px"}))
+        figs.append(panel(section("SUITE SCORES"), graph(sf2, 300), flex="1"))
 
     return html.Div([
-        html.Div(figs, style={"display": "flex", "gap": "16px"}),
-        html.Div([section("STS TABLE"), table(sts_df)],
-                 style={"background": PANEL_BG, "border": f"1px solid {BORDER}", "borderRadius": "8px", "padding": "16px", "marginTop": "16px"}),
+        html.Div(figs, style={"display": "grid", "gridTemplateColumns": "1fr 1fr", "gap": "12px"}),
+        html.Div(style={"height": "12px"}),
+        panel(section("STS TABLE"), table(sts_df)),
     ])
 
 
@@ -1192,8 +1288,7 @@ def tab_perft() -> html.Div:
                              labels={"engine_name": "Engine", "nps": "Nodes/sec"})
             nps_fig.update_layout(title="NPS by Engine", showlegend=False)
             apply_theme(nps_fig)
-            figs.append(html.Div([section("NPS"), graph(nps_fig, 360)],
-                                  style={"flex": "1", "background": PANEL_BG, "border": f"1px solid {BORDER}", "borderRadius": "8px", "padding": "16px"}))
+            figs.append(panel(section("NPS"), graph(nps_fig, 320), flex="1"))
 
     # Correctness rate
     if "correct" in perft_df.columns and "engine_name" in perft_df.columns:
@@ -1203,13 +1298,12 @@ def tab_perft() -> html.Div:
                     labels={"engine_name": "Engine", "pct_correct": "% Correct"})
         cf.update_layout(title="Perft Correctness by Engine")
         apply_theme(cf)
-        figs.append(html.Div([section("CORRECTNESS"), graph(cf, 360)],
-                              style={"flex": "1", "background": PANEL_BG, "border": f"1px solid {BORDER}", "borderRadius": "8px", "padding": "16px"}))
+        figs.append(panel(section("CORRECTNESS"), graph(cf, 320), flex="1"))
 
     return html.Div([
-        html.Div(figs, style={"display": "flex", "gap": "16px"}),
-        html.Div([section("PERFT TABLE"), table(perft_df)],
-                 style={"background": PANEL_BG, "border": f"1px solid {BORDER}", "borderRadius": "8px", "padding": "16px", "marginTop": "16px"}),
+        html.Div(figs, style={"display": "grid", "gridTemplateColumns": "1fr 1fr", "gap": "12px"}),
+        html.Div(style={"height": "12px"}),
+        panel(section("PERFT TABLE"), table(perft_df)),
     ])
 
 
@@ -1277,11 +1371,7 @@ def tab_positions(sf: pd.DataFrame) -> html.Div:
         )
         mf.update_layout(title=f"{label} by Position Type", showlegend=False)
         apply_theme(mf)
-        metric_figs.append(
-            html.Div([section(label.upper()), graph(mf, 300)],
-                     style={"flex": "1", "background": PANEL_BG, "border": f"1px solid {BORDER}",
-                            "borderRadius": "8px", "padding": "16px"})
-        )
+        metric_figs.append(panel(section(label.upper()), graph(mf, 260), flex="1"))
 
     # ── Position type breakdown per engine ───────────────────────────────────
     eng_pos_figs = []
@@ -1298,11 +1388,7 @@ def tab_positions(sf: pd.DataFrame) -> html.Div:
         )
         ep_fig.update_layout(title="Position Type Mix per Engine")
         apply_theme(ep_fig)
-        eng_pos_figs.append(
-            html.Div([section("POSITION MIX PER ENGINE"), graph(ep_fig, 360)],
-                     style={"background": PANEL_BG, "border": f"1px solid {BORDER}",
-                            "borderRadius": "8px", "padding": "16px", "marginTop": "16px"})
-        )
+        eng_pos_figs.append(panel(section("POSITION MIX PER ENGINE"), graph(ep_fig, 320)))
 
         # Avg score metrics by engine × position type — use detected column names
         cols_to_avg = [c for c in (tactical_col, positional_col, endgame_col) if c in sf.columns]
@@ -1317,11 +1403,7 @@ def tab_positions(sf: pd.DataFrame) -> html.Div:
                     )
                     sf2.update_layout(title=f"{sc_label} by Engine & Position Type")
                     apply_theme(sf2)
-                    eng_pos_figs.append(
-                        html.Div([section(sc_label.upper()), graph(sf2, 320)],
-                                 style={"background": PANEL_BG, "border": f"1px solid {BORDER}",
-                                        "borderRadius": "8px", "padding": "16px", "marginTop": "16px"})
-                    )
+                    eng_pos_figs.append(panel(section(sc_label.upper()), graph(sf2, 280)))
 
     # ── Ternary scatter: each search as a point in (T, P, E) space ──────────
     tern_fig = None
@@ -1352,23 +1434,17 @@ def tab_positions(sf: pd.DataFrame) -> html.Div:
 
     return html.Div([
         html.Div([
-            html.Div([section("POSITION TYPE BREAKDOWN"), graph(pie_fig, 360)],
-                     style={"flex": "1", "background": PANEL_BG, "border": f"1px solid {BORDER}",
-                            "borderRadius": "8px", "padding": "16px"}),
-            html.Div([section("SCORE COMPONENTS"), graph(violin_fig, 360)],
-                     style={"flex": "1", "background": PANEL_BG, "border": f"1px solid {BORDER}",
-                            "borderRadius": "8px", "padding": "16px"}),
-        ], style={"display": "flex", "gap": "16px", "marginBottom": "16px"}),
+            panel(section("POSITION TYPE BREAKDOWN"), graph(pie_fig, 320), flex="1"),
+            panel(section("SCORE COMPONENTS"), graph(violin_fig, 320), flex="1"),
+        ], style={"display": "grid", "gridTemplateColumns": "1fr 1fr", "gap": "12px", "marginBottom": "12px"}),
 
-        html.Div(metric_figs[:2], style={"display": "flex", "gap": "16px", "marginBottom": "16px"}),
-        html.Div(metric_figs[2:], style={"display": "flex", "gap": "16px", "marginBottom": "16px"}),
+        html.Div(metric_figs[:2], style={"display": "grid", "gridTemplateColumns": "1fr 1fr", "gap": "12px", "marginBottom": "12px"}),
+        html.Div(metric_figs[2:], style={"display": "grid", "gridTemplateColumns": "1fr 1fr", "gap": "12px", "marginBottom": "12px"}),
 
-        *eng_pos_figs,
+        *[html.Div([f], style={"marginBottom": "12px"}) for f in eng_pos_figs],
 
         *([] if tern_fig is None else [
-            html.Div([section("TERNARY POSITION SPACE"), graph(tern_fig, 500)],
-                     style={"background": PANEL_BG, "border": f"1px solid {BORDER}",
-                            "borderRadius": "8px", "padding": "16px", "marginTop": "16px"})
+            panel(section("TERNARY POSITION SPACE"), graph(tern_fig, 440))
         ]),
     ])
 
@@ -1385,10 +1461,10 @@ def tab_corr(sf: pd.DataFrame) -> html.Div:
     )
     fig.update_layout(title="Search Feature Correlation Matrix")
     apply_theme(fig)
-    return html.Div([
+    return panel(
         section("CORRELATION MATRIX"),
-        graph(fig, height=max(400, len(corr) * 28)),
-    ], style={"background": PANEL_BG, "border": f"1px solid {BORDER}", "borderRadius": "8px", "padding": "16px"})
+        graph(fig, height=max(380, len(corr) * 24)),
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -1751,10 +1827,11 @@ def update_compare(eng_a, eng_b, metric, chart_type, engine_ids, result_vals, op
                 elif pct_zero > 90:
                     anomalies.append(f"{eng_label}: {pct_zero}% rows have {col} == 0")
 
-    anomalies_block = html.Div([
+    anomalies_block = panel(
         section("ANOMALIES & CHECKS"),
-        html.Div([html.Div(a, style={"color": ("#ff6b35" if "= 0" in a else TEXT_SEC)}) for a in anomalies])
-    ], style={"background": PANEL_BG, "border": f"1px solid {BORDER}", "borderRadius": "8px", "padding": "16px", "marginTop": "16px"})
+        html.Div([html.Div(a, style={"color": ("#ff6b35" if "= 0" in a else TEXT_SEC), "fontSize": "11px",
+                                      "fontFamily": "'JetBrains Mono'", "marginBottom": "4px"}) for a in anomalies])
+    )
 
     # --- Per-game aligned deltas (by metric) ---
     per_game_delta_block = html.Div()
@@ -1787,20 +1864,18 @@ def update_compare(eng_a, eng_b, metric, chart_type, engine_ids, result_vals, op
                            labels={"norm_value": "Normalised value", "metric": "Metric", "engine_label": "Engine"})
         radar_fig.update_layout(title="Normalised Metrics Across All Engines")
         apply_theme(radar_fig)
-        multi_section = html.Div([graph(radar_fig, 360)],
-                                  style={"background": PANEL_BG, "border": f"1px solid {BORDER}", "borderRadius": "8px", "padding": "16px", "marginTop": "16px"})
+        multi_section = panel(graph(radar_fig, 320))
     else:
         multi_section = html.Div()
 
     summary_block = html.Div([
-        html.Div([section("STAT SUMMARY"), summary_tbl],
-                 style={"background": PANEL_BG, "border": f"1px solid {BORDER}", "borderRadius": "8px", "padding": "16px"}),
+        panel(section("STAT SUMMARY"), summary_tbl),
+        html.Div(style={"height": "12px"}),
         multi_section,
     ])
 
     return html.Div([
-        html.Div([main_graph],
-                 style={"background": PANEL_BG, "border": f"1px solid {BORDER}", "borderRadius": "8px", "padding": "16px"}),
+        panel(main_graph),
     ]), summary_block
 
 

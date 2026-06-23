@@ -33,6 +33,8 @@ def build_search_iterations_features(cnxn):
             fail_highs AS fail_highs, fail_lows AS fail_lows, fail_high_first AS fail_high_first, fail_high_late AS fail_high_late,
             fail_high_researches, fail_low_researches,
             see_prunes AS see_prunes, delta_prunes AS delta_prunes,
+            pvs_researches AS pvs_researches,
+            nmp AS nmp, nmp_fail AS nmp_fail,
 
             -- within iteration derived metrics
             total_nodes,
@@ -46,6 +48,9 @@ def build_search_iterations_features(cnxn):
             see_prunes / NULLIF(qnodes, 0) AS see_prune_ratio,
             delta_prunes / NULLIF(qnodes, 0) AS delta_prune_ratio,
             (see_prunes + delta_prunes) / NULLIF(qnodes, 0) AS prune_ratio,
+            nmp / NULLIF(total_nodes, 0) AS nmp_ratio,
+            nmp_fail / NULLIF(nmp, 0) AS nmp_fail_ratio,
+            pvs_researches / NULLIF(total_nodes, 0) AS pvs_research_ratio,
 
             -- across iterations derived metrics
             time_ms / LAG(time_ms) OVER {window_spec} as time_increase_ratio,
@@ -83,6 +88,8 @@ def build_search_tree_features(cnxn):
             fail_highs AS fail_highs, fail_lows AS fail_lows,
             fail_high_first AS fail_high_first, fail_high_late AS fail_high_late,
             see_prunes AS see_prunes, delta_prunes AS delta_prunes,
+            pvs_researches AS pvs_researches,
+            nmp AS nmp, nmp_fail AS nmp_fail,
 
             nodes + qnodes AS total_nodes,
             qnodes / NULLIF(nodes, 0) as qratio,
@@ -94,6 +101,9 @@ def build_search_tree_features(cnxn):
             see_prunes / NULLIF(qnodes, 0) AS see_prune_ratio,
             delta_prunes / NULLIF(qnodes, 0) AS delta_prune_ratio,
             (see_prunes + delta_prunes) / NULLIF(qnodes, 0) AS prune_ratio,
+            nmp / NULLIF(nodes + qnodes, 0) AS nmp_ratio,
+            nmp_fail / NULLIF(nmp, 0) AS nmp_fail_ratio,
+            pvs_researches / NULLIF(nodes + qnodes, 0) AS pvs_research_ratio,
 
             (nodes + qnodes) / NULLIF(LAG(nodes + qnodes) OVER {window_spec}, 0) as ebf,
             qnodes / NULLIF(LAG(qnodes) OVER {window_spec}, 0) as qebf
@@ -218,6 +228,12 @@ def build_search_features(cnxn):
             MAX(itdeep.fail_high_researches) AS max_fail_high_researches,
             MAX(itdeep.fail_low_researches) AS max_fail_low_researches,
 
+            AVG(itdeep.nmp_ratio) AS avg_nmp_ratio,
+            MAX(itdeep.nmp_ratio) AS max_nmp_ratio,
+            AVG(itdeep.nmp_fail_ratio) AS avg_nmp_fail_ratio,
+            AVG(itdeep.pvs_research_ratio) AS avg_pvs_research_ratio,
+            MAX(itdeep.pvs_research_ratio) AS max_pvs_research_ratio,
+
             MAX(itdeep.move_stability) AS max_move_stability,
             MAX_BY(itdeep.move_stability, itdeep.depth) AS final_move_stability,
 
@@ -259,6 +275,9 @@ def build_search_features(cnxn):
             s.fail_low_researches AS total_fail_low_researches,
             s.see_prunes AS total_see_prunes,
             s.delta_prunes AS total_delta_prunes,
+            s.nmp AS total_nmp,
+            s.nmp_fail AS total_nmp_fail,
+            s.tt_overwritten AS total_tt_overwritten,
 
             -- stockfish ground-truth (added by transform_positions)
             s.sf_eval AS sf_eval,
@@ -290,6 +309,8 @@ def build_search_features(cnxn):
             s.fail_high_late / NULLIF(s.fail_highs,1) AS fail_high_late_ratio,
             s.fail_high_researches / GREATEST(1, 1 + s.depth - {ASPIRATION_START_DEPTH}) AS fail_high_researches_per_depth,
             s.fail_low_researches / GREATEST(1, 1 + s.depth - {ASPIRATION_START_DEPTH}) AS fail_low_researches_per_depth,
+            s.nmp / NULLIF(s.nodes + s.qnodes, 0) AS nmp_ratio,
+            s.nmp_fail / NULLIF(s.nmp, 0) AS nmp_fail_ratio,
 
             -- iterative deepening aggregated stats
             itdeep.* EXCLUDE (search_id),

@@ -346,6 +346,9 @@ inline void logSearchStats(const std::string& fen = "") {
         << "\"aspiration_fail_low_researches\":" << g_stats.aspiration_fail_low_researches << ","
         << "\"aspiration_fail_high_researches\":" << g_stats.aspiration_fail_high_researches << ","
 
+        << "\"nmp\":" << g_stats.nmp << ","
+        << "\"nmp_fail\":" << g_stats.nmp_fail << ","
+
         << "\"max_depth\":" << g_stats.max_depth << ","
         << "\"max_qdepth\":" << g_stats.max_qdepth << ","
         << "\"completed_depth\":" << g_stats.max_completed_depth << ","
@@ -371,6 +374,8 @@ inline void logSearchStats(const std::string& fen = "") {
         << "\"itdepth_see_prunes\":" << array_to_json(g_stats.it_depth_see_prunes, n) << ","
         << "\"itdepth_delta_prunes\":" << array_to_json(g_stats.it_depth_delta_prunes, n) << ","
         << "\"itdepth_pvs_researches\":" << array_to_json(g_stats.it_depth_pvs_researches, n) << ","
+        << "\"itdepth_nmp\":" << array_to_json(g_stats.it_depth_nmp, n) << ","
+        << "\"itdepth_nmp_fail\":" << array_to_json(g_stats.it_depth_nmp_fail, n) << ","
 
         // tree ply stats
         << "\"treedepth_nodes\":" << array_to_json(g_stats.tree_depth_nodes, q_n) << ","
@@ -383,7 +388,9 @@ inline void logSearchStats(const std::string& fen = "") {
         << "\"treedepth_fail_high_lates\":" << array_to_json(g_stats.tree_depth_fail_high_lates, q_n) << ","
         << "\"treedepth_see_prunes\":" << array_to_json(g_stats.tree_depth_see_prunes, q_n) << ","
         << "\"treedepth_delta_prunes\":" << array_to_json(g_stats.tree_depth_delta_prunes, q_n) << ","
-        << "\"treedepth_pvs_researches\":" << array_to_json(g_stats.tree_depth_pvs_researches, q_n)
+        << "\"treedepth_pvs_researches\":" << array_to_json(g_stats.tree_depth_pvs_researches, q_n) << ","
+        << "\"treedepth_nmp\":" << array_to_json(g_stats.tree_depth_nmp, q_n) << ","
+        << "\"treedepth_nmp_fail\":" << array_to_json(g_stats.tree_depth_nmp_fail, q_n)
 
         << "}\n";
 

@@ -16,6 +16,7 @@ MODULES = [
     "data.load_analytics",
     "data.transform_positions",
     "data.transform_search",
+    "data.normalize_metadata",
 ]
 
 

@@ -682,6 +682,9 @@ def bulk_log_search_and_timing(
                 data.get("aspiration_fail_low_researches"),
                 data.get("see_prunes"),
                 data.get("delta_prunes"),
+                data.get("nmp"),
+                data.get("nmp_fail"),
+                data.get("tt_overwritten"),
                 data["search_uuid"],  # temp
             ))
 
@@ -691,9 +694,9 @@ def bulk_log_search_and_timing(
             engine_id, game_id, sts_id, fen, ply, time_ms, eval, depth, qdepth, move, 
             principal_variation, nodes, qnodes, tt_stores, tt_hits, tt_fill,
             fail_highs, fail_lows, fail_high_first, fail_high_late, fail_high_researches, fail_low_researches,
-            see_prunes, delta_prunes
+            see_prunes, delta_prunes, nmp, nmp_fail, tt_overwritten
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         [row[:-1] for row in searches_rows]
     )
@@ -737,7 +740,10 @@ def bulk_log_search_and_timing(
                     safe(data.get("itdepth_aspiration_failhigh_researches", []), d),
                     safe(data.get("itdepth_aspiration_faillow_researches", []), d),
                     safe(data.get("itdepth_see_prunes", []), d),
-                    safe(data.get("itdepth_delta_prunes", []), d)
+                    safe(data.get("itdepth_delta_prunes", []), d),
+                    safe(data.get("itdepth_pvs_researches", []), d),
+                    safe(data.get("itdepth_nmp", []), d),
+                    safe(data.get("itdepth_nmp_fail", []), d),
                 ))
 
     cursor.executemany(
@@ -746,9 +752,10 @@ def bulk_log_search_and_timing(
             search_id, depth, time_ms, eval, move, qdepth,
             nodes, qnodes, tt_stores, tt_hits, tt_fill,
             fail_highs, fail_lows, fail_high_first, fail_high_late,
-            fail_high_researches, fail_low_researches, see_prunes, delta_prunes
+            fail_high_researches, fail_low_researches, see_prunes, delta_prunes,
+            pvs_researches, nmp, nmp_fail
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         depth_rows
     )
@@ -779,6 +786,9 @@ def bulk_log_search_and_timing(
                     safe(data.get("treedepth_fail_high_lates", []), d),
                     safe(data.get("treedepth_see_prunes", []), d),
                     safe(data.get("treedepth_delta_prunes", []), d),
+                    safe(data.get("treedepth_pvs_researches", []), d),
+                    safe(data.get("treedepth_nmp", []), d),
+                    safe(data.get("treedepth_nmp_fail", []), d),
                 ))
 
     cursor.executemany(
@@ -786,9 +796,10 @@ def bulk_log_search_and_timing(
         INSERT INTO searches_by_tree_depth (
             search_id, depth, 
             nodes, qnodes, tt_stores, tt_hits, fail_highs, fail_lows,
-            fail_high_first, fail_high_late, see_prunes, delta_prunes
+            fail_high_first, fail_high_late, see_prunes, delta_prunes,
+            pvs_researches, nmp, nmp_fail
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         ply_rows
     )
