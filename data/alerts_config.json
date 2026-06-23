@@ -1,5 +1,0 @@
-{
-  "fail_zero_pct_threshold": 90,
-  "min_rows_for_check": 10,
-  "eval_shift_threshold_cp": 50
-}

@@ -316,6 +316,18 @@ void Board::CapturePiece(int piece, int target_square, bool is_enpassant, bool c
         pop_bit(colorBitboards[1-move_color], target_square);
         zobrist_hash ^= zobrist_table[(1-move_color)*6 + piece][target_square];
     }
+
+    if (
+        !pawn_endgame
+        && (
+            pieceBitboards[knight] == 0
+            && pieceBitboards[bishop] == 0
+            && pieceBitboards[rook] == 0
+            && pieceBitboards[queen] == 0
+        )
+    ) {
+        pawn_endgame = true;
+    }
 }
 
 void Board::PromoteToPiece(int piece, int target_square) {

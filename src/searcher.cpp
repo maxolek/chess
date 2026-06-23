@@ -260,10 +260,10 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
     // so we pass the move (null move) and perform a null-window search with reduced depth around beta
     // if the null move fails high then we can assume the best move will also fail high
     // certain position restrictions must be used for the assumptions to hold
-    if ( // not in check, and not only king-pawn endgame (zugzwang prevention)
+    if ( // not in check, and not king-pawn endgame (zugzwang prevention)
         !(
             board.is_in_check 
-        || (board.colorBitboards[board.move_color] & (board.pieceBitboards[bishop] | board.pieceBitboards[queen] | board.pieceBitboards[rook] | board.pieceBitboards[knight])) 
+            || board.pawn_endgame 
         )
     ) {
         STATS_NMP(depth+ply, ply);

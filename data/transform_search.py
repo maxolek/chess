@@ -112,7 +112,6 @@ def build_search_tree_features(cnxn):
     """)
     
 def build_search_features(cnxn):
-    ASPIRATION_START_DEPTH = 6
     # Ensure numeric search-level columns for arithmetic
     # Use search tables' original numeric columns directly
     cnxn.execute(f"""

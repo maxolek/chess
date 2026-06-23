@@ -434,8 +434,9 @@ def get_mobility_characteristics(fen):
     mobility = {}
     
     for color in [chess.WHITE, chess.BLACK]:
+        if board.turn != color:
+            board.push(chess.Move.null())  # switch turn to color for legal moves
         legal_moves = list(board.legal_moves)
-        if board.turn != color: legal_moves = []
         capture_moves = sum(board.is_capture(m) for m in legal_moves)
         check_moves = sum(board.gives_check(m) for m in legal_moves)
 

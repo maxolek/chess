@@ -229,8 +229,233 @@ NUMERIC_EXCLUDE = {
     "baseline_engine_id", "candidate_engine_id",
 }
 
+# ── Metric display labels and logical ordering ────────────────────────────────
+# Groups: Core → Nodes → Pruning → TT → Move Ordering → Stability → Timing → Ratios (agg)
+METRIC_LABELS: dict[str, str] = {
+    # ── Core ──
+    "depth": "Depth",
+    "max_depth": "Max Depth",
+    "qdepth": "QSearch Depth",
+    "max_qdepth": "Max QSearch Depth",
+    "eval": "Eval (cp)",
+    "final_eval": "Final Eval (cp)",
+    "sf_eval": "Stockfish Eval",
+    "eval_diff": "Eval Diff (vs SF)",
+    "engine_move_rank": "Move Rank (vs SF)",
+    "best_move_match": "Best Move Match",
+    "ply": "Game Ply",
+    "time_ms": "Time (ms)",
+    "total_time_ms": "Total Time (ms)",
+    "running_time_ms": "Running Time (ms)",
+    "total_search_time": "Search Duration (ms)",
+    # ── Nodes ──
+    "nodes": "Nodes",
+    "qnodes": "QSearch Nodes",
+    "total_nodes": "Total Nodes",
+    "total_internal_nodes": "Internal Nodes (total)",
+    "total_qnodes": "QSearch Nodes (total)",
+    "nps": "Nodes/sec (NPS)",
+    "avg_nps": "Avg NPS",
+    "stddev_nps": "NPS Std Dev",
+    "peak_nps": "Peak NPS",
+    "worst_nps": "Worst NPS",
+    "final_nps": "Final NPS",
+    "qratio": "QNode Ratio",
+    "avg_qratio": "Avg QNode Ratio",
+    "max_qratio": "Max QNode Ratio",
+    "stddev_qratio": "QNode Ratio Std Dev",
+    # ── Branching Factor ──
+    "ebf": "Eff. Branching Factor",
+    "avg_ebf": "Avg EBF",
+    "max_ebf": "Max EBF",
+    "geo_mean_ebf": "Geometric Mean EBF",
+    "qebf": "QSearch EBF",
+    "avg_qebf": "Avg QSearch EBF",
+    "max_qebf": "Max QSearch EBF",
+    "geo_mean_qebf": "Geometric Mean QEBF",
+    "time_increase_ratio": "Time Growth Ratio",
+    # ── Pruning ──
+    "see_prunes": "SEE Prunes",
+    "total_see_prunes": "SEE Prunes (total)",
+    "see_prune_ratio": "SEE Prune Rate",
+    "avg_see_prune_ratio": "Avg SEE Prune Rate",
+    "delta_prunes": "Delta Prunes",
+    "total_delta_prunes": "Delta Prunes (total)",
+    "delta_prune_ratio": "Delta Prune Rate",
+    "avg_delta_prune_ratio": "Avg Delta Prune Rate",
+    "prune_ratio": "Combined Prune Rate",
+    "avg_prune_ratio": "Avg Combined Prune Rate",
+    # ── Null Move Pruning ──
+    "nmp": "NMP Attempts",
+    "total_nmp": "NMP Attempts (total)",
+    "nmp_fail": "NMP Failures",
+    "total_nmp_fail": "NMP Failures (total)",
+    "nmp_ratio": "NMP Rate",
+    "avg_nmp_ratio": "Avg NMP Rate",
+    "max_nmp_ratio": "Max NMP Rate",
+    "nmp_fail_ratio": "NMP Fail Rate",
+    "avg_nmp_fail_ratio": "Avg NMP Fail Rate",
+    # ── PVS ──
+    "pvs_researches": "PVS Re-searches",
+    "pvs_research_ratio": "PVS Re-search Rate",
+    "avg_pvs_research_ratio": "Avg PVS Re-search Rate",
+    "max_pvs_research_ratio": "Max PVS Re-search Rate",
+    # ── Transposition Table ──
+    "tt_stores": "TT Stores",
+    "total_tt_stores": "TT Stores (total)",
+    "tt_hits": "TT Hits",
+    "total_tt_hits": "TT Hits (total)",
+    "tt_overwritten": "TT Overwrites",
+    "total_tt_overwritten": "TT Overwrites (total)",
+    "tt_hit_ratio": "TT Hit Rate",
+    "avg_tt_hit_ratio": "Avg TT Hit Rate",
+    "max_tt_hit_ratio": "Max TT Hit Rate",
+    "stddev_tt_hit_ratio": "TT Hit Rate Std Dev",
+    "tt_store_ratio": "TT Store Rate",
+    "avg_tt_store_ratio": "Avg TT Store Rate",
+    "max_tt_store_ratio": "Max TT Store Rate",
+    "stddev_tt_store_ratio": "TT Store Rate Std Dev",
+    # ── Move Ordering (fail high/low) ──
+    "fail_highs": "Fail Highs",
+    "total_fail_highs": "Fail Highs (total)",
+    "fail_lows": "Fail Lows",
+    "total_fail_low": "Fail Lows (total)",
+    "fail_high_first": "Fail High 1st Move",
+    "total_fail_high_first": "Fail High 1st (total)",
+    "fail_high_late": "Fail High Late",
+    "total_fail_high_late": "Fail High Late (total)",
+    "fail_high_ratio": "Fail High Rate",
+    "avg_fail_high_ratio": "Avg Fail High Rate",
+    "max_fail_high_ratio": "Max Fail High Rate",
+    "fail_low_ratio": "Fail Low Rate",
+    "avg_fail_low_ratio": "Avg Fail Low Rate",
+    "max_fail_low_ratio": "Max Fail Low Rate",
+    "fail_high_first_ratio": "Fail High 1st Rate",
+    "avg_fail_high_first_ratio": "Avg Fail High 1st Rate",
+    "fail_high_late_ratio": "Fail High Late Rate",
+    "avg_fail_high_late_ratio": "Avg Fail High Late Rate",
+    "fail_high_researches": "Aspiration Fail-High Re-searches",
+    "total_fail_high_researches": "Aspiration Fail-High (total)",
+    "fail_low_researches": "Aspiration Fail-Low Re-searches",
+    "total_fail_low_researches": "Aspiration Fail-Low (total)",
+    "max_fail_high_researches": "Max Fail-High Re-searches",
+    "max_fail_low_researches": "Max Fail-Low Re-searches",
+    "fail_high_researches_per_depth": "Fail-High Re-searches/Depth",
+    "fail_low_researches_per_depth": "Fail-Low Re-searches/Depth",
+    # ── Eval Stability ──
+    "prior_eval_delta": "Eval Delta (prev iter)",
+    "first_eval_delta": "Eval Delta (from 1st iter)",
+    "eval_sign_flips": "Eval Sign Flips",
+    "eval_sign_flips_per_depth": "Eval Flips / Depth",
+    "stddev_eval": "Eval Std Dev",
+    "stddev_last5_eval": "Eval Std Dev (last 5)",
+    "max_eval": "Max Eval",
+    "avg_eval": "Avg Eval",
+    "move_stability": "Move Stability",
+    "max_move_stability": "Max Move Stability",
+    "final_move_stability": "Final Move Stability",
+    # ── Timing Breakdown ──
+    "make_move_avg_ms": "MakeMove Avg (ms)",
+    "make_move_perc_total_time": "MakeMove % Time",
+    "make_move_total_ms": "MakeMove Total (ms)",
+    "unmake_move_avg_ms": "UnmakeMove Avg (ms)",
+    "unmake_move_perc_total_time": "UnmakeMove % Time",
+    "unmake_move_total_ms": "UnmakeMove Total (ms)",
+    "movegen_avg_ms": "MoveGen Avg (ms)",
+    "movegen_perc_total_time": "MoveGen % Time",
+    "movegen_total_ms": "MoveGen Total (ms)",
+    "move_order_avg_ms": "Move Order Avg (ms)",
+    "move_order_perc_total_time": "Move Order % Time",
+    "move_order_total_ms": "Move Order Total (ms)",
+    "nnue_avg_ms": "NNUE Avg (ms)",
+    "nnue_perc_total_time": "NNUE % Time",
+    "nnue_total_ms": "NNUE Total (ms)",
+    "static_eval_avg_ms": "Static Eval Avg (ms)",
+    "static_eval_perc_total_time": "Static Eval % Time",
+    "static_eval_total_ms": "Static Eval Total (ms)",
+    "see_avg_ms": "SEE Avg (ms)",
+    "see_perc_total_time": "SEE % Time",
+    "see_total_ms": "SEE Total (ms)",
+    "tt_probe_avg_ms": "TT Probe Avg (ms)",
+    "tt_probe_perc_total_time": "TT Probe % Time",
+    "tt_probe_total_ms": "TT Probe Total (ms)",
+    "tt_store_avg_ms": "TT Store Avg (ms)",
+    "tt_store_perc_total_time": "TT Store % Time",
+    "tt_store_total_ms": "TT Store Total (ms)",
+}
+
+# Canonical ordering by group; columns not listed here go to the end alphabetically.
+_METRIC_ORDER = [
+    # Core
+    "depth", "max_depth", "qdepth", "max_qdepth", "eval", "final_eval",
+    "sf_eval", "eval_diff", "engine_move_rank", "best_move_match", "ply",
+    "time_ms", "total_time_ms", "running_time_ms", "total_search_time",
+    # Nodes
+    "nodes", "qnodes", "total_nodes", "total_internal_nodes", "total_qnodes",
+    "nps", "avg_nps", "stddev_nps", "peak_nps", "worst_nps", "final_nps",
+    "qratio", "avg_qratio", "max_qratio", "stddev_qratio",
+    # Branching
+    "ebf", "avg_ebf", "max_ebf", "geo_mean_ebf",
+    "qebf", "avg_qebf", "max_qebf", "geo_mean_qebf", "time_increase_ratio",
+    # Pruning
+    "see_prunes", "total_see_prunes", "see_prune_ratio", "avg_see_prune_ratio",
+    "delta_prunes", "total_delta_prunes", "delta_prune_ratio", "avg_delta_prune_ratio",
+    "prune_ratio", "avg_prune_ratio",
+    # NMP
+    "nmp", "total_nmp", "nmp_fail", "total_nmp_fail",
+    "nmp_ratio", "avg_nmp_ratio", "max_nmp_ratio",
+    "nmp_fail_ratio", "avg_nmp_fail_ratio",
+    # PVS
+    "pvs_researches", "pvs_research_ratio", "avg_pvs_research_ratio", "max_pvs_research_ratio",
+    # TT
+    "tt_stores", "total_tt_stores", "tt_hits", "total_tt_hits",
+    "tt_overwritten", "total_tt_overwritten",
+    "tt_hit_ratio", "avg_tt_hit_ratio", "max_tt_hit_ratio", "stddev_tt_hit_ratio",
+    "tt_store_ratio", "avg_tt_store_ratio", "max_tt_store_ratio", "stddev_tt_store_ratio",
+    # Move Ordering
+    "fail_highs", "total_fail_highs", "fail_lows", "total_fail_low",
+    "fail_high_first", "total_fail_high_first", "fail_high_late", "total_fail_high_late",
+    "fail_high_ratio", "avg_fail_high_ratio", "max_fail_high_ratio",
+    "fail_low_ratio", "avg_fail_low_ratio", "max_fail_low_ratio",
+    "fail_high_first_ratio", "avg_fail_high_first_ratio",
+    "fail_high_late_ratio", "avg_fail_high_late_ratio",
+    "fail_high_researches", "total_fail_high_researches",
+    "fail_low_researches", "total_fail_low_researches",
+    "max_fail_high_researches", "max_fail_low_researches",
+    "fail_high_researches_per_depth", "fail_low_researches_per_depth",
+    # Stability
+    "prior_eval_delta", "first_eval_delta", "eval_sign_flips", "eval_sign_flips_per_depth",
+    "stddev_eval", "stddev_last5_eval", "max_eval", "avg_eval",
+    "move_stability", "max_move_stability", "final_move_stability",
+    # Timing
+    "make_move_avg_ms", "make_move_perc_total_time", "make_move_total_ms",
+    "unmake_move_avg_ms", "unmake_move_perc_total_time", "unmake_move_total_ms",
+    "movegen_avg_ms", "movegen_perc_total_time", "movegen_total_ms",
+    "move_order_avg_ms", "move_order_perc_total_time", "move_order_total_ms",
+    "nnue_avg_ms", "nnue_perc_total_time", "nnue_total_ms",
+    "static_eval_avg_ms", "static_eval_perc_total_time", "static_eval_total_ms",
+    "see_avg_ms", "see_perc_total_time", "see_total_ms",
+    "tt_probe_avg_ms", "tt_probe_perc_total_time", "tt_probe_total_ms",
+    "tt_store_avg_ms", "tt_store_perc_total_time", "tt_store_total_ms",
+]
+_METRIC_RANK = {col: i for i, col in enumerate(_METRIC_ORDER)}
+
+
 def numeric_cols(df: pd.DataFrame) -> list[str]:
-    return [c for c in df.select_dtypes(include=np.number).columns if c not in NUMERIC_EXCLUDE]
+    """Return numeric column names sorted by canonical group order."""
+    cols = [c for c in df.select_dtypes(include=np.number).columns if c not in NUMERIC_EXCLUDE]
+    cols.sort(key=lambda c: (_METRIC_RANK.get(c, 9999), c))
+    return cols
+
+
+def metric_label(col: str) -> str:
+    """Human-readable label for a metric column."""
+    return METRIC_LABELS.get(col, col.replace("_", " ").title())
+
+
+def metric_options(cols: list[str]) -> list[dict]:
+    """Build dropdown options with human-readable labels, preserving canonical order."""
+    return [{"label": metric_label(c), "value": c} for c in cols]
 
 
 def apply_filters(
@@ -239,12 +464,23 @@ def apply_filters(
     opening_vals: list | None,
     side_vals: list | None,
     pos_type_vals: list | None,
+    game_phase_vals: list | None = None,
+    include_mates: bool = False,
+    mates_only: bool = False,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     gf = games_df.copy()
     sf = searches_df.copy()
 
-    # Sanity limits
-    sf = sf[sf["depth"].between(0, 60) & sf["eval"].abs().le(30000)] if "depth" in sf.columns and "eval" in sf.columns else sf
+    # Sanity limits — always exclude clearly broken data (depth > 60)
+    if "depth" in sf.columns:
+        sf = sf[sf["depth"].between(0, 60)]
+
+    # Checkmate filtering: exclude (default), include all, or mates only
+    if "eval" in sf.columns:
+        if mates_only:
+            sf = sf[sf["eval"].abs().gt(EVAL_CLIP_CP)]
+        elif not include_mates:
+            sf = sf[sf["eval"].abs().le(EVAL_CLIP_CP)]
 
     if engine_ids:
         if "white_engine_id" in gf.columns:
@@ -263,6 +499,9 @@ def apply_filters(
 
     if pos_type_vals and "pos_label" in sf.columns:
         sf = sf[sf["pos_label"].isin(pos_type_vals)]
+
+    if game_phase_vals and "game_phase" in sf.columns:
+        sf = sf[sf["game_phase"].isin(game_phase_vals)]
 
     # Keep searches consistent with filtered games
     if "game_id" in sf.columns and "id" in gf.columns:
@@ -292,8 +531,13 @@ pos_type_options = _opts(searches_df["pos_label"])     if "pos_label"     in sea
 _search_nums = numeric_cols(searches_df)
 _iter_nums   = numeric_cols(iter_df) if not iter_df.empty else []
 _tree_nums   = numeric_cols(tree_df) if not tree_df.empty else []
+game_phase_options = _opts(searches_df["game_phase"]) if "game_phase" in searches_df.columns else []
 
 MAX_TABLE_ROWS = 5000
+
+# Eval clipping: checkmate scores (~±10000) skew charts meant for normal evals (±1000).
+# We clip eval to ±EVAL_CLIP_CP for all visualizations. Rows are NOT excluded — just clamped.
+EVAL_CLIP_CP = 1500
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -568,7 +812,28 @@ def make_sidebar():
                 style=_dropdown_style,
             ),
 
+            html.Div("Game Phase", style=_sidebar_label),
+            dcc.Dropdown(
+                id="filter-game-phase", options=game_phase_options, multi=True,
+                placeholder="All phases",
+                style=_dropdown_style,
+            ),
+
             html.Hr(style={"borderColor": BORDER, "margin": "16px 0", "opacity": "0.5"}),
+
+            html.Div("Checkmates", style=_sidebar_label),
+            dcc.RadioItems(
+                id="filter-include-mates",
+                options=[
+                    {"label": " Exclude", "value": "exclude"},
+                    {"label": " Include", "value": "include"},
+                    {"label": " Only", "value": "only"},
+                ],
+                value="exclude",
+                style={"fontSize": "11px", "fontFamily": "'JetBrains Mono'", "color": TEXT_SEC,
+                       "marginBottom": "12px"},
+                labelStyle={"display": "inline-block", "marginRight": "10px"},
+            ),
 
             html.Button(
                 "↺  RESET", id="btn-reset", n_clicks=0,
@@ -620,12 +885,17 @@ _tab_selected_style = {
 
 TABS = [
     ("tab-overview",   "OVERVIEW"),
+    ("tab-trends",     "TRENDS"),
     ("tab-games",      "GAMES"),
     ("tab-search",     "SEARCH"),
     ("tab-iter",       "ITER DEPTH"),
     ("tab-tree",       "TREE DEPTH"),
     ("tab-compare",    "COMPARE"),
+    ("tab-openings",   "OPENINGS"),
+    ("tab-quality",    "MOVE QUALITY"),
     ("tab-timing",     "TIMING"),
+    ("tab-time-mgmt",  "TIME MGMT"),
+    ("tab-tt",         "TT ANALYSIS"),
     ("tab-sprt",       "SPRT"),
     ("tab-sts",        "STS"),
     ("tab-perft",      "PERFT"),
@@ -644,7 +914,8 @@ app.layout = html.Div([
                     dcc.Tab(label=lbl, value=val, style=_tab_style, selected_style=_tab_selected_style)
                     for val, lbl in TABS
                 ],
-                style={"borderBottom": f"1px solid {BORDER}"},
+                style={"borderBottom": f"1px solid {BORDER}", "backgroundColor": "#0b0d12",
+                       "paddingLeft": "8px"},
             ),
             html.Div(id="tab-content", className="tab-content",
                      style={"padding": "20px 24px", "overflowY": "auto", "flex": "1"}),
@@ -696,11 +967,33 @@ def panel(*children, flex=None, **style_kwargs) -> html.Div:
     return html.Div(list(children), className="panel", style=style)
 
 
-def metric_card(value, label: str, accent=ACCENT) -> html.Div:
-    return html.Div([
+def metric_card(value, label: str, accent=ACCENT, sparkline=None) -> html.Div:
+    """Create a KPI card. If sparkline (list of numbers) is provided, render a tiny inline SVG."""
+    children = [
         html.Div(str(value), className="metric-val", style={"color": accent}),
         html.Div(label, className="metric-lbl"),
-    ], className="metric-card")
+    ]
+    if sparkline and len(sparkline) > 1:
+        # Build a tiny SVG sparkline
+        vals = [v for v in sparkline if v is not None and not (isinstance(v, float) and np.isnan(v))]
+        if len(vals) > 1:
+            mn, mx = min(vals), max(vals)
+            rng = mx - mn if mx != mn else 1
+            w, h = 80, 24
+            points = []
+            for i, v in enumerate(vals):
+                x = i / (len(vals) - 1) * w
+                y = h - ((v - mn) / rng) * h
+                points.append(f"{x:.1f},{y:.1f}")
+            polyline = " ".join(points)
+            svg = f'''<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}" xmlns="http://www.w3.org/2000/svg">
+                <polyline points="{polyline}" fill="none" stroke="{accent}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.7"/>
+            </svg>'''
+            children.append(html.Div(
+                dash.dcc.Markdown(f'<div>{svg}</div>', dangerously_allow_html=True),
+                style={"marginTop": "6px", "lineHeight": "0"}
+            ))
+    return html.Div(children, className="metric-card")
 
 
 def graph(fig, height=380, **kwargs) -> dcc.Graph:
@@ -794,11 +1087,21 @@ def tab_overview(gf: pd.DataFrame, sf: pd.DataFrame) -> html.Div:
     engine_count  = sf["engine_id"].nunique() if "engine_id" in sf else 0
     avg_depth     = round(sf["depth"].mean(), 1) if "depth" in sf and not sf.empty else "—"
 
+    # Sparklines: metric trends across engine versions (sorted by engine_id as proxy for time)
+    def _version_sparkline(col):
+        if "engine_label" not in sf.columns or col not in sf.columns or sf.empty:
+            return None
+        grp = sf.groupby("engine_label")[col].mean()
+        return grp.tolist() if len(grp) > 1 else None
+
+    spark_depth = _version_sparkline("depth")
+    spark_nps = _version_sparkline("nps")
+
     kpis = html.Div([
         metric_card(f"{total_games:,}",    "TOTAL GAMES"),
         metric_card(f"{total_searches:,}", "TOTAL SEARCHES", accent=ACCENT2),
         metric_card(engine_count,          "ENGINE VERSIONS", accent="#7fff6b"),
-        metric_card(avg_depth,             "AVG SEARCH DEPTH", accent="#f7b731"),
+        metric_card(avg_depth,             "AVG SEARCH DEPTH", accent="#f7b731", sparkline=spark_depth),
     ], style={"display": "grid", "gridTemplateColumns": "repeat(4,1fr)", "gap": "10px", "marginBottom": "10px"})
 
     # Second KPI row: pruning / NMP efficiency
@@ -807,11 +1110,15 @@ def tab_overview(gf: pd.DataFrame, sf: pd.DataFrame) -> html.Div:
     avg_fh_first = round(sf["fail_high_first_ratio"].mean() * 100, 1) if "fail_high_first_ratio" in sf.columns and not sf.empty else "—"
     avg_tt_hit = round(sf["tt_hit_ratio"].mean() * 100, 1) if "tt_hit_ratio" in sf.columns and not sf.empty else "—"
 
+    spark_nmp = _version_sparkline("nmp_ratio")
+    spark_fh = _version_sparkline("fail_high_first_ratio")
+    spark_tt = _version_sparkline("tt_hit_ratio")
+
     kpis2 = html.Div([
-        metric_card(f"{avg_nmp_ratio}%", "NMP ATTEMPT RATE", accent="#a29bfe"),
+        metric_card(f"{avg_nmp_ratio}%", "NMP ATTEMPT RATE", accent="#a29bfe", sparkline=spark_nmp),
         metric_card(f"{avg_nmp_fail}%", "NMP FAIL RATE", accent="#fd79a8"),
-        metric_card(f"{avg_fh_first}%", "FAIL-HIGH FIRST", accent="#55efc4"),
-        metric_card(f"{avg_tt_hit}%", "TT HIT RATE", accent="#fdcb6e"),
+        metric_card(f"{avg_fh_first}%", "FAIL-HIGH FIRST", accent="#55efc4", sparkline=spark_fh),
+        metric_card(f"{avg_tt_hit}%", "TT HIT RATE", accent="#fdcb6e", sparkline=spark_tt),
     ], style={"display": "grid", "gridTemplateColumns": "repeat(4,1fr)", "gap": "10px", "marginBottom": "14px"})
 
     # Win/draw/loss by engine
@@ -870,9 +1177,52 @@ def tab_overview(gf: pd.DataFrame, sf: pd.DataFrame) -> html.Div:
     else:
         prune_fig = empty_fig("No pruning data available")
 
+    # Regression alerts: flag metrics where latest version is worse than prior
+    regression_items = []
+    if "engine_label" in sf.columns and len(sf["engine_label"].dropna().unique()) >= 2:
+        versions = sf.groupby("engine_label")["engine_id"].first().sort_values()
+        if len(versions) >= 2:
+            latest = versions.index[-1]
+            prior = versions.index[-2]
+            check_cols = [c for c in ["nps", "eval", "depth", "tt_hit_ratio", "fail_high_first_ratio",
+                                       "nmp_ratio", "best_move_match"] if c in sf.columns]
+            for col in check_cols:
+                v_latest = sf[sf["engine_label"] == latest][col].mean()
+                v_prior = sf[sf["engine_label"] == prior][col].mean()
+                if pd.notna(v_latest) and pd.notna(v_prior) and v_prior != 0:
+                    pct_change = (v_latest - v_prior) / abs(v_prior) * 100
+                    if pct_change < -5:  # >5% regression
+                        regression_items.append(
+                            html.Div(f"⚠ {metric_label(col)}: {pct_change:+.1f}% ({prior} → {latest})",
+                                     style={"color": "#ff6b35", "fontSize": "11px", "fontFamily": "'JetBrains Mono'",
+                                            "marginBottom": "4px"})
+                        )
+
+    regression_panel = panel(
+        section("REGRESSION ALERTS"),
+        html.Div(regression_items if regression_items else
+                 [html.Div("No regressions detected (>5% decline)", style={"color": TEXT_SEC, "fontSize": "11px"})])
+    ) if "engine_label" in sf.columns else html.Div()
+
+    # Experiment summary panel
+    exp_panel = html.Div()
+    if not experiments_df.empty:
+        exp_summary = experiments_df.groupby("type").size().reset_index(name="count")
+        exp_items = [
+            html.Div(f"{row['type'].upper()}: {row['count']} experiments",
+                     style={"color": TEXT_PRI, "fontSize": "11px", "fontFamily": "'JetBrains Mono'", "marginBottom": "4px"})
+            for _, row in exp_summary.iterrows()
+        ]
+        exp_panel = panel(section("EXPERIMENTS"), html.Div(exp_items))
+
     return html.Div([
         kpis,
         kpis2,
+        html.Div([
+            regression_panel,
+            exp_panel,
+        ], style={"display": "grid", "gridTemplateColumns": "1fr 1fr", "gap": "12px", "marginBottom": "12px"}) if not experiments_df.empty else regression_panel,
+        html.Div(style={"height": "12px"}) if experiments_df.empty else html.Div(),
         html.Div([
             panel(section("PERFORMANCE"), graph(bar_fig, 320), flex="1"),
             panel(section("EVAL SPREAD"), graph(ev_fig, 320), flex="1"),
@@ -956,12 +1306,12 @@ def tab_search(sf: pd.DataFrame) -> html.Div:
     axis_row = html.Div([
         html.Div([
             html.Div("X AXIS", style=_sidebar_label),
-            dcc.Dropdown(id="srch-x", options=[{"label": c, "value": c} for c in nums],
+            dcc.Dropdown(id="srch-x", options=metric_options(nums),
                          value=x_default, clearable=False, style=_dropdown_style),
         ], style={"flex": "1"}),
         html.Div([
             html.Div("Y AXIS", style=_sidebar_label),
-            dcc.Dropdown(id="srch-y", options=[{"label": c, "value": c} for c in nums],
+            dcc.Dropdown(id="srch-y", options=metric_options(nums),
                          value=y_default, clearable=False, style=_dropdown_style),
         ], style={"flex": "1"}),
         html.Div([
@@ -969,10 +1319,11 @@ def tab_search(sf: pd.DataFrame) -> html.Div:
             # Include categorical defaults plus numeric axis columns so users can
             # colour by any axis (e.g., eval_diff by depth with see_prune colouring)
             dcc.Dropdown(id="srch-color",
-                         options=[{"label": c, "value": c} for c in (
-                             [c for c in ["engine_name", "result_label", "engine_side"] if c in sf.columns]
-                             + [c for c in nums if c in sf.columns]
-                         )],
+                         options=(
+                             [{"label": c.replace("_", " ").title(), "value": c}
+                              for c in ["engine_name", "result_label", "engine_side"] if c in sf.columns]
+                             + metric_options([c for c in nums if c in sf.columns])
+                         ),
                          value=("engine_name" if "engine_name" in sf.columns else (nums[0] if nums else None)),
                          clearable=True, style=_dropdown_style),
         ], style={"flex": "1"}),
@@ -983,7 +1334,10 @@ def tab_search(sf: pd.DataFrame) -> html.Div:
             section("SEARCH SCATTER"),
             axis_row,
             html.Div(id="srch-graph-container"),
+            html.Div("Click a point to inspect the position details below.", style={"color": TEXT_SEC, "fontSize": "10px", "marginTop": "8px"}),
         ),
+        html.Div(style={"height": "12px"}),
+        html.Div(id="fen-detail-container"),
         html.Div(style={"height": "12px"}),
         panel(
             section("SEARCH TABLE"),
@@ -1004,7 +1358,21 @@ def tab_iter(sf: pd.DataFrame) -> html.Div:
     idf = iter_df[iter_df["search_id"].isin(valid_ids)].copy() if len(valid_ids) else iter_df.copy()
 
     nums = numeric_cols(idf)
-    y_opts = [{"label": c, "value": c} for c in nums]
+    y_opts = metric_options(nums)
+
+    # EBF heatmap: branching factor by depth × game phase
+    ebf_heatmap = html.Div()
+    if "ebf" in idf.columns and "depth" in idf.columns:
+        phase_col = "game_phase" if "game_phase" in idf.columns else None
+        if phase_col:
+            hm_data = idf.dropna(subset=["ebf", "depth", phase_col])
+            if not hm_data.empty:
+                hm_pivot = hm_data.pivot_table(values="ebf", index=phase_col, columns="depth", aggfunc="mean")
+                hm_fig = px.imshow(hm_pivot, color_continuous_scale="Viridis", aspect="auto",
+                                   labels={"x": "Iteration Depth", "y": "Game Phase", "color": "Avg EBF"})
+                hm_fig.update_layout(title="Branching Factor Heatmap (Depth × Game Phase)")
+                apply_theme(hm_fig)
+                ebf_heatmap = panel(section("EBF HEATMAP"), graph(hm_fig, 300))
 
     return html.Div([
         panel(
@@ -1026,6 +1394,8 @@ def tab_iter(sf: pd.DataFrame) -> html.Div:
             html.Div(id="iter-graph-container"),
         ),
         html.Div(style={"height": "12px"}),
+        ebf_heatmap,
+        html.Div(style={"height": "12px"}),
         panel(section("RAW ITERATION DATA"), table(idf)),
     ])
 
@@ -1039,7 +1409,7 @@ def tab_tree(sf: pd.DataFrame) -> html.Div:
     tdf = tree_df[tree_df["search_id"].isin(valid_ids)].copy() if len(valid_ids) else tree_df.copy()
 
     nums = numeric_cols(tdf)
-    y_opts = [{"label": c, "value": c} for c in nums]
+    y_opts = metric_options(nums)
 
     return html.Div([
         panel(
@@ -1074,7 +1444,7 @@ def tab_compare(sf: pd.DataFrame) -> html.Div:
     eng_names = sorted(sf["engine_label"].dropna().unique())
     eng_opts = [{"label": e, "value": e} for e in eng_names]
     nums = numeric_cols(sf)
-    metric_opts = [{"label": c, "value": c} for c in nums]
+    metric_opts = metric_options(nums)
 
     return html.Div([
         panel(
@@ -1107,10 +1477,6 @@ def tab_compare(sf: pd.DataFrame) -> html.Div:
                 ], style={"flex": "1"}),
             ], style={"display": "flex", "gap": "12px", "marginBottom": "12px"}),
             html.Div([
-                html.Button("Export Anomalies CSV", id="cmp-export-anomalies", n_clicks=0,
-                            style={"padding": "6px 12px", "background": "transparent", "border": f"1px solid {BORDER}",
-                                   "borderRadius": "5px", "color": TEXT_SEC, "fontSize": "10px", "fontFamily": "'JetBrains Mono'",
-                                   "cursor": "pointer", "marginRight": "8px"}),
                 html.Button("Export Comparison Report", id="cmp-export-report", n_clicks=0,
                             style={"padding": "6px 12px", "background": "transparent", "border": f"1px solid {BORDER}",
                                    "borderRadius": "5px", "color": TEXT_SEC, "fontSize": "10px", "fontFamily": "'JetBrains Mono'",
@@ -1468,28 +1834,354 @@ def tab_corr(sf: pd.DataFrame) -> html.Div:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# 9b. NEW TAB RENDERERS (Trends, Openings, Move Quality, Time Mgmt, TT Analysis)
+# ──────────────────────────────────────────────────────────────────────────────
+
+def tab_trends(sf: pd.DataFrame) -> html.Div:
+    """Version trend timeline: key metrics across engine versions."""
+    if "engine_label" not in sf.columns or sf.empty:
+        return html.Div("No engine version data available.", style={"color": TEXT_SEC})
+
+    versions = sorted(sf["engine_label"].dropna().unique())
+    if len(versions) < 2:
+        return html.Div("Need at least 2 engine versions for trends.", style={"color": TEXT_SEC})
+
+    trend_metrics = [c for c in ["nps", "depth", "eval", "tt_hit_ratio", "fail_high_first_ratio",
+                                  "nmp_ratio", "ebf", "avg_ebf", "best_move_match", "qratio"]
+                     if c in sf.columns]
+    if not trend_metrics:
+        return html.Div("No trend-compatible metrics found.", style={"color": TEXT_SEC})
+
+    agg = sf.groupby("engine_label")[trend_metrics].mean().reindex(versions).reset_index()
+
+    figs = []
+    for col in trend_metrics:
+        fig = px.line(agg, x="engine_label", y=col, markers=True,
+                      color_discrete_sequence=[ACCENT],
+                      labels={"engine_label": "Version", col: metric_label(col)})
+        fig.update_layout(title=metric_label(col))
+        apply_theme(fig)
+        figs.append(panel(graph(fig, 280)))
+
+    # Build a grid of mini charts
+    rows = []
+    for i in range(0, len(figs), 3):
+        rows.append(html.Div(figs[i:i+3],
+                    style={"display": "grid", "gridTemplateColumns": "1fr 1fr 1fr", "gap": "12px", "marginBottom": "12px"}))
+
+    return html.Div([section("METRIC TRENDS ACROSS VERSIONS")] + rows)
+
+
+def tab_openings(sf: pd.DataFrame) -> html.Div:
+    """Opening performance breakdown: win rate, eval, depth by opening/ECO."""
+    if "opening" not in sf.columns or sf.empty:
+        return html.Div("No opening data available. Ensure games have opening classification.", style={"color": TEXT_SEC})
+
+    has_result = "result_label" in sf.columns
+    has_eval = "eval" in sf.columns
+
+    # Aggregate by opening
+    agg_cols = {}
+    if has_eval:
+        agg_cols["eval"] = "mean"
+    if "depth" in sf.columns:
+        agg_cols["depth"] = "mean"
+    if "nps" in sf.columns:
+        agg_cols["nps"] = "mean"
+
+    opening_stats = sf.groupby("opening").agg(searches=("opening", "size"), **{
+        f"avg_{k}": (k, v) for k, v in agg_cols.items()
+    }).reset_index()
+
+    # Win rate by opening
+    wr_fig = empty_fig("No result data")
+    if has_result:
+        wr = sf.dropna(subset=["opening", "result_label"]).groupby(["opening", "result_label"]).size().reset_index(name="count")
+        totals = wr.groupby("opening")["count"].sum().rename("total")
+        wr = wr.merge(totals, on="opening")
+        wr["pct"] = wr["count"] / wr["total"] * 100
+        # Only show openings with enough data
+        big_openings = wr.groupby("opening")["count"].sum()
+        big_openings = big_openings[big_openings >= 5].index
+        wr = wr[wr["opening"].isin(big_openings)]
+        if not wr.empty:
+            wr_fig = px.bar(wr, x="opening", y="pct", color="result_label", barmode="stack",
+                            color_discrete_map={"Win": "#7fff6b", "Draw": "#f7b731", "Loss": "#ff6b35"},
+                            labels={"pct": "% of games", "opening": "Opening", "result_label": "Result"})
+            wr_fig.update_layout(title="Win Rate by Opening", xaxis_tickangle=-45)
+            apply_theme(wr_fig)
+
+    # Avg eval by opening
+    eval_fig = empty_fig("No eval data")
+    if has_eval:
+        opening_eval = sf.groupby("opening")["eval"].mean().reset_index()
+        opening_eval = opening_eval.sort_values("eval", ascending=False).head(20)
+        if not opening_eval.empty:
+            eval_fig = px.bar(opening_eval, x="opening", y="eval", color_discrete_sequence=[ACCENT],
+                              labels={"opening": "Opening", "eval": "Avg Eval (cp)"})
+            eval_fig.update_layout(title="Average Eval by Opening (Top 20)", xaxis_tickangle=-45)
+            apply_theme(eval_fig)
+
+    # Per-engine opening comparison
+    eng_open_fig = empty_fig("No engine/opening data")
+    if "engine_name" in sf.columns and has_eval:
+        eng_open = sf.groupby(["engine_name", "opening"])["eval"].mean().reset_index()
+        top_opens = sf["opening"].value_counts().head(10).index
+        eng_open = eng_open[eng_open["opening"].isin(top_opens)]
+        if not eng_open.empty:
+            eng_open_fig = px.bar(eng_open, x="opening", y="eval", color="engine_name",
+                                  barmode="group", color_discrete_sequence=_PALETTE,
+                                  labels={"opening": "Opening", "eval": "Avg Eval", "engine_name": "Engine"})
+            eng_open_fig.update_layout(title="Eval by Opening × Engine (Top 10 openings)", xaxis_tickangle=-45)
+            apply_theme(eng_open_fig)
+
+    return html.Div([
+        html.Div([
+            panel(section("WIN RATE BY OPENING"), graph(wr_fig, 340)),
+            panel(section("EVAL BY OPENING"), graph(eval_fig, 340)),
+        ], style={"display": "grid", "gridTemplateColumns": "1fr 1fr", "gap": "12px", "marginBottom": "12px"}),
+        panel(section("ENGINE × OPENING COMPARISON"), graph(eng_open_fig, 380)),
+        html.Div(style={"height": "12px"}),
+        panel(section("OPENING STATS TABLE"), table(opening_stats)),
+    ])
+
+
+def tab_quality(sf: pd.DataFrame) -> html.Div:
+    """Move quality analysis: eval_diff distribution, move rank, nodes-to-solution."""
+    if sf.empty:
+        return html.Div("No search data available.", style={"color": TEXT_SEC})
+
+    children = []
+
+    # Eval diff histogram (vs Stockfish)
+    if "eval_diff" in sf.columns:
+        ed = sf["eval_diff"].dropna()
+        if not ed.empty:
+            # Clip extreme outliers for better visualization
+            ed_clipped = ed.clip(-500, 500)
+            if "engine_name" in sf.columns:
+                plot_df = sf[["eval_diff", "engine_name"]].dropna()
+                plot_df["eval_diff"] = plot_df["eval_diff"].clip(-500, 500)
+                diff_fig = px.histogram(plot_df, x="eval_diff", color="engine_name",
+                                        barmode="overlay", nbins=80, opacity=0.7,
+                                        color_discrete_sequence=_PALETTE,
+                                        labels={"eval_diff": "Eval Diff vs SF (cp)", "engine_name": "Engine"})
+            else:
+                diff_fig = px.histogram(pd.DataFrame({"eval_diff": ed_clipped}), x="eval_diff",
+                                        nbins=80, color_discrete_sequence=[ACCENT],
+                                        labels={"eval_diff": "Eval Diff vs SF (cp)"})
+            diff_fig.add_vline(x=0, line_dash="dot", line_color=TEXT_SEC)
+            diff_fig.update_layout(title="Eval Difference vs Stockfish")
+            apply_theme(diff_fig)
+            children.append(panel(section("EVAL DIFF DISTRIBUTION"), graph(diff_fig, 340)))
+
+    # Move quality by game phase
+    if "eval_diff" in sf.columns and "game_phase" in sf.columns:
+        phase_df = sf[["eval_diff", "game_phase"]].dropna()
+        if not phase_df.empty:
+            phase_fig = px.box(phase_df, x="game_phase", y="eval_diff",
+                               color_discrete_sequence=[ACCENT],
+                               labels={"game_phase": "Game Phase", "eval_diff": "Eval Diff (cp)"})
+            phase_fig.update_layout(title="Move Quality by Game Phase")
+            apply_theme(phase_fig)
+            children.append(panel(section("QUALITY BY GAME PHASE"), graph(phase_fig, 320)))
+
+    # Move rank distribution
+    if "engine_move_rank" in sf.columns:
+        rank_data = sf["engine_move_rank"].dropna()
+        if not rank_data.empty:
+            rank_counts = rank_data.value_counts().sort_index().reset_index()
+            rank_counts.columns = ["rank", "count"]
+            rank_counts["rank"] = rank_counts["rank"].astype(int)
+            rank_counts = rank_counts[rank_counts["rank"].between(0, 5)]
+            rank_labels = {0: "Not Top-5", 1: "#1 (Best)", 2: "#2", 3: "#3", 4: "#4", 5: "#5"}
+            rank_counts["label"] = rank_counts["rank"].map(rank_labels)
+            rank_fig = px.bar(rank_counts, x="label", y="count", color_discrete_sequence=[ACCENT],
+                              labels={"label": "Move Rank vs SF", "count": "Count"})
+            rank_fig.update_layout(title="Engine Move Rank (vs Stockfish Top-5)")
+            apply_theme(rank_fig)
+            children.append(panel(section("MOVE RANK"), graph(rank_fig, 320)))
+
+    # Nodes to solution: iterations needed to find the best move
+    if "best_move_match" in sf.columns and "depth" in sf.columns:
+        matched = sf[sf["best_move_match"] == 1]
+        if not matched.empty and "engine_name" in matched.columns:
+            nts_fig = px.box(matched, x="engine_name", y="depth",
+                             color_discrete_sequence=_PALETTE,
+                             labels={"engine_name": "Engine", "depth": "Depth to Find Best Move"})
+            nts_fig.update_layout(title="Depth-to-Solution (positions where engine found SF best move)")
+            apply_theme(nts_fig)
+            children.append(panel(section("DEPTH TO SOLUTION"), graph(nts_fig, 320)))
+
+    if not children:
+        return html.Div("No move quality data (eval_diff, engine_move_rank) available.", style={"color": TEXT_SEC})
+
+    return html.Div(children, style={"display": "flex", "flexDirection": "column", "gap": "12px"})
+
+
+def tab_time_mgmt(sf: pd.DataFrame) -> html.Div:
+    """Time management analysis: time vs complexity, time vs game phase."""
+    if "time_ms" not in sf.columns or sf.empty:
+        return html.Div("No time data available.", style={"color": TEXT_SEC})
+
+    children = []
+
+    # Time vs tactical score
+    if "tactical_score" in sf.columns:
+        sample = sf[["time_ms", "tactical_score"]].dropna().head(5000)
+        if not sample.empty:
+            fig = px.scatter(sample, x="tactical_score", y="time_ms", opacity=0.5,
+                             color_discrete_sequence=[ACCENT],
+                             labels={"tactical_score": "Tactical Complexity", "time_ms": "Time (ms)"})
+            fig.update_layout(title="Time Allocated vs Tactical Complexity")
+            apply_theme(fig)
+            children.append(panel(section("TIME vs COMPLEXITY"), graph(fig, 340)))
+
+    # Time by game phase
+    if "game_phase" in sf.columns:
+        phase_time = sf[["game_phase", "time_ms"]].dropna()
+        if not phase_time.empty:
+            fig = px.box(phase_time, x="game_phase", y="time_ms",
+                         color_discrete_sequence=[ACCENT],
+                         labels={"game_phase": "Game Phase", "time_ms": "Time (ms)"})
+            fig.update_layout(title="Time Allocation by Game Phase")
+            apply_theme(fig)
+            children.append(panel(section("TIME BY PHASE"), graph(fig, 320)))
+
+    # Time vs eval_diff (are we spending more time and still getting it wrong?)
+    if "eval_diff" in sf.columns:
+        td = sf[["time_ms", "eval_diff"]].dropna().head(5000)
+        if not td.empty:
+            color_col = "engine_name" if "engine_name" in sf.columns else None
+            plot_df = sf[["time_ms", "eval_diff"] + (["engine_name"] if color_col else [])].dropna().head(5000)
+            fig = px.scatter(plot_df, x="time_ms", y="eval_diff",
+                             color=color_col, opacity=0.5,
+                             color_discrete_sequence=_PALETTE,
+                             labels={"time_ms": "Time (ms)", "eval_diff": "Eval Error (cp)"})
+            fig.update_layout(title="Time Spent vs Eval Error")
+            fig.add_hline(y=0, line_dash="dot", line_color=TEXT_SEC)
+            apply_theme(fig)
+            children.append(panel(section("TIME vs ERROR"), graph(fig, 340)))
+
+    # Time efficiency: NPS over ply (does the engine slow down?)
+    if "nps" in sf.columns and "ply" in sf.columns:
+        nps_by_ply = sf[["ply", "nps", "engine_name"]].dropna() if "engine_name" in sf.columns else sf[["ply", "nps"]].dropna()
+        if not nps_by_ply.empty:
+            agg = nps_by_ply.groupby(["ply"] + (["engine_name"] if "engine_name" in nps_by_ply.columns else []))["nps"].mean().reset_index()
+            fig = px.line(agg, x="ply", y="nps",
+                          color="engine_name" if "engine_name" in agg.columns else None,
+                          color_discrete_sequence=_PALETTE,
+                          labels={"ply": "Game Ply", "nps": "Avg NPS"})
+            fig.update_layout(title="NPS Over Game Progress")
+            apply_theme(fig)
+            children.append(panel(section("NPS OVER GAME"), graph(fig, 320)))
+
+    if not children:
+        return html.Div("Insufficient data for time management analysis.", style={"color": TEXT_SEC})
+
+    return html.Div(children, style={"display": "flex", "flexDirection": "column", "gap": "12px"})
+
+
+def tab_tt(sf: pd.DataFrame) -> html.Div:
+    """TT (Transposition Table) deep-dive: hit rate, store rate, overwrites by depth."""
+    if sf.empty:
+        return html.Div("No search data available.", style={"color": TEXT_SEC})
+
+    children = []
+
+    # TT hit rate by depth (using iteration data if available)
+    if not iter_df.empty and "tt_hit_ratio" in iter_df.columns and "depth" in iter_df.columns:
+        tt_by_depth = iter_df.groupby("depth")["tt_hit_ratio"].mean().reset_index()
+        fig = px.line(tt_by_depth, x="depth", y="tt_hit_ratio", markers=True,
+                      color_discrete_sequence=[ACCENT],
+                      labels={"depth": "Iteration Depth", "tt_hit_ratio": "TT Hit Rate"})
+        fig.update_layout(title="TT Hit Rate by Iteration Depth")
+        apply_theme(fig)
+        children.append(panel(section("TT HIT RATE BY DEPTH"), graph(fig, 320)))
+
+    # TT store rate by depth
+    if not iter_df.empty and "tt_store_ratio" in iter_df.columns and "depth" in iter_df.columns:
+        ts_by_depth = iter_df.groupby("depth")["tt_store_ratio"].mean().reset_index()
+        fig = px.line(ts_by_depth, x="depth", y="tt_store_ratio", markers=True,
+                      color_discrete_sequence=[ACCENT2],
+                      labels={"depth": "Iteration Depth", "tt_store_ratio": "TT Store Rate"})
+        fig.update_layout(title="TT Store Rate by Iteration Depth")
+        apply_theme(fig)
+        children.append(panel(section("TT STORE RATE BY DEPTH"), graph(fig, 320)))
+
+    # TT effectiveness: hit rate by engine (search-level)
+    if "tt_hit_ratio" in sf.columns and "engine_name" in sf.columns:
+        fig = px.box(sf.dropna(subset=["tt_hit_ratio", "engine_name"]),
+                     x="engine_name", y="tt_hit_ratio",
+                     color_discrete_sequence=_PALETTE,
+                     labels={"engine_name": "Engine", "tt_hit_ratio": "TT Hit Rate"})
+        fig.update_layout(title="TT Hit Rate Distribution by Engine")
+        apply_theme(fig)
+        children.append(panel(section("TT HIT RATE BY ENGINE"), graph(fig, 320)))
+
+    # Overwrite rate (if available)
+    if "total_tt_overwritten" in sf.columns and "total_tt_stores" in sf.columns:
+        sf_tt = sf[["total_tt_overwritten", "total_tt_stores", "engine_name", "depth"]].dropna()
+        if not sf_tt.empty:
+            sf_tt["overwrite_ratio"] = sf_tt["total_tt_overwritten"] / sf_tt["total_tt_stores"].replace(0, np.nan)
+            if "engine_name" in sf_tt.columns:
+                ow_agg = sf_tt.groupby("engine_name")["overwrite_ratio"].mean().reset_index()
+                fig = px.bar(ow_agg, x="engine_name", y="overwrite_ratio",
+                             color_discrete_sequence=[ACCENT],
+                             labels={"engine_name": "Engine", "overwrite_ratio": "Overwrite Ratio"})
+                fig.update_layout(title="TT Overwrite Ratio by Engine (stores that replaced existing entries)")
+                apply_theme(fig)
+                children.append(panel(section("TT OVERWRITE RATIO"), graph(fig, 300)))
+
+    # TT hit rate vs search time scatter
+    if "tt_hit_ratio" in sf.columns and "time_ms" in sf.columns:
+        sample = sf[["tt_hit_ratio", "time_ms"]].dropna().head(5000)
+        if not sample.empty:
+            fig = px.scatter(sample, x="tt_hit_ratio", y="time_ms", opacity=0.4,
+                             color_discrete_sequence=[ACCENT],
+                             labels={"tt_hit_ratio": "TT Hit Rate", "time_ms": "Search Time (ms)"})
+            fig.update_layout(title="TT Hit Rate vs Search Time")
+            apply_theme(fig)
+            children.append(panel(section("TT vs SEARCH TIME"), graph(fig, 300)))
+
+    if not children:
+        return html.Div("No TT-related columns found.", style={"color": TEXT_SEC})
+
+    return html.Div(children, style={"display": "flex", "flexDirection": "column", "gap": "12px"})
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # 10. MAIN TAB CALLBACK
 # ──────────────────────────────────────────────────────────────────────────────
 
 @app.callback(
     Output("tab-content", "children"),
-    Input("main-tabs",      "value"),
-    Input("filter-engine",  "value"),
-    Input("filter-result",  "value"),
-    Input("filter-opening", "value"),
-    Input("filter-side",    "value"),
-    Input("filter-pos-type","value"),
+    Input("main-tabs",       "value"),
+    Input("filter-engine",   "value"),
+    Input("filter-result",   "value"),
+    Input("filter-opening",  "value"),
+    Input("filter-side",     "value"),
+    Input("filter-pos-type", "value"),
+    Input("filter-game-phase","value"),
+    Input("filter-include-mates","value"),
 )
-def render_tab(tab, engine_ids, result_vals, opening_vals, side_vals, pos_type_vals):
-    gf, sf = apply_filters(engine_ids, result_vals, opening_vals, side_vals, pos_type_vals)
+def render_tab(tab, engine_ids, result_vals, opening_vals, side_vals, pos_type_vals, game_phase_vals, include_mates_val):
+    gf, sf = apply_filters(engine_ids, result_vals, opening_vals, side_vals, pos_type_vals, game_phase_vals,
+                           include_mates=(include_mates_val == "include"),
+                           mates_only=(include_mates_val == "only"))
 
     if tab == "tab-overview": return tab_overview(gf, sf)
+    if tab == "tab-trends":   return tab_trends(sf)
     if tab == "tab-games":    return tab_games(gf)
     if tab == "tab-search":   return tab_search(sf)
     if tab == "tab-iter":     return tab_iter(sf)
     if tab == "tab-tree":     return tab_tree(sf)
     if tab == "tab-compare":  return tab_compare(sf)
+    if tab == "tab-openings": return tab_openings(sf)
+    if tab == "tab-quality":  return tab_quality(sf)
     if tab == "tab-timing":   return tab_timing()
+    if tab == "tab-time-mgmt": return tab_time_mgmt(sf)
+    if tab == "tab-tt":       return tab_tt(sf)
     if tab == "tab-sprt":     return tab_sprt()
     if tab == "tab-sts":      return tab_sts()
     if tab == "tab-perft":    return tab_perft()
@@ -1503,16 +2195,18 @@ def render_tab(tab, engine_ids, result_vals, opening_vals, side_vals, pos_type_v
 # ──────────────────────────────────────────────────────────────────────────────
 
 @app.callback(
-    Output("filter-engine",   "value"),
-    Output("filter-result",   "value"),
-    Output("filter-opening",  "value"),
-    Output("filter-side",     "value"),
-    Output("filter-pos-type", "value"),
+    Output("filter-engine",     "value"),
+    Output("filter-result",     "value"),
+    Output("filter-opening",    "value"),
+    Output("filter-side",       "value"),
+    Output("filter-pos-type",   "value"),
+    Output("filter-game-phase", "value"),
+    Output("filter-include-mates", "value"),
     Input("btn-reset", "n_clicks"),
     prevent_initial_call=True,
 )
 def reset_filters(_):
-    return None, None, None, None, None
+    return None, None, None, None, None, None, "exclude"
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -1529,9 +2223,13 @@ def reset_filters(_):
     Input("filter-opening", "value"),
     Input("filter-side",    "value"),
     Input("filter-pos-type","value"),
+    Input("filter-game-phase","value"),
+    Input("filter-include-mates","value"),
 )
-def update_search_scatter(x_col, y_col, color_col, engine_ids, result_vals, opening_vals, side_vals, pos_type_vals):
-    _, sf = apply_filters(engine_ids, result_vals, opening_vals, side_vals, pos_type_vals)
+def update_search_scatter(x_col, y_col, color_col, engine_ids, result_vals, opening_vals, side_vals, pos_type_vals, game_phase_vals, include_mates_val):
+    _, sf = apply_filters(engine_ids, result_vals, opening_vals, side_vals, pos_type_vals, game_phase_vals,
+                          include_mates=(include_mates_val == "include"),
+                          mates_only=(include_mates_val == "only"))
     if not x_col or not y_col:
         return html.Div("Select axes.", style={"color": TEXT_SEC})
     if x_col not in sf.columns or y_col not in sf.columns:
@@ -1569,9 +2267,118 @@ def update_search_scatter(x_col, y_col, color_col, engine_ids, result_vals, open
             except Exception:
                 pass
 
-    fig.update_layout(title=f"{y_col} vs {x_col}")
+    fig.update_layout(title=f"{metric_label(y_col)} vs {metric_label(x_col)}")
     apply_theme(fig)
-    return graph(fig, 480)
+    return graph(fig, 400, id="srch-scatter-plot")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 12b. FEN DETAIL CALLBACK (click on scatter point)
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.callback(
+    Output("fen-detail-container", "children"),
+    Input("srch-scatter-plot", "clickData"),
+    State("filter-engine",  "value"),
+    State("filter-result",  "value"),
+    State("filter-opening", "value"),
+    State("filter-side",    "value"),
+    State("filter-pos-type","value"),
+    State("filter-game-phase","value"),
+    State("filter-include-mates","value"),
+    prevent_initial_call=True,
+)
+def show_fen_detail(click_data, engine_ids, result_vals, opening_vals, side_vals, pos_type_vals, game_phase_vals, include_mates_val):
+    """Show position details when a scatter point is clicked."""
+    if not click_data:
+        return html.Div()
+
+    _, sf = apply_filters(engine_ids, result_vals, opening_vals, side_vals, pos_type_vals, game_phase_vals,
+                          include_mates=(include_mates_val == "include"),
+                          mates_only=(include_mates_val == "only"))
+
+    point = click_data["points"][0]
+    custom = point.get("customdata", [])
+    # Try to find the search row by search_id or by x/y match
+    row = None
+    if custom and "search_id" in sf.columns:
+        # hover_data includes search_id as first custom field
+        sid = custom[0] if isinstance(custom, list) else custom
+        matches = sf[sf["search_id"] == sid] if "search_id" in sf.columns else pd.DataFrame()
+        if not matches.empty:
+            row = matches.iloc[0]
+
+    if row is None:
+        return html.Div("Could not identify position from click.", style={"color": TEXT_SEC})
+
+    # Build a detail panel
+    fen = row.get("fen", "N/A")
+    best_move = row.get("best_move", row.get("move", "N/A"))
+    pv = row.get("principal_variation", "N/A")
+    eval_val = row.get("eval", "N/A")
+    depth_val = row.get("depth", "N/A")
+    time_val = row.get("time_ms", row.get("total_time_ms", "N/A"))
+    engine = row.get("engine_name", "N/A")
+    sf_eval = row.get("sf_eval", None)
+    sf_move = row.get("sf_best_move", None)
+
+    detail_items = [
+        ("Engine", engine),
+        ("FEN", fen),
+        ("Best Move", best_move),
+        ("Eval (cp)", eval_val),
+        ("Depth", depth_val),
+        ("Time (ms)", time_val),
+        ("PV", str(pv)[:100] if pv else "N/A"),
+    ]
+    if sf_eval is not None:
+        detail_items.append(("SF Eval", sf_eval))
+    if sf_move is not None:
+        detail_items.append(("SF Best Move", sf_move))
+
+    # Add key metrics
+    for col in ["nps", "tt_hit_ratio", "fail_high_first_ratio", "nmp_ratio", "ebf"]:
+        if col in row.index and pd.notna(row[col]):
+            detail_items.append((metric_label(col), f"{row[col]:.4f}"))
+
+    detail_grid = html.Div([
+        html.Div([
+            html.Span(label + ": ", style={"color": TEXT_SEC, "fontWeight": "700", "fontSize": "10px",
+                                            "textTransform": "uppercase", "letterSpacing": "0.08em"}),
+            html.Span(str(val), style={"color": TEXT_PRI, "fontFamily": "'JetBrains Mono'", "fontSize": "11px"}),
+        ], style={"marginBottom": "6px"})
+        for label, val in detail_items
+    ])
+
+    # Iteration history for this search (if available)
+    iter_section = html.Div()
+    search_id = row.get("search_id", row.get("id"))
+    if search_id and not iter_df.empty and "search_id" in iter_df.columns:
+        irows = iter_df[iter_df["search_id"] == search_id].sort_values("depth")
+        if not irows.empty and "eval" in irows.columns:
+            iter_fig = go.Figure()
+            iter_fig.add_trace(go.Scatter(x=irows["depth"], y=irows["eval"],
+                                          mode="lines+markers", name="Eval",
+                                          line=dict(color=ACCENT)))
+            if "nps" in irows.columns:
+                iter_fig.add_trace(go.Bar(x=irows["depth"], y=irows["nps"],
+                                          name="NPS", marker_color=hex_to_rgba(ACCENT2, 0.5),
+                                          yaxis="y2"))
+                iter_fig.update_layout(yaxis2=dict(overlaying="y", side="right", showgrid=False,
+                                                    title="NPS", title_font=dict(color=ACCENT2)))
+            iter_fig.update_layout(title="Iteration History for Selected Position",
+                                    xaxis_title="Depth", yaxis_title="Eval")
+            apply_theme(iter_fig)
+            iter_section = html.Div([
+                html.Div(style={"height": "8px"}),
+                graph(iter_fig, 260),
+            ])
+
+    return panel(
+        section("POSITION DETAIL"),
+        detail_grid,
+        iter_section,
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -1587,9 +2394,13 @@ def update_search_scatter(x_col, y_col, color_col, engine_ids, result_vals, open
     Input("filter-opening", "value"),
     Input("filter-side",    "value"),
     Input("filter-pos-type","value"),
+    Input("filter-game-phase","value"),
+    Input("filter-include-mates","value"),
 )
-def update_iter_graph(y_col, agg, engine_ids, result_vals, opening_vals, side_vals, pos_type_vals):
-    _, sf = apply_filters(engine_ids, result_vals, opening_vals, side_vals, pos_type_vals)
+def update_iter_graph(y_col, agg, engine_ids, result_vals, opening_vals, side_vals, pos_type_vals, game_phase_vals, include_mates_val):
+    _, sf = apply_filters(engine_ids, result_vals, opening_vals, side_vals, pos_type_vals, game_phase_vals,
+                          include_mates=(include_mates_val == "include"),
+                          mates_only=(include_mates_val == "only"))
     if iter_df.empty or not y_col:
         return html.Div("No data.", style={"color": TEXT_SEC})
 
@@ -1607,10 +2418,35 @@ def update_iter_graph(y_col, agg, engine_ids, result_vals, opening_vals, side_va
     fig = px.line(agg_df, x="depth", y=y_col, color=color_col,
                   color_discrete_sequence=_PALETTE,
                   markers=True,
-                  labels={"depth": "Iteration Depth", y_col: f"{agg}({y_col})"})
-    fig.update_layout(title=f"{agg}({y_col}) by Iteration Depth")
+                  labels={"depth": "Iteration Depth", y_col: f"{agg}({metric_label(y_col)})"})
+
+    # Add p10/p90 percentile bands
+    if agg in ("mean", "median"):
+        band_group = ["depth"] if color_col is None else ["depth", "engine_name"]
+        p10 = idf.groupby(band_group)[y_col].quantile(0.1).reset_index().rename(columns={y_col: "p10"})
+        p90 = idf.groupby(band_group)[y_col].quantile(0.9).reset_index().rename(columns={y_col: "p90"})
+        bands = p10.merge(p90, on=band_group)
+        if color_col is None:
+            fig.add_trace(go.Scatter(x=bands["depth"], y=bands["p90"], mode="lines",
+                                     line=dict(width=0), showlegend=False, hoverinfo="skip"))
+            fig.add_trace(go.Scatter(x=bands["depth"], y=bands["p10"], mode="lines",
+                                     line=dict(width=0), fill="tonexty",
+                                     fillcolor=hex_to_rgba(ACCENT, 0.15),
+                                     showlegend=True, name="p10–p90"))
+        else:
+            for i, eng in enumerate(bands[color_col].unique()):
+                eb = bands[bands[color_col] == eng]
+                col = _PALETTE[i % len(_PALETTE)]
+                fig.add_trace(go.Scatter(x=eb["depth"], y=eb["p90"], mode="lines",
+                                         line=dict(width=0), showlegend=False, hoverinfo="skip"))
+                fig.add_trace(go.Scatter(x=eb["depth"], y=eb["p10"], mode="lines",
+                                         line=dict(width=0), fill="tonexty",
+                                         fillcolor=hex_to_rgba(col, 0.1),
+                                         showlegend=False, hoverinfo="skip"))
+
+    fig.update_layout(title=f"{agg}({metric_label(y_col)}) by Iteration Depth")
     apply_theme(fig)
-    return graph(fig, 440)
+    return graph(fig, 380)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -1626,9 +2462,13 @@ def update_iter_graph(y_col, agg, engine_ids, result_vals, opening_vals, side_va
     Input("filter-opening", "value"),
     Input("filter-side",    "value"),
     Input("filter-pos-type","value"),
+    Input("filter-game-phase","value"),
+    Input("filter-include-mates","value"),
 )
-def update_tree_graph(y_col, scale, engine_ids, result_vals, opening_vals, side_vals, pos_type_vals):
-    _, sf = apply_filters(engine_ids, result_vals, opening_vals, side_vals, pos_type_vals)
+def update_tree_graph(y_col, scale, engine_ids, result_vals, opening_vals, side_vals, pos_type_vals, game_phase_vals, include_mates_val):
+    _, sf = apply_filters(engine_ids, result_vals, opening_vals, side_vals, pos_type_vals, game_phase_vals,
+                          include_mates=(include_mates_val == "include"),
+                          mates_only=(include_mates_val == "only"))
     if tree_df.empty or not y_col:
         return html.Div("No data.", style={"color": TEXT_SEC})
 
@@ -1645,10 +2485,34 @@ def update_tree_graph(y_col, scale, engine_ids, result_vals, opening_vals, side_
     fig = px.line(agg_df, x="depth", y=y_col, color=color_col,
                   color_discrete_sequence=_PALETTE, markers=True,
                   log_y=(scale == "log"),
-                  labels={"depth": "Tree Ply", y_col: f"mean({y_col})"})
-    fig.update_layout(title=f"mean({y_col}) by Tree Ply")
+                  labels={"depth": "Tree Ply", y_col: f"mean({metric_label(y_col)})"})
+
+    # Add p10/p90 percentile bands
+    band_group = ["depth"] if color_col is None else ["depth", "engine_name"]
+    p10 = tdf.groupby(band_group)[y_col].quantile(0.1).reset_index().rename(columns={y_col: "p10"})
+    p90 = tdf.groupby(band_group)[y_col].quantile(0.9).reset_index().rename(columns={y_col: "p90"})
+    bands = p10.merge(p90, on=band_group)
+    if color_col is None:
+        fig.add_trace(go.Scatter(x=bands["depth"], y=bands["p90"], mode="lines",
+                                 line=dict(width=0), showlegend=False, hoverinfo="skip"))
+        fig.add_trace(go.Scatter(x=bands["depth"], y=bands["p10"], mode="lines",
+                                 line=dict(width=0), fill="tonexty",
+                                 fillcolor=hex_to_rgba(ACCENT, 0.15),
+                                 showlegend=True, name="p10–p90"))
+    else:
+        for i, eng in enumerate(bands[color_col].unique()):
+            eb = bands[bands[color_col] == eng]
+            col = _PALETTE[i % len(_PALETTE)]
+            fig.add_trace(go.Scatter(x=eb["depth"], y=eb["p90"], mode="lines",
+                                     line=dict(width=0), showlegend=False, hoverinfo="skip"))
+            fig.add_trace(go.Scatter(x=eb["depth"], y=eb["p10"], mode="lines",
+                                     line=dict(width=0), fill="tonexty",
+                                     fillcolor=hex_to_rgba(col, 0.1),
+                                     showlegend=False, hoverinfo="skip"))
+
+    fig.update_layout(title=f"mean({metric_label(y_col)}) by Tree Ply")
     apply_theme(fig)
-    return graph(fig, 440)
+    return graph(fig, 380)
 
 
 # Per-game progress plot: eval (primary) and nodes/time (secondary)
@@ -1660,12 +2524,16 @@ def update_tree_graph(y_col, scale, engine_ids, result_vals, opening_vals, side_
     Input("filter-opening", "value"),
     Input("filter-side",    "value"),
     Input("filter-pos-type","value"),
+    Input("filter-game-phase","value"),
+    Input("filter-include-mates","value"),
 )
-def update_game_progress(game_id, engine_ids, result_vals, opening_vals, side_vals, pos_type_vals):
+def update_game_progress(game_id, engine_ids, result_vals, opening_vals, side_vals, pos_type_vals, game_phase_vals, include_mates_val):
     if not game_id:
         return html.Div("Select a game to view progress.", style={"color": TEXT_SEC})
 
-    gf, sf = apply_filters(engine_ids, result_vals, opening_vals, side_vals, pos_type_vals)
+    gf, sf = apply_filters(engine_ids, result_vals, opening_vals, side_vals, pos_type_vals, game_phase_vals,
+                           include_mates=(include_mates_val == "include"),
+                           mates_only=(include_mates_val == "only"))
     if sf.empty or "game_id" not in sf.columns:
         return html.Div("No per-ply search data available.", style={"color": TEXT_SEC})
 
@@ -1684,7 +2552,8 @@ def update_game_progress(game_id, engine_ids, result_vals, opening_vals, side_va
     fig = make_subplots(specs=[[{"secondary_y": True}]])
 
     if "eval" in gsearch.columns:
-        fig.add_trace(go.Scatter(x=x, y=gsearch["eval"], mode="lines+markers", name="Eval",
+        fig.add_trace(go.Scatter(x=x, y=gsearch["eval"],
+                                 mode="lines+markers", name="Eval",
                                  line=dict(color=ACCENT)), secondary_y=False)
 
     # Add nodes/time on secondary axis if present
@@ -1698,7 +2567,7 @@ def update_game_progress(game_id, engine_ids, result_vals, opening_vals, side_va
     fig.update_yaxes(title_text="Nodes / Time", secondary_y=True)
     fig.update_layout(title=f"Game {game_id} Progress: Eval vs Ply", legend=dict(orientation="h", y=-0.15))
     apply_theme(fig)
-    return graph(fig, 420)
+    return graph(fig, 360)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -1717,13 +2586,18 @@ def update_game_progress(game_id, engine_ids, result_vals, opening_vals, side_va
     Input("filter-opening", "value"),
     Input("filter-side",    "value"),
     Input("filter-pos-type","value"),
+    Input("filter-game-phase","value"),
+    Input("filter-include-mates","value"),
 )
-def update_compare(eng_a, eng_b, metric, chart_type, engine_ids, result_vals, opening_vals, side_vals, pos_type_vals):
-    _, sf = apply_filters(engine_ids, result_vals, opening_vals, side_vals, pos_type_vals)
+def update_compare(eng_a, eng_b, metric, chart_type, engine_ids, result_vals, opening_vals, side_vals, pos_type_vals, game_phase_vals, include_mates_val):
+    _, sf = apply_filters(engine_ids, result_vals, opening_vals, side_vals, pos_type_vals, game_phase_vals,
+                          include_mates=(include_mates_val == "include"),
+                          mates_only=(include_mates_val == "only"))
     if "engine_label" not in sf.columns or not metric:
         return html.Div("No data.", style={"color": TEXT_SEC}), html.Div()
 
     pair = sf[sf["engine_label"].isin([eng_a, eng_b])].dropna(subset=[metric, "engine_label"])
+
     a_data = pair[pair["engine_label"] == eng_a][metric]
     b_data = pair[pair["engine_label"] == eng_b][metric]
 
@@ -1761,20 +2635,20 @@ def update_compare(eng_a, eng_b, metric, chart_type, engine_ids, result_vals, op
     else:
         fig = go.Figure()
 
-    fig.update_layout(title=f"{metric} — {eng_a} vs {eng_b}")
+    fig.update_layout(title=f"{metric_label(metric)} — {eng_a} vs {eng_b}")
     apply_theme(fig)
 
     # Build main graph area: primary chart + ECDF + KS-test summary
-    main_graph_children = [graph(fig, 440)]
+    main_graph_children = [graph(fig, 380)]
 
     # ECDF (CDF) to visualize distributional differences
     try:
         ecdf_df = pair[[metric, "engine_label"]].dropna()
         if not ecdf_df.empty:
             cdf_fig = px.ecdf(ecdf_df, x=metric, color="engine_label")
-            cdf_fig.update_layout(title=f"CDF: {metric} distribution")
+            cdf_fig.update_layout(title=f"CDF: {metric_label(metric)} distribution")
             apply_theme(cdf_fig)
-            main_graph_children.append(graph(cdf_fig, 360))
+            main_graph_children.append(graph(cdf_fig, 300))
     except Exception:
         pass
 
@@ -1808,30 +2682,6 @@ def update_compare(eng_a, eng_b, metric, chart_type, engine_ids, result_vals, op
             "Max": round(grp.max(), 4),
         })
     summary_tbl = table(pd.DataFrame(rows), page_size=5)
-
-    # --- Anomalies / basic checks ---
-    anomalies = []
-    for eng_label in (eng_a, eng_b):
-        grp = pair[pair["engine_label"] == eng_label]
-        if grp.empty:
-            anomalies.append(f"{eng_label}: no matching rows")
-            continue
-        # check for fail_highs/fail_lows presence and counts
-        for col in ("fail_highs", "fail_lows"):
-            if col in grp.columns:
-                total = int(grp[col].sum()) if not grp[col].isna().all() else 0
-                zeros = int((grp[col] == 0).sum())
-                pct_zero = round(zeros / len(grp) * 100, 1) if len(grp) else 0
-                if total == 0:
-                    anomalies.append(f"{eng_label}: {col} = 0 across all rows")
-                elif pct_zero > 90:
-                    anomalies.append(f"{eng_label}: {pct_zero}% rows have {col} == 0")
-
-    anomalies_block = panel(
-        section("ANOMALIES & CHECKS"),
-        html.Div([html.Div(a, style={"color": ("#ff6b35" if "= 0" in a else TEXT_SEC), "fontSize": "11px",
-                                      "fontFamily": "'JetBrains Mono'", "marginBottom": "4px"}) for a in anomalies])
-    )
 
     # --- Per-game aligned deltas (by metric) ---
     per_game_delta_block = html.Div()
@@ -1881,7 +2731,6 @@ def update_compare(eng_a, eng_b, metric, chart_type, engine_ids, result_vals, op
 
 @app.callback(
     Output("cmp-export-link", "children"),
-    Input("cmp-export-anomalies", "n_clicks"),
     Input("cmp-export-report", "n_clicks"),
     State("cmp-eng-a", "value"),
     State("cmp-eng-b", "value"),
@@ -1891,64 +2740,37 @@ def update_compare(eng_a, eng_b, metric, chart_type, engine_ids, result_vals, op
     State("filter-opening", "value"),
     State("filter-side", "value"),
     State("filter-pos-type","value"),
+    State("filter-game-phase","value"),
+    State("filter-include-mates","value"),
 )
-def export_compare(anom_clicks, rpt_clicks, eng_a, eng_b, metric, engine_ids, result_vals, opening_vals, side_vals, pos_type_vals):
-    """Generate anomalies CSV or a markdown report for the current comparison selection.
-    Writes outputs to `data/exports/` and returns an HTML link to the file.
+def export_compare(rpt_clicks, eng_a, eng_b, metric, engine_ids, result_vals, opening_vals, side_vals, pos_type_vals, game_phase_vals, include_mates_val):
+    """Generate a markdown report for the current comparison selection.
+    Writes output to `data/exports/` and returns an HTML link to the file.
     """
     import time, pathlib
-    gf, sf = apply_filters(engine_ids, result_vals, opening_vals, side_vals, pos_type_vals)
-    if not eng_a or not eng_b:
+    gf, sf = apply_filters(engine_ids, result_vals, opening_vals, side_vals, pos_type_vals, game_phase_vals,
+                           include_mates=(include_mates_val == "include"),
+                           mates_only=(include_mates_val == "only"))
+    if not eng_a or not eng_b or not rpt_clicks:
         return ""
     ts = int(time.time())
     out_dir = pathlib.Path(__file__).resolve().parent / "exports"
     out_dir.mkdir(exist_ok=True)
 
-    # If anomalies button clicked
-    ctx_id = ctx.triggered_id if hasattr(ctx, 'triggered_id') else None
-    try:
-        ctx_id = ctx.triggered_id
-    except Exception:
-        ctx_id = None
-
-    if ctx_id == "cmp-export-anomalies":
-        pair = sf[sf["engine_label"].isin([eng_a, eng_b])]
-        rows = []
-        for eng_label in (eng_a, eng_b):
-            grp = pair[pair["engine_label"] == eng_label]
-            if grp.empty:
-                continue
-            total_rows = len(grp)
-            fail_highs = int(grp["fail_highs"].sum()) if "fail_highs" in grp.columns else 0
-            fail_lows = int(grp["fail_lows"].sum()) if "fail_lows" in grp.columns else 0
-            rows.append({"engine": eng_label, "rows": total_rows, "fail_highs": fail_highs, "fail_lows": fail_lows})
-        import csv
-        out = out_dir / f"anomalies_{eng_a.replace(' ','_')}_vs_{eng_b.replace(' ','_')}_{ts}.csv"
-        with out.open('w', newline='') as fh:
-            writer = csv.DictWriter(fh, fieldnames=["engine","rows","fail_highs","fail_lows"])
-            writer.writeheader()
-            for r in rows:
-                writer.writerow(r)
-        return html.A(f"Download anomalies CSV: {out.name}", href=str(out), target="_blank")
-
-    if ctx_id == "cmp-export-report":
-        pair = sf[sf["engine_label"].isin([eng_a, eng_b])]
-        # basic summary in Markdown
-        md = []
-        md.append(f"# Comparison report: {eng_a} vs {eng_b}")
-        md.append(f"Metric: {metric}")
-        for eng_label in (eng_a, eng_b):
-            grp = pair[pair["engine_label"] == eng_label]
-            md.append(f"## {eng_label}")
-            md.append(f"Rows: {len(grp)}")
-            if metric in grp.columns and len(grp):
-                md.append(f"Mean {metric}: {grp[metric].mean():.4f}")
-                md.append(f"Median {metric}: {grp[metric].median():.4f}")
-        out = out_dir / f"report_{eng_a.replace(' ','_')}_vs_{eng_b.replace(' ','_')}_{ts}.md"
-        out.write_text('\n\n'.join(md))
-        return html.A(f"Download report: {out.name}", href=str(out), target="_blank")
-
-    return ""
+    pair = sf[sf["engine_label"].isin([eng_a, eng_b])]
+    md = []
+    md.append(f"# Comparison report: {eng_a} vs {eng_b}")
+    md.append(f"Metric: {metric}")
+    for eng_label in (eng_a, eng_b):
+        grp = pair[pair["engine_label"] == eng_label]
+        md.append(f"## {eng_label}")
+        md.append(f"Rows: {len(grp)}")
+        if metric in grp.columns and len(grp):
+            md.append(f"Mean {metric}: {grp[metric].mean():.4f}")
+            md.append(f"Median {metric}: {grp[metric].median():.4f}")
+    out = out_dir / f"report_{eng_a.replace(' ','_')}_vs_{eng_b.replace(' ','_')}_{ts}.md"
+    out.write_text('\n\n'.join(md))
+    return html.A(f"Download report: {out.name}", href=str(out), target="_blank")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
