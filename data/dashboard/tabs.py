@@ -24,6 +24,7 @@ from .components import apply_theme, empty_fig, section, panel, metric_card, gra
 from .data_loader import (
     engines_df, experiments_df, games_df, searches_df, iter_df, tree_df,
     timing_df, sprt_df, sts_df, positions_df, perft_df,
+    query_iter, query_tree, _iter_nums, _tree_nums,
 )
 
 # Aliases used inside tab functions (from old single-file code)
@@ -303,14 +304,13 @@ def tab_search(sf: pd.DataFrame) -> html.Div:
 
 def tab_iter(sf: pd.DataFrame) -> html.Div:
     """Per-iteration depth view: how do metrics evolve as iterative deepening progresses?"""
-    if iter_df.empty:
+    # Query iteration data on demand for the filtered searches
+    valid_ids = sf["search_id"].unique() if "search_id" in sf.columns else (sf["id"].unique() if "id" in sf.columns else [])
+    idf = query_iter(valid_ids)
+    if idf.empty:
         return html.Div("No searches_by_iteration data found.", style={"color": TEXT_SEC})
 
-    # Join to filtered searches
-    valid_ids = sf["id"].unique() if "id" in sf.columns else []
-    idf = iter_df[iter_df["search_id"].isin(valid_ids)].copy() if len(valid_ids) else iter_df.copy()
-
-    nums = numeric_cols(idf)
+    nums = numeric_cols(idf) if not idf.empty else _iter_nums
     y_opts = metric_options(nums)
 
     # EBF heatmap: branching factor by depth × game phase
@@ -355,13 +355,12 @@ def tab_iter(sf: pd.DataFrame) -> html.Div:
 
 def tab_tree(sf: pd.DataFrame) -> html.Div:
     """Per-tree-ply view: how do stats distribute across plies in the search tree?"""
-    if tree_df.empty:
+    valid_ids = sf["search_id"].unique() if "search_id" in sf.columns else (sf["id"].unique() if "id" in sf.columns else [])
+    tdf = query_tree(valid_ids)
+    if tdf.empty:
         return html.Div("No searches_by_tree_depth data found.", style={"color": TEXT_SEC})
 
-    valid_ids = sf["id"].unique() if "id" in sf.columns else []
-    tdf = tree_df[tree_df["search_id"].isin(valid_ids)].copy() if len(valid_ids) else tree_df.copy()
-
-    nums = numeric_cols(tdf)
+    nums = numeric_cols(tdf) if not tdf.empty else _tree_nums
     y_opts = metric_options(nums)
 
     return html.Div([

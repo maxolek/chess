@@ -21,6 +21,7 @@ from .data_loader import (
     engines_df, experiments_df, games_df, searches_df, iter_df, tree_df,
     timing_df, sprt_df, sts_df, positions_df, perft_df,
     apply_filters, _search_nums, _iter_nums, _tree_nums,
+    query_iter, query_tree, query_iter_single, query_searches_for_game,
 )
 from .tabs import (
     tab_overview, tab_trends, tab_games, tab_search, tab_iter, tab_tree,
@@ -240,8 +241,8 @@ def show_fen_detail(click_data, engine_ids, result_vals, opening_vals, side_vals
     # Iteration history for this search (if available)
     iter_section = html.Div()
     search_id = row.get("search_id", row.get("id"))
-    if search_id and not iter_df.empty and "search_id" in iter_df.columns:
-        irows = iter_df[iter_df["search_id"] == search_id].sort_values("depth")
+    if search_id:
+        irows = query_iter_single(search_id)
         if not irows.empty and "eval" in irows.columns:
             iter_fig = go.Figure()
             iter_fig.add_trace(go.Scatter(x=irows["depth"], y=irows["eval"],
@@ -288,11 +289,13 @@ def update_iter_graph(y_col, agg, engine_ids, result_vals, opening_vals, side_va
     _, sf = apply_filters(engine_ids, result_vals, opening_vals, side_vals, pos_type_vals, game_phase_vals,
                           include_mates=(include_mates_val == "include"),
                           mates_only=(include_mates_val == "only"))
-    if iter_df.empty or not y_col:
+    if not y_col:
         return html.Div("No data.", style={"color": TEXT_SEC})
 
-    valid_ids = sf["id"].unique() if "id" in sf.columns else []
-    idf = iter_df[iter_df["search_id"].isin(valid_ids)].copy() if len(valid_ids) else iter_df.copy()
+    valid_ids = sf["search_id"].unique() if "search_id" in sf.columns else (sf["id"].unique() if "id" in sf.columns else [])
+    idf = query_iter(valid_ids)
+    if idf.empty:
+        return html.Div("No iteration data.", style={"color": TEXT_SEC})
 
     if y_col not in idf.columns or "depth" not in idf.columns:
         return html.Div("Column not found.", style={"color": TEXT_SEC})
@@ -356,11 +359,13 @@ def update_tree_graph(y_col, scale, engine_ids, result_vals, opening_vals, side_
     _, sf = apply_filters(engine_ids, result_vals, opening_vals, side_vals, pos_type_vals, game_phase_vals,
                           include_mates=(include_mates_val == "include"),
                           mates_only=(include_mates_val == "only"))
-    if tree_df.empty or not y_col:
+    if not y_col:
         return html.Div("No data.", style={"color": TEXT_SEC})
 
-    valid_ids = sf["id"].unique() if "id" in sf.columns else []
-    tdf = tree_df[tree_df["search_id"].isin(valid_ids)].copy() if len(valid_ids) else tree_df.copy()
+    valid_ids = sf["search_id"].unique() if "search_id" in sf.columns else (sf["id"].unique() if "id" in sf.columns else [])
+    tdf = query_tree(valid_ids)
+    if tdf.empty:
+        return html.Div("No tree data.", style={"color": TEXT_SEC})
 
     if y_col not in tdf.columns or "depth" not in tdf.columns:
         return html.Div("Column not found.", style={"color": TEXT_SEC})
@@ -418,15 +423,10 @@ def update_game_progress(game_id, engine_ids, result_vals, opening_vals, side_va
     if not game_id:
         return html.Div("Select a game to view progress.", style={"color": TEXT_SEC})
 
-    gf, sf = apply_filters(engine_ids, result_vals, opening_vals, side_vals, pos_type_vals, game_phase_vals,
-                           include_mates=(include_mates_val == "include"),
-                           mates_only=(include_mates_val == "only"))
-    if sf.empty or "game_id" not in sf.columns:
-        return html.Div("No per-ply search data available.", style={"color": TEXT_SEC})
-
-    gsearch = sf[sf["game_id"] == game_id].copy()
+    # Query all searches for this specific game directly from DB
+    gsearch = query_searches_for_game(game_id)
     if gsearch.empty:
-        return html.Div("No search rows for selected game.", style={"color": TEXT_SEC})
+        return html.Div("No per-ply search data available.", style={"color": TEXT_SEC})
 
     # Determine x-axis (ply). Prefer `ply` column otherwise use incremental index.
     if "ply" in gsearch.columns:
