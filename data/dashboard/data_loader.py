@@ -4,7 +4,7 @@ Data loading, enrichment, and filtering — SCALABLE version.
 Design:
 - Small reference tables (engines, experiments, sprt, sts, timing, positions) stay in memory.
 - Large tables (search_features, iter, tree) are queried on demand via DuckDB.
-- apply_filters() pushes WHERE clauses to DuckDB and returns at most QUERY_LIMIT rows.
+- apply_filters() pushes WHERE clauses to DuckDB and returns all matching rows.
 - query_iter() / query_tree() fetch detail rows on demand for specific search_ids.
 """
 import pandas as pd
@@ -17,9 +17,10 @@ from .config import DB_PATH, EVAL_CLIP_CP, NUMERIC_EXCLUDE, numeric_cols
 # CONFIGURATION
 # ──────────────────────────────────────────────────────────────────────────────
 
-# Max rows pulled into pandas for any single query.  Charts degrade gracefully
-# beyond this (scatter → sample, aggregations stay accurate via SQL).
-QUERY_LIMIT = 1_000_000
+# Max rows pulled into pandas for any single query — safety cap to prevent OOM.
+# Normal usage (1000 games × 50 searches × 4 engines × 15 depths ≈ 3M) is well under this.
+SAFETY_LIMIT = 10_000_000
+
 SCATTER_SAMPLE = 100_000
 
 # The primary search table — prefer `search_features` if it exists.
@@ -41,6 +42,20 @@ def get_connection(path: str):
 def _query(sql: str) -> pd.DataFrame:
     """Execute a query against the shared connection."""
     return con.execute(sql).df()
+
+
+def _safe_limited_query(sql: str) -> pd.DataFrame:
+    """Run query with SAFETY_LIMIT — samples if result set is too large."""
+    # Wrap in a counted check
+    count_sql = f"SELECT COUNT(*) FROM ({sql}) AS _q"
+    try:
+        n = con.execute(count_sql).fetchone()[0]
+    except Exception:
+        return _query(sql)
+    if n <= SAFETY_LIMIT:
+        return _query(sql)
+    print(f"[WARN] Query returned {n:,} rows — sampling down to {SAFETY_LIMIT:,} to avoid OOM")
+    return _query(f"SELECT * FROM ({sql}) AS _q USING SAMPLE {SAFETY_LIMIT}")
 
 
 def safe_query(sql: str, fallback: pd.DataFrame = None) -> pd.DataFrame:
@@ -337,12 +352,11 @@ def apply_filters(
     game_phase_vals: list | None = None,
     include_mates: bool = False,
     mates_only: bool = False,
-    limit: int = QUERY_LIMIT,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Query DuckDB with filters pushed down, return (games_df, searches_df).
 
-    The searches DataFrame is capped at `limit` rows (sampled via ORDER BY random()
-    if the result set is larger). Games are filtered in memory (small table).
+    Games are filtered in memory (small table). Searches are queried in full
+    since DuckDB handles millions of rows efficiently and callbacks aggregate.
     """
     # ── Games filtering (in-memory, always small) ──
     gf = games_df.copy()
@@ -365,22 +379,11 @@ def apply_filters(
 
     where_sql = (" WHERE " + " AND ".join(where)) if where else ""
 
-    # Check result set size to decide if we need sampling
-    count_sql = f"SELECT COUNT(*) FROM {_SEARCH_TABLE}{where_sql}"
+    sql = f"SELECT * FROM {_SEARCH_TABLE}{where_sql}"
     try:
-        total_rows = con.execute(count_sql).fetchone()[0]
+        sf = _safe_limited_query(sql)
     except Exception:
-        total_rows = 0
-
-    if total_rows == 0:
         sf = pd.DataFrame(columns=_SEARCH_COLUMNS)
-    elif total_rows <= limit:
-        sql = f"SELECT * FROM {_SEARCH_TABLE}{where_sql}"
-        sf = _query(sql)
-    else:
-        # Use reservoir sampling via ORDER BY random() LIMIT for uniform distribution
-        sql = f"SELECT * FROM {_SEARCH_TABLE}{where_sql} ORDER BY random() LIMIT {limit}"
-        sf = _query(sql)
 
     # Enrich with engine names, side, result
     sf = enrich_searches(sf)
@@ -402,33 +405,32 @@ def apply_filters(
 # ON-DEMAND QUERIES FOR DETAIL TABLES
 # ──────────────────────────────────────────────────────────────────────────────
 
-def query_iter(search_ids, limit: int = QUERY_LIMIT) -> pd.DataFrame:
+def query_iter(search_ids) -> pd.DataFrame:
     """Fetch iteration data for given search_ids from DuckDB."""
     table = "search_iteration_features" if "search_iteration_features" in _tables else "iterative_deepening_stats"
     if search_ids is None or len(search_ids) == 0:
         return pd.DataFrame()
 
-    # For very large sets, limit the search_ids queried
-    ids = list(search_ids[:2000])
+    ids = list(search_ids)
     ids_str = ", ".join(str(int(i)) for i in ids)
-    sql = f"SELECT * FROM {table} WHERE search_id IN ({ids_str}) LIMIT {limit}"
+    sql = f"SELECT * FROM {table} WHERE search_id IN ({ids_str})"
     try:
-        return _query(sql)
+        return _safe_limited_query(sql)
     except Exception:
         return pd.DataFrame()
 
 
-def query_tree(search_ids, limit: int = QUERY_LIMIT) -> pd.DataFrame:
+def query_tree(search_ids) -> pd.DataFrame:
     """Fetch tree depth data for given search_ids from DuckDB."""
     table = "search_tree_features" if "search_tree_features" in _tables else "search_tree_stats"
     if search_ids is None or len(search_ids) == 0:
         return pd.DataFrame()
 
-    ids = list(search_ids[:2000])
+    ids = list(search_ids)
     ids_str = ", ".join(str(int(i)) for i in ids)
-    sql = f"SELECT * FROM {table} WHERE search_id IN ({ids_str}) LIMIT {limit}"
+    sql = f"SELECT * FROM {table} WHERE search_id IN ({ids_str})"
     try:
-        return _query(sql)
+        return _safe_limited_query(sql)
     except Exception:
         return pd.DataFrame()
 
