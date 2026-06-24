@@ -405,15 +405,105 @@ def apply_filters(
 # ON-DEMAND QUERIES FOR DETAIL TABLES
 # ──────────────────────────────────────────────────────────────────────────────
 
+_ITER_TABLE = "search_iteration_features" if "search_iteration_features" in _tables else (
+    "iterative_deepening_stats" if "iterative_deepening_stats" in _tables else None)
+_TREE_TABLE = "search_tree_features" if "search_tree_features" in _tables else (
+    "search_tree_stats" if "search_tree_stats" in _tables else None)
+
+
+def _filter_subquery(engine_ids, pos_type_vals, game_phase_vals, include_mates, mates_only) -> str:
+    """Return a subquery selecting search IDs matching the given filters."""
+    where = _build_where_clauses(engine_ids, pos_type_vals, game_phase_vals, include_mates, mates_only)
+    where_sql = (" WHERE " + " AND ".join(where)) if where else ""
+    return f"SELECT id FROM {_SEARCH_TABLE}{where_sql}"
+
+
+def query_iter_agg(
+    y_col: str,
+    agg: str,
+    engine_ids: list | None = None,
+    pos_type_vals: list | None = None,
+    game_phase_vals: list | None = None,
+    include_mates: bool = False,
+    mates_only: bool = False,
+) -> pd.DataFrame:
+    """Aggregate iteration data in SQL. Returns (depth, engine_name, value, p10, p90)."""
+    if not _ITER_TABLE or not y_col:
+        return pd.DataFrame()
+
+    agg_sql = {"mean": "AVG", "median": "MEDIAN", "std": "STDDEV_SAMP"}.get(agg, "AVG")
+
+    # Build WHERE using a subquery join instead of IN(million ids)
+    filter_sub = _filter_subquery(engine_ids, pos_type_vals, game_phase_vals, include_mates, mates_only)
+
+    sql = f"""
+    SELECT
+        i.depth,
+        e.name AS engine_name,
+        {agg_sql}(i.{y_col}) AS {y_col},
+        PERCENTILE_CONT(0.1) WITHIN GROUP (ORDER BY i.{y_col}) AS p10,
+        PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY i.{y_col}) AS p90,
+        COUNT(*) AS n
+    FROM {_ITER_TABLE} i
+    JOIN {_SEARCH_TABLE} s ON i.search_id = s.id
+    LEFT JOIN engines e ON s.engine_id = e.id
+    WHERE i.search_id IN ({filter_sub})
+      AND i.{y_col} IS NOT NULL
+    GROUP BY i.depth, e.name
+    ORDER BY i.depth
+    """
+    try:
+        return _query(sql)
+    except Exception as ex:
+        print(f"[WARN] query_iter_agg failed: {ex}")
+        return pd.DataFrame()
+
+
+def query_tree_agg(
+    y_col: str,
+    engine_ids: list | None = None,
+    pos_type_vals: list | None = None,
+    game_phase_vals: list | None = None,
+    include_mates: bool = False,
+    mates_only: bool = False,
+) -> pd.DataFrame:
+    """Aggregate tree-depth data in SQL. Returns (depth, engine_name, value, p10, p90)."""
+    if not _TREE_TABLE or not y_col:
+        return pd.DataFrame()
+
+    filter_sub = _filter_subquery(engine_ids, pos_type_vals, game_phase_vals, include_mates, mates_only)
+
+    sql = f"""
+    SELECT
+        t.depth,
+        e.name AS engine_name,
+        AVG(t.{y_col}) AS {y_col},
+        PERCENTILE_CONT(0.1) WITHIN GROUP (ORDER BY t.{y_col}) AS p10,
+        PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY t.{y_col}) AS p90,
+        COUNT(*) AS n
+    FROM {_TREE_TABLE} t
+    JOIN {_SEARCH_TABLE} s ON t.search_id = s.id
+    LEFT JOIN engines e ON s.engine_id = e.id
+    WHERE t.search_id IN ({filter_sub})
+      AND t.{y_col} IS NOT NULL
+    GROUP BY t.depth, e.name
+    ORDER BY t.depth
+    """
+    try:
+        return _query(sql)
+    except Exception as ex:
+        print(f"[WARN] query_tree_agg failed: {ex}")
+        return pd.DataFrame()
+
+
 def query_iter(search_ids) -> pd.DataFrame:
     """Fetch iteration data for given search_ids from DuckDB."""
-    table = "search_iteration_features" if "search_iteration_features" in _tables else "iterative_deepening_stats"
-    if search_ids is None or len(search_ids) == 0:
+    if not _ITER_TABLE or search_ids is None or len(search_ids) == 0:
         return pd.DataFrame()
 
     ids = list(search_ids)
     ids_str = ", ".join(str(int(i)) for i in ids)
-    sql = f"SELECT * FROM {table} WHERE search_id IN ({ids_str})"
+    sql = f"SELECT * FROM {_ITER_TABLE} WHERE search_id IN ({ids_str})"
     try:
         return _safe_limited_query(sql)
     except Exception:
@@ -422,13 +512,12 @@ def query_iter(search_ids) -> pd.DataFrame:
 
 def query_tree(search_ids) -> pd.DataFrame:
     """Fetch tree depth data for given search_ids from DuckDB."""
-    table = "search_tree_features" if "search_tree_features" in _tables else "search_tree_stats"
-    if search_ids is None or len(search_ids) == 0:
+    if not _TREE_TABLE or search_ids is None or len(search_ids) == 0:
         return pd.DataFrame()
 
     ids = list(search_ids)
     ids_str = ", ".join(str(int(i)) for i in ids)
-    sql = f"SELECT * FROM {table} WHERE search_id IN ({ids_str})"
+    sql = f"SELECT * FROM {_TREE_TABLE} WHERE search_id IN ({ids_str})"
     try:
         return _safe_limited_query(sql)
     except Exception:
@@ -437,9 +526,10 @@ def query_tree(search_ids) -> pd.DataFrame:
 
 def query_iter_single(search_id: int) -> pd.DataFrame:
     """Fetch iteration data for a single search (e.g., FEN detail view)."""
-    table = "search_iteration_features" if "search_iteration_features" in _tables else "iterative_deepening_stats"
+    if not _ITER_TABLE:
+        return pd.DataFrame()
     try:
-        return _query(f"SELECT * FROM {table} WHERE search_id = {int(search_id)} ORDER BY depth")
+        return _query(f"SELECT * FROM {_ITER_TABLE} WHERE search_id = {int(search_id)} ORDER BY depth")
     except Exception:
         return pd.DataFrame()
 

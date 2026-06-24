@@ -22,6 +22,7 @@ from .data_loader import (
     timing_df, sprt_df, sts_df, positions_df, perft_df,
     apply_filters, _search_nums, _iter_nums, _tree_nums,
     query_iter, query_tree, query_iter_single, query_searches_for_game,
+    query_iter_agg, query_tree_agg,
 )
 from .tabs import (
     tab_overview, tab_trends, tab_games, tab_search, tab_iter, tab_tree,
@@ -286,46 +287,42 @@ def show_fen_detail(click_data, engine_ids, result_vals, opening_vals, side_vals
     Input("filter-include-mates","value"),
 )
 def update_iter_graph(y_col, agg, engine_ids, result_vals, opening_vals, side_vals, pos_type_vals, game_phase_vals, include_mates_val):
-    _, sf = apply_filters(engine_ids, result_vals, opening_vals, side_vals, pos_type_vals, game_phase_vals,
-                          include_mates=(include_mates_val == "include"),
-                          mates_only=(include_mates_val == "only"))
     if not y_col:
         return html.Div("No data.", style={"color": TEXT_SEC})
 
-    valid_ids = sf["search_id"].unique() if "search_id" in sf.columns else (sf["id"].unique() if "id" in sf.columns else [])
-    idf = query_iter(valid_ids)
-    if idf.empty:
+    # Push aggregation to DuckDB — returns ~(depths × engines) rows
+    agg_df = query_iter_agg(
+        y_col, agg,
+        engine_ids=engine_ids,
+        pos_type_vals=pos_type_vals,
+        game_phase_vals=game_phase_vals,
+        include_mates=(include_mates_val == "include"),
+        mates_only=(include_mates_val == "only"),
+    )
+    if agg_df.empty:
         return html.Div("No iteration data.", style={"color": TEXT_SEC})
 
-    if y_col not in idf.columns or "depth" not in idf.columns:
+    if "depth" not in agg_df.columns or y_col not in agg_df.columns:
         return html.Div("Column not found.", style={"color": TEXT_SEC})
 
-    agg_fn = {"mean": "mean", "median": "median", "std": "std"}.get(agg, "mean")
-    group_by = ["depth", "engine_name"] if "engine_name" in idf.columns else ["depth"]
-    agg_df = idf.groupby(group_by)[y_col].agg(agg_fn).reset_index()
-
-    color_col = "engine_name" if "engine_name" in agg_df.columns else None
+    color_col = "engine_name" if "engine_name" in agg_df.columns and agg_df["engine_name"].nunique() > 1 else None
     fig = px.line(agg_df, x="depth", y=y_col, color=color_col,
                   color_discrete_sequence=_PALETTE,
                   markers=True,
                   labels={"depth": "Iteration Depth", y_col: f"{agg}({metric_label(y_col)})"})
 
-    # Add p10/p90 percentile bands
-    if agg in ("mean", "median"):
-        band_group = ["depth"] if color_col is None else ["depth", "engine_name"]
-        p10 = idf.groupby(band_group)[y_col].quantile(0.1).reset_index().rename(columns={y_col: "p10"})
-        p90 = idf.groupby(band_group)[y_col].quantile(0.9).reset_index().rename(columns={y_col: "p90"})
-        bands = p10.merge(p90, on=band_group)
+    # p10/p90 bands come pre-computed from SQL
+    if agg in ("mean", "median") and "p10" in agg_df.columns and "p90" in agg_df.columns:
         if color_col is None:
-            fig.add_trace(go.Scatter(x=bands["depth"], y=bands["p90"], mode="lines",
+            fig.add_trace(go.Scatter(x=agg_df["depth"], y=agg_df["p90"], mode="lines",
                                      line=dict(width=0), showlegend=False, hoverinfo="skip"))
-            fig.add_trace(go.Scatter(x=bands["depth"], y=bands["p10"], mode="lines",
+            fig.add_trace(go.Scatter(x=agg_df["depth"], y=agg_df["p10"], mode="lines",
                                      line=dict(width=0), fill="tonexty",
                                      fillcolor=hex_to_rgba(ACCENT, 0.15),
                                      showlegend=True, name="p10–p90"))
         else:
-            for i, eng in enumerate(bands[color_col].unique()):
-                eb = bands[bands[color_col] == eng]
+            for i, eng in enumerate(agg_df[color_col].unique()):
+                eb = agg_df[agg_df[color_col] == eng]
                 col = _PALETTE[i % len(_PALETTE)]
                 fig.add_trace(go.Scatter(x=eb["depth"], y=eb["p90"], mode="lines",
                                          line=dict(width=0), showlegend=False, hoverinfo="skip"))
@@ -356,51 +353,49 @@ def update_iter_graph(y_col, agg, engine_ids, result_vals, opening_vals, side_va
     Input("filter-include-mates","value"),
 )
 def update_tree_graph(y_col, scale, engine_ids, result_vals, opening_vals, side_vals, pos_type_vals, game_phase_vals, include_mates_val):
-    _, sf = apply_filters(engine_ids, result_vals, opening_vals, side_vals, pos_type_vals, game_phase_vals,
-                          include_mates=(include_mates_val == "include"),
-                          mates_only=(include_mates_val == "only"))
     if not y_col:
         return html.Div("No data.", style={"color": TEXT_SEC})
 
-    valid_ids = sf["search_id"].unique() if "search_id" in sf.columns else (sf["id"].unique() if "id" in sf.columns else [])
-    tdf = query_tree(valid_ids)
-    if tdf.empty:
+    # Push aggregation to DuckDB — returns ~(depths × engines) rows
+    agg_df = query_tree_agg(
+        y_col,
+        engine_ids=engine_ids,
+        pos_type_vals=pos_type_vals,
+        game_phase_vals=game_phase_vals,
+        include_mates=(include_mates_val == "include"),
+        mates_only=(include_mates_val == "only"),
+    )
+    if agg_df.empty:
         return html.Div("No tree data.", style={"color": TEXT_SEC})
 
-    if y_col not in tdf.columns or "depth" not in tdf.columns:
+    if "depth" not in agg_df.columns or y_col not in agg_df.columns:
         return html.Div("Column not found.", style={"color": TEXT_SEC})
 
-    group_by = ["depth", "engine_name"] if "engine_name" in tdf.columns else ["depth"]
-    agg_df = tdf.groupby(group_by)[y_col].mean().reset_index()
-
-    color_col = "engine_name" if "engine_name" in agg_df.columns else None
+    color_col = "engine_name" if "engine_name" in agg_df.columns and agg_df["engine_name"].nunique() > 1 else None
     fig = px.line(agg_df, x="depth", y=y_col, color=color_col,
                   color_discrete_sequence=_PALETTE, markers=True,
                   log_y=(scale == "log"),
                   labels={"depth": "Tree Ply", y_col: f"mean({metric_label(y_col)})"})
 
-    # Add p10/p90 percentile bands
-    band_group = ["depth"] if color_col is None else ["depth", "engine_name"]
-    p10 = tdf.groupby(band_group)[y_col].quantile(0.1).reset_index().rename(columns={y_col: "p10"})
-    p90 = tdf.groupby(band_group)[y_col].quantile(0.9).reset_index().rename(columns={y_col: "p90"})
-    bands = p10.merge(p90, on=band_group)
-    if color_col is None:
-        fig.add_trace(go.Scatter(x=bands["depth"], y=bands["p90"], mode="lines",
-                                 line=dict(width=0), showlegend=False, hoverinfo="skip"))
-        fig.add_trace(go.Scatter(x=bands["depth"], y=bands["p10"], mode="lines",
-                                 line=dict(width=0), fill="tonexty",
-                                 fillcolor=hex_to_rgba(ACCENT, 0.15),
-                                 showlegend=True, name="p10–p90"))
-    else:
-        for i, eng in enumerate(bands[color_col].unique()):
-            eb = bands[bands[color_col] == eng]
-            col = _PALETTE[i % len(_PALETTE)]
-            fig.add_trace(go.Scatter(x=eb["depth"], y=eb["p90"], mode="lines",
+    # p10/p90 bands come pre-computed from SQL
+    if "p10" in agg_df.columns and "p90" in agg_df.columns:
+        if color_col is None:
+            fig.add_trace(go.Scatter(x=agg_df["depth"], y=agg_df["p90"], mode="lines",
                                      line=dict(width=0), showlegend=False, hoverinfo="skip"))
-            fig.add_trace(go.Scatter(x=eb["depth"], y=eb["p10"], mode="lines",
+            fig.add_trace(go.Scatter(x=agg_df["depth"], y=agg_df["p10"], mode="lines",
                                      line=dict(width=0), fill="tonexty",
-                                     fillcolor=hex_to_rgba(col, 0.1),
-                                     showlegend=False, hoverinfo="skip"))
+                                     fillcolor=hex_to_rgba(ACCENT, 0.15),
+                                     showlegend=True, name="p10–p90"))
+        else:
+            for i, eng in enumerate(agg_df[color_col].unique()):
+                eb = agg_df[agg_df[color_col] == eng]
+                col = _PALETTE[i % len(_PALETTE)]
+                fig.add_trace(go.Scatter(x=eb["depth"], y=eb["p90"], mode="lines",
+                                         line=dict(width=0), showlegend=False, hoverinfo="skip"))
+                fig.add_trace(go.Scatter(x=eb["depth"], y=eb["p10"], mode="lines",
+                                         line=dict(width=0), fill="tonexty",
+                                         fillcolor=hex_to_rgba(col, 0.1),
+                                         showlegend=False, hoverinfo="skip"))
 
     fig.update_layout(title=f"mean({metric_label(y_col)}) by Tree Ply")
     apply_theme(fig)
