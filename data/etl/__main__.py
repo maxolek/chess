@@ -6,16 +6,13 @@ Usage:
 """
 import sqlite3
 import argparse
-import platform
-import os
-from pathlib import Path
 
+from .paths import RAW_DB
 from .db import get_db
 from .ingest import register_engine, log_games_directory
 
 
 def main():
-    system = platform.system()
 
     p = argparse.ArgumentParser(
         description="ETL functions for chess.db\nRegister engines, upload logs, clear directories"
@@ -36,13 +33,7 @@ def main():
     args = p.parse_args()
 
     # Resolve DB path
-    if system == "Windows":
-        _default_raw = 'F:/databases/chess.db'
-    elif system == "Darwin":
-        _default_raw = str(Path.home() / "Documents/databases/chess.db")
-    else:
-        _default_raw = str(Path.home() / "Documents/databases/chess.db")
-    raw_path = os.environ.get('CHESS_RAW_DB') or _default_raw
+    raw_path = str(RAW_DB)
 
     cnxn = sqlite3.connect(raw_path)
 

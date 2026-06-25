@@ -1,7 +1,5 @@
 import argparse
 import json
-import argparse
-import json
 from pathlib import Path
 import chess.pgn
 

@@ -5,7 +5,7 @@ import time
 import subprocess
 import platform
 import shutil
-from pathlib import Path
+from .paths import RAW_DB
 
 
 def clear_log_dir(log_dir):
@@ -24,8 +24,10 @@ def clear_log_dir(log_dir):
             print(f"[WARN] Failed to delete {path}: {e}")
 
 
-def get_db(path="F:/databases/chess.db"):
+def get_db(path=None):
     """Get a SQLite connection with Row factory."""
+    if path is None:
+        path = str(RAW_DB)
     cnxn = sqlite3.connect(path)
     cnxn.row_factory = sqlite3.Row
     return cnxn
