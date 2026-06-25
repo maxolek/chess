@@ -21,9 +21,11 @@ MODULES = [
 
 
 
-def run_module(module: str) -> None:
+def run_module(module: str, extra_args: list = None) -> None:
     print(f"\n=== Running module: {module} ===")
     cmd = [sys.executable, "-m", module]
+    if extra_args:
+        cmd.extend(extra_args)
     try:
         # run subprocess from repository root so package imports like 'data.*' resolve
         repo_root = Path(__file__).resolve().parent.parent
@@ -37,6 +39,7 @@ def main():
     cwd = Path(__file__).resolve().parent.parent
     parser = argparse.ArgumentParser(description="Run ETL pipeline modules")
     parser.add_argument('--skip-load', action='store_true', help='Skip data.load_analytics step')
+    parser.add_argument('--full', action='store_true', help='Full refresh (drop + reload all tables)')
     args = parser.parse_args()
 
     print(f"Running pipeline from: {cwd}")
@@ -44,7 +47,9 @@ def main():
     if args.skip_load:
         print("Skipping data.load_analytics (use --skip-load to enable)")
     for m in modules_to_run:
-        run_module(m)
+        # Pass --full to load_analytics if requested
+        extra = ['--full'] if args.full and m == 'data.load_analytics' else None
+        run_module(m, extra_args=extra)
     print("\nPipeline completed successfully.")
 
 

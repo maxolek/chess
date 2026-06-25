@@ -467,9 +467,9 @@ def get_mobility_characteristics(fen):
     return mobility[chess.WHITE], mobility[chess.BLACK]
 
 def build_position_features(cnxn):
-    # Drop and recreate table (DuckDB syntax)
+    # Create table if it doesn't exist
     cnxn.execute("""
-        CREATE OR REPLACE TABLE position_features (
+        CREATE TABLE IF NOT EXISTS position_features (
             search_id   INTEGER,
             game_id     INTEGER,
             fen         TEXT,
@@ -504,8 +504,19 @@ def build_position_features(cnxn):
         )
     """)
 
-    # Fetch all positions (from your intermediate table)
-    rows = cnxn.execute("SELECT search_id, fen, game_id, sts_id FROM dim_positions").fetchall()
+    # Only fetch positions not already processed (incremental)
+    rows = cnxn.execute("""
+        SELECT d.search_id, d.fen, d.game_id, d.sts_id
+        FROM dim_positions d
+        LEFT JOIN position_features pf ON d.search_id = pf.search_id
+        WHERE pf.search_id IS NULL AND d.fen IS NOT NULL
+    """).fetchall()
+
+    if not rows:
+        print(f"  position_features: 0 new positions to process")
+        return
+
+    print(f"  position_features: processing {len(rows)} new positions...")
 
     for row in rows:
         search_id, fen, game_id, sts_id = row
@@ -579,15 +590,19 @@ import duckdb
 import platform
 import shutil
 import time
+import os
 import datetime
 from pathlib import Path
 system = platform.system()
 
 if __name__ == "__main__":
     if system == "Windows":
-        DB = "F:/databases/chess_analytics.duckdb"
+        _DEFAULT_DB = "F:/databases/chess_analytics.duckdb"
     elif system == "Darwin":
-        DB = Path.home() / "Documents/databases/chess_analytics.duckdb"
+        _DEFAULT_DB = str(Path.home() / "Documents/databases/chess_analytics.duckdb")
+    else:
+        _DEFAULT_DB = str(Path.home() / "Documents/databases/chess_analytics.duckdb")
+    DB = os.environ.get('CHESS_ANALYTICS_DB') or _DEFAULT_DB
 
     cnxn = duckdb.connect(DB)
 

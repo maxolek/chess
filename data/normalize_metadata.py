@@ -12,9 +12,10 @@ import platform
 if __name__ == '__main__':
     system = platform.system()
     if system == "Windows":
-        db = Path('F:/databases/chess_analytics.duckdb')
+        _default = Path('F:/databases/chess_analytics.duckdb')
     else:
-        db = Path.home() / 'Documents' / 'databases' / 'chess_analytics.duckdb'
+        _default = Path.home() / 'Documents' / 'databases' / 'chess_analytics.duckdb'
+    db = Path(os.environ.get('CHESS_ANALYTICS_DB') or _default)
     con = duckdb.connect(str(db))
 
     # engines.normalized_version
