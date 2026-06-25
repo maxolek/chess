@@ -22,9 +22,10 @@ from .config import (
 )
 from .components import apply_theme, empty_fig, section, panel, metric_card, graph, table
 from .data_loader import (
-    engines_df, experiments_df, games_df, searches_df, iter_df, tree_df,
+    engines_df, experiments_df, searches_df,
     sprt_df, sts_df, perft_df,
-    query_iter, query_tree, query_timing, _iter_nums, _tree_nums,
+    query_iter, query_tree, query_timing, query_iter_agg,
+    _iter_nums, _tree_nums,
 )
 
 # Aliases used inside tab functions (from old single-file code)
@@ -1043,8 +1044,8 @@ def tab_tt(sf: pd.DataFrame) -> html.Div:
     children = []
 
     # TT hit rate by depth (using iteration data if available)
-    if not iter_df.empty and "tt_hit_ratio" in iter_df.columns and "depth" in iter_df.columns:
-        tt_by_depth = iter_df.groupby("depth")["tt_hit_ratio"].mean().reset_index()
+    tt_by_depth = query_iter_agg("tt_hit_ratio", "mean")
+    if not tt_by_depth.empty:
         fig = px.line(tt_by_depth, x="depth", y="tt_hit_ratio", markers=True,
                       color_discrete_sequence=[ACCENT],
                       labels={"depth": "Iteration Depth", "tt_hit_ratio": "TT Hit Rate"})
@@ -1053,8 +1054,8 @@ def tab_tt(sf: pd.DataFrame) -> html.Div:
         children.append(panel(section("TT HIT RATE BY DEPTH"), graph(fig, 320)))
 
     # TT store rate by depth
-    if not iter_df.empty and "tt_store_ratio" in iter_df.columns and "depth" in iter_df.columns:
-        ts_by_depth = iter_df.groupby("depth")["tt_store_ratio"].mean().reset_index()
+    ts_by_depth = query_iter_agg("tt_store_ratio", "mean")
+    if not ts_by_depth.empty:
         fig = px.line(ts_by_depth, x="depth", y="tt_store_ratio", markers=True,
                       color_discrete_sequence=[ACCENT2],
                       labels={"depth": "Iteration Depth", "tt_store_ratio": "TT Store Rate"})

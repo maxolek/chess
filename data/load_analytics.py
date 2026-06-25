@@ -9,30 +9,9 @@ Usage:
   python -m data.load_analytics --full   # full refresh
 """
 import duckdb
-from pathlib import Path
-import platform
-import os
 import argparse
 from . import etl
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Database paths — configurable via environment variables
-# ─────────────────────────────────────────────────────────────────────────────
-system = platform.system()
-
-if system == "Windows":
-    _DEFAULT_RAW = Path('F:/databases/chess.db')
-    _DEFAULT_ANALYTICS = Path('F:/databases/chess_analytics.duckdb')
-elif system == "Darwin":
-    _DEFAULT_RAW = Path.home() / "Documents/databases/chess.db"
-    _DEFAULT_ANALYTICS = Path.home() / "Documents/databases/chess_analytics.duckdb"
-else:
-    _DEFAULT_RAW = Path.home() / "Documents/databases/chess.db"
-    _DEFAULT_ANALYTICS = Path.home() / "Documents/databases/chess_analytics.duckdb"
-
-RAW_DB = Path(os.environ.get('CHESS_RAW_DB') or _DEFAULT_RAW)
-ANALYTICS_DB = Path(os.environ.get('CHESS_ANALYTICS_DB') or _DEFAULT_ANALYTICS)
-
+from .etl.paths import RAW_DB, ANALYTICS_DB
 
 # ─────────────────────────────────────────────────────────────────────────────
 # UDFs

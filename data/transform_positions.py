@@ -4,7 +4,6 @@ get characteristics of a position
 
 import chess
 from collections import Counter
-from pathlib import Path
 import pandas as pd
 
 # pawn value of pieces (approx)
@@ -594,22 +593,13 @@ def _insert_batch(cnxn, batch):
 
 
 import duckdb
-import platform
 import shutil
-import time
 import os
-import datetime
 from pathlib import Path
-system = platform.system()
+from .etl.paths import ANALYTICS_DB
 
 if __name__ == "__main__":
-    if system == "Windows":
-        _DEFAULT_DB = "F:/databases/chess_analytics.duckdb"
-    elif system == "Darwin":
-        _DEFAULT_DB = str(Path.home() / "Documents/databases/chess_analytics.duckdb")
-    else:
-        _DEFAULT_DB = str(Path.home() / "Documents/databases/chess_analytics.duckdb")
-    DB = os.environ.get('CHESS_ANALYTICS_DB') or _DEFAULT_DB
+    DB = os.environ.get('CHESS_ANALYTICS_DB') or str(ANALYTICS_DB)
 
     cnxn = duckdb.connect(DB)
 

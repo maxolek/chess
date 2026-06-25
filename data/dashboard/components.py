@@ -103,10 +103,10 @@ def table(df: pd.DataFrame, page_size=15, max_rows=MAX_TABLE_ROWS) -> dash_table
 
     for c in disp.columns:
         try:
-            disp = disp.applymap(_coerce_cell)
+            disp = disp.map(_coerce_cell)
         except Exception:
             try:
-                disp = disp.applymap(lambda v: None if v is None else str(v))
+                disp = disp.map(lambda v: None if v is None else str(v))
             except Exception:
                 disp = disp.astype(str)
 

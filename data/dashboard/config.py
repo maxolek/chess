@@ -1,10 +1,11 @@
 """
 Configuration constants: colors, theme, DB path, metric labels, ordering.
 """
-import platform
 from pathlib import Path
 
 import numpy as np
+
+from ..etl.paths import ANALYTICS_DB
 
 # ──────────────────────────────────────────────────────────────────────────────
 # COLORS
@@ -83,20 +84,7 @@ PLOTLY_THEME = dict(
 # DATABASE
 # ──────────────────────────────────────────────────────────────────────────────
 
-_system = platform.system()
-if _system == "Windows":
-    # Try F: drive first, fall back to local test_db
-    _f_path = Path("F:/databases/chess_analytics.duckdb")
-    _local_path = Path(__file__).resolve().parents[2] / "test_db" / "chess_analytics.duckdb"
-    if _f_path.exists():
-        DB_PATH = str(_f_path)
-    elif _local_path.exists():
-        DB_PATH = str(_local_path)
-    else:
-        DB_PATH = "F:/databases/chess_analytics.duckdb"
-else:
-    _base = Path.home() / "Documents/databases"
-    DB_PATH = str(_base / "chess_analytics.duckdb") if (_base / "chess_analytics.duckdb").exists() else str(_base / "chess.db")
+DB_PATH = str(ANALYTICS_DB)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # THRESHOLDS

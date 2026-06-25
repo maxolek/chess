@@ -377,19 +377,11 @@ def build_search_features(cnxn):
     """)
 
 import duckdb
-import platform
 import os
-from pathlib import Path
-system = platform.system()
+from .etl.paths import ANALYTICS_DB
 
 if __name__ == "__main__":
-    if system == "Windows":
-        _DEFAULT_DB = "F:/databases/chess_analytics.duckdb"
-    elif system == "Darwin":
-        _DEFAULT_DB = str(Path.home() / "Documents/databases/chess_analytics.duckdb")
-    else:
-        _DEFAULT_DB = str(Path.home() / "Documents/databases/chess_analytics.duckdb")
-    DB = os.environ.get('CHESS_ANALYTICS_DB') or _DEFAULT_DB
+    DB = os.environ.get('CHESS_ANALYTICS_DB') or str(ANALYTICS_DB)
 
     cnxn = duckdb.connect(DB)
 

@@ -1,12 +1,11 @@
 import sqlite3
 from pathlib import Path
-
-dir = "F:/databases"
+from .etl.paths import RAW_DB
 
 # long form function that create the database
 # and some associated tables
 
-def init_engine_db(db_dir=dir) -> None:
+def init_engine_db(db_dir=None) -> None:
 
     """
         input: directory of database
@@ -22,7 +21,7 @@ def init_engine_db(db_dir=dir) -> None:
     """
 
     # dir + path
-    db_dir = Path(db_dir)
+    db_dir = Path(db_dir) if db_dir else RAW_DB.parent
     db_dir.mkdir(parents=True, exist_ok=True)
 
     db_path = db_dir / "chess.db"

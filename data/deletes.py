@@ -1,8 +1,9 @@
 import sqlite3
 from pathlib import Path
 import argparse
+from .etl.paths import RAW_DB
 
-def drop_all_tables(db_path="F:/databases/chess.db") -> None:
+def drop_all_tables(db_path=str(RAW_DB)) -> None:
     """
     Drops all tables from chess.db.
     WARNING: This deletes schemas and all data permanently.
@@ -34,7 +35,7 @@ def drop_all_tables(db_path="F:/databases/chess.db") -> None:
     cnxn.commit()
     cnxn.close()
 
-def clear_all_tables(db_path="F:/databases/chess.db") -> None:
+def clear_all_tables(db_path=str(RAW_DB)) -> None:
     """
     Deletes all rows from all tables but keeps schemas intact.
     Resets AUTOINCREMENT counters.
@@ -78,6 +79,6 @@ if __name__ == "__main__":
     args = p.parse_args()
 
     if args.clear:
-        clear_all_tables("F:/databases/" + args.db)
+        clear_all_tables(str(RAW_DB.parent / args.db))
     if args.delete:
-        drop_all_tables("F:/databases/" + args.db)
+        drop_all_tables(str(RAW_DB.parent / args.db))

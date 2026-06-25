@@ -98,23 +98,37 @@ _DEPTH_COL = "depth" if "depth" in _SEARCH_COLUMNS else ("max_depth" if "max_dep
 
 engines_df      = safe_query("SELECT * FROM engines")
 experiments_df  = safe_query("SELECT * FROM experiments")
-games_df        = safe_query("SELECT * FROM game_stats")
 sprt_df         = safe_query("SELECT * FROM sprt_runs")
 sts_df          = safe_query("SELECT * FROM sts_runs")
 perft_df        = pd.DataFrame()
 
-# Map engine IDs to names
-if not engines_df.empty:
-    _ename = engines_df.set_index('id')['name']
-    if 'white_engine_id' in games_df.columns:
-        games_df['white_name'] = games_df['white_engine_id'].map(_ename)
-    if 'black_engine_id' in games_df.columns:
-        games_df['black_name'] = games_df['black_engine_id'].map(_ename)
-    if 'white_name' in games_df.columns and 'black_name' in games_df.columns:
-        games_df['game_label'] = games_df.apply(
-            lambda r: f"{r.get('white_name','?')} vs {r.get('black_name','?')} ({r.get('result','')})",
-            axis=1
-        )
+# Engine name lookup (small, always in memory)
+_ename = engines_df.set_index('id')['name'] if not engines_df.empty else pd.Series(dtype=str)
+
+# games_df: loaded on demand (can grow large), cached after first fetch
+_games_df_cache = None
+
+def query_games() -> pd.DataFrame:
+    """Load games with engine names attached. Cached after first call."""
+    global _games_df_cache
+    if _games_df_cache is not None:
+        return _games_df_cache
+    gdf = safe_query("SELECT * FROM game_stats")
+    if not gdf.empty and not engines_df.empty:
+        if 'white_engine_id' in gdf.columns:
+            gdf['white_name'] = gdf['white_engine_id'].map(_ename)
+        if 'black_engine_id' in gdf.columns:
+            gdf['black_name'] = gdf['black_engine_id'].map(_ename)
+        if 'white_name' in gdf.columns and 'black_name' in gdf.columns:
+            gdf['game_label'] = gdf.apply(
+                lambda r: f"{r.get('white_name','?')} vs {r.get('black_name','?')} ({r.get('result','')})",
+                axis=1
+            )
+    _games_df_cache = gdf
+    return _games_df_cache
+
+# Schema stub for imports that check columns (never iterated directly)
+games_df = safe_query("SELECT * FROM game_stats LIMIT 0")
 
 
 def _attach_experiment(df: pd.DataFrame, experiments: pd.DataFrame, engines: pd.DataFrame) -> pd.DataFrame:
@@ -142,9 +156,13 @@ sts_df  = _attach_experiment(sts_df, experiments_df, engines_df)
 
 def _get_data_stats() -> dict:
     stats = {
-        "n_games": len(games_df),
         "n_engines": len(engines_df),
     }
+    # Count games and searches via SQL (don't load them)
+    try:
+        stats["n_games"] = con.execute("SELECT COUNT(*) FROM game_stats").fetchone()[0]
+    except Exception:
+        stats["n_games"] = 0
     # Count searches via SQL (don't load them)
     try:
         stats["n_searches"] = con.execute(f"SELECT COUNT(*) FROM {_SEARCH_TABLE}").fetchone()[0]
@@ -259,10 +277,11 @@ def enrich_searches(df: pd.DataFrame) -> pd.DataFrame:
             df["engine_label"] = df["engine_name"].astype(str)
 
     # Join game info for side/result
-    if not games_df.empty and "game_id" in df.columns:
+    _gdf = query_games()
+    if not _gdf.empty and "game_id" in df.columns:
         gcols = ["id", "white_engine_id", "black_engine_id", "result", "opening"]
-        gcols = [c for c in gcols if c in games_df.columns]
-        gmap = games_df[gcols].rename(columns={"id": "game_id"})
+        gcols = [c for c in gcols if c in _gdf.columns]
+        gmap = _gdf[gcols].rename(columns={"id": "game_id"})
         df = df.merge(gmap, on="game_id", how="left", suffixes=("", "_game"))
 
     # Side
@@ -353,11 +372,11 @@ def apply_filters(
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Query DuckDB with filters pushed down, return (games_df, searches_df).
 
-    Games are filtered in memory (small table). Searches are queried in full
+    Games are filtered in memory (loaded on demand). Searches are queried in full
     since DuckDB handles millions of rows efficiently and callbacks aggregate.
     """
-    # ── Games filtering (in-memory, always small) ──
-    gf = games_df.copy()
+    # ── Games filtering (loaded on demand, cached) ──
+    gf = query_games().copy()
     if engine_ids:
         if "white_engine_id" in gf.columns:
             gf = gf[gf["white_engine_id"].isin(engine_ids) | gf["black_engine_id"].isin(engine_ids)]
