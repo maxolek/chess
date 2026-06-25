@@ -101,8 +101,6 @@ experiments_df  = safe_query("SELECT * FROM experiments")
 games_df        = safe_query("SELECT * FROM game_stats")
 sprt_df         = safe_query("SELECT * FROM sprt_runs")
 sts_df          = safe_query("SELECT * FROM sts_runs")
-positions_df    = safe_query("SELECT * FROM dim_positions")
-timing_df       = safe_query("SELECT * FROM search_timings")
 perft_df        = pd.DataFrame()
 
 # Map engine IDs to names
@@ -567,3 +565,28 @@ try:
     tree_df = _query(f"SELECT * FROM {_tree_table} LIMIT 0")
 except Exception:
     tree_df = pd.DataFrame()
+
+# timing_df / positions_df: schema-only stubs (same pattern as iter_df/tree_df)
+try:
+    timing_df = _query("SELECT * FROM search_timings LIMIT 0")
+except Exception:
+    timing_df = pd.DataFrame()
+
+
+def query_timing() -> pd.DataFrame:
+    """Fetch full timing data on demand, with engine names attached."""
+    df = safe_query("SELECT * FROM search_timings")
+    if df.empty or engines_df.empty or 'search_id' not in df.columns:
+        return df
+    try:
+        emap = safe_query(f"""
+            SELECT id AS search_id, engine_id FROM {_SEARCH_TABLE}
+            WHERE id IN (SELECT DISTINCT search_id FROM search_timings)
+        """)
+        if not emap.empty:
+            df = df.merge(emap, on='search_id', how='left')
+            ename = engines_df.set_index('id')['name']
+            df['engine_name'] = df['engine_id'].map(ename)
+    except Exception:
+        pass
+    return df

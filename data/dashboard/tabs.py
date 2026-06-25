@@ -23,8 +23,8 @@ from .config import (
 from .components import apply_theme, empty_fig, section, panel, metric_card, graph, table
 from .data_loader import (
     engines_df, experiments_df, games_df, searches_df, iter_df, tree_df,
-    timing_df, sprt_df, sts_df, positions_df, perft_df,
-    query_iter, query_tree, _iter_nums, _tree_nums,
+    sprt_df, sts_df, perft_df,
+    query_iter, query_tree, query_timing, _iter_nums, _tree_nums,
 )
 
 # Aliases used inside tab functions (from old single-file code)
@@ -446,11 +446,12 @@ def tab_compare(sf: pd.DataFrame) -> html.Div:
 
 
 def tab_timing() -> html.Div:
-    if timing_df.empty:
+    tdf = query_timing()
+    if tdf.empty:
         return html.Div("No timing data found.", style={"color": TEXT_SEC})
 
     # Top functions by total time
-    tsum = timing_df.groupby("function", as_index=False).agg(
+    tsum = tdf.groupby("function", as_index=False).agg(
         total_ms=("total_time_ms", "sum"),
         calls=("num_calls", "sum"),
     ).sort_values("total_ms", ascending=False)
@@ -470,8 +471,8 @@ def tab_timing() -> html.Div:
 
     # Per-engine if engine_name is available
     extra = []
-    if "engine_name" in timing_df.columns:
-        eng_tsum = timing_df.groupby(["engine_name", "function"], as_index=False).agg(
+    if "engine_name" in tdf.columns:
+        eng_tsum = tdf.groupby(["engine_name", "function"], as_index=False).agg(
             total_ms=("total_time_ms", "sum")
         )
         hm_df = eng_tsum.pivot(index="function", columns="engine_name", values="total_ms").fillna(0)

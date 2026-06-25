@@ -518,7 +518,10 @@ def build_position_features(cnxn):
 
     print(f"  position_features: processing {len(rows)} new positions...")
 
-    for row in rows:
+    BATCH_SIZE = 500
+    batch = []
+
+    for i, row in enumerate(rows):
         search_id, fen, game_id, sts_id = row
 
         # Extract features
@@ -542,48 +545,52 @@ def build_position_features(cnxn):
         # Mobility + space
         wm, bm = get_mobility_characteristics(fen)
 
-        # Flatten into a dict
-        features = {
-            'search_id': search_id,
-            'game_id': game_id,
-            'fen': fen,
-            'game_phase': game_phase,
-            'position_type': position_type,
-            'pos_tactical': tactical_score,
-            'pos_positional': positional_score,
-            'pos_endgame': endgame_score,
-            'balance': balance,
-            'white_backwards': w_backward,
-            'white_doubled': w_doubled,
-            'white_passed': w_passed,
-            'black_backwards': b_backward,
-            'black_doubled': b_doubled,
-            'black_passed': b_passed,
-            'white_shield_pawns': ws['shield_pawns'],
-            'white_open_files': ws['open_files'],
-            'white_tropism': ws['tropism'],
-            'black_shield_pawns': bs['shield_pawns'],
-            'black_open_files': bs['open_files'],
-            'black_tropism': bs['tropism'],
-            'white_num_moves': wm['num_moves'],
-            'white_capture_ratio': wm['capture_ratio'],
-            'white_check_ratio': wm['check_ratio'],
-            'white_legal_enemy': wm['legal_enemy'],
-            'white_controlled_enemy': wm['controlled_enemy'],
-            'black_num_moves': bm['num_moves'],
-            'black_capture_ratio': bm['capture_ratio'],
-            'black_check_ratio': bm['check_ratio'],
-            'black_legal_enemy': bm['legal_enemy'],
-            'black_controlled_enemy': bm['controlled_enemy'],
-        }
+        batch.append((
+            search_id, game_id, fen, game_phase, position_type,
+            tactical_score, positional_score, endgame_score, balance,
+            w_backward, w_doubled, w_passed,
+            b_backward, b_doubled, b_passed,
+            ws['shield_pawns'], ws['open_files'], ws['tropism'],
+            bs['shield_pawns'], bs['open_files'], bs['tropism'],
+            wm['num_moves'], wm['capture_ratio'], wm['check_ratio'],
+            wm['legal_enemy'], wm['controlled_enemy'],
+            bm['num_moves'], bm['capture_ratio'], bm['check_ratio'],
+            bm['legal_enemy'], bm['controlled_enemy'],
+        ))
 
-        cols = ','.join(features.keys())
-        placeholders = ','.join('?' for _ in features)
+        if len(batch) >= BATCH_SIZE:
+            _insert_batch(cnxn, batch)
+            batch = []
+            if (i + 1) % 2000 == 0:
+                print(f"    ...processed {i + 1}/{len(rows)}")
 
-        cnxn.execute(
-            f"INSERT INTO position_features ({cols}) VALUES ({placeholders})",
-            list(features.values())
+    # flush remaining
+    if batch:
+        _insert_batch(cnxn, batch)
+
+    print(f"  position_features: done ({len(rows)} rows inserted)")
+
+
+def _insert_batch(cnxn, batch):
+    """Insert a batch of position feature tuples."""
+    cnxn.executemany(
+        """
+        INSERT INTO position_features (
+            search_id, game_id, fen, game_phase, position_type,
+            pos_tactical, pos_positional, pos_endgame, balance,
+            white_backwards, white_doubled, white_passed,
+            black_backwards, black_doubled, black_passed,
+            white_shield_pawns, white_open_files, white_tropism,
+            black_shield_pawns, black_open_files, black_tropism,
+            white_num_moves, white_capture_ratio, white_check_ratio,
+            white_legal_enemy, white_controlled_enemy,
+            black_num_moves, black_capture_ratio, black_check_ratio,
+            black_legal_enemy, black_controlled_enemy
         )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        batch
+    )
 
 
 import duckdb

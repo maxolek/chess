@@ -19,7 +19,7 @@ from .config import (
 from .components import apply_theme, empty_fig, section, panel, metric_card, graph, table
 from .data_loader import (
     engines_df, experiments_df, games_df, searches_df, iter_df, tree_df,
-    timing_df, sprt_df, sts_df, positions_df, perft_df,
+    sprt_df, sts_df, perft_df,
     apply_filters, _search_nums, _iter_nums, _tree_nums,
     query_iter, query_tree, query_iter_single, query_searches_for_game,
     query_iter_agg, query_tree_agg,
