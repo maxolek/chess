@@ -521,6 +521,25 @@ def query_tree(search_ids) -> pd.DataFrame:
     except Exception:
         return pd.DataFrame()
 
+ 
+def query_timing() -> pd.DataFrame:
+    """Fetch full timing data on demand, with engine names attached."""
+    df = safe_query("SELECT * FROM search_timings")
+    if df.empty or engines_df.empty or 'search_id' not in df.columns:
+        return df
+    try:
+        emap = safe_query(f"""
+            SELECT id AS search_id, engine_id FROM {_SEARCH_TABLE}
+            WHERE id IN (SELECT DISTINCT search_id FROM search_timings)
+        """)
+        if not emap.empty:
+            df = df.merge(emap, on='search_id', how='left')
+            ename = engines_df.set_index('id')['name']
+            df['engine_name'] = df['engine_id'].map(ename)
+    except Exception:
+        pass
+    return df
+
 
 def query_iter_single(search_id: int) -> pd.DataFrame:
     """Fetch iteration data for a single search (e.g., FEN detail view)."""
@@ -572,21 +591,3 @@ try:
 except Exception:
     timing_df = pd.DataFrame()
 
-
-def query_timing() -> pd.DataFrame:
-    """Fetch full timing data on demand, with engine names attached."""
-    df = safe_query("SELECT * FROM search_timings")
-    if df.empty or engines_df.empty or 'search_id' not in df.columns:
-        return df
-    try:
-        emap = safe_query(f"""
-            SELECT id AS search_id, engine_id FROM {_SEARCH_TABLE}
-            WHERE id IN (SELECT DISTINCT search_id FROM search_timings)
-        """)
-        if not emap.empty:
-            df = df.merge(emap, on='search_id', how='left')
-            ename = engines_df.set_index('id')['name']
-            df['engine_name'] = df['engine_id'].map(ename)
-    except Exception:
-        pass
-    return df
