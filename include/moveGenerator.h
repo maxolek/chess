@@ -10,6 +10,7 @@
 #include "PrecomputedMoveData.h"
 #include "move.h"
 #include "board.h"
+#include "config.h"
 
 class MoveGenerator {
 public:

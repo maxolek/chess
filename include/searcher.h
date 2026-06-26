@@ -7,6 +7,7 @@
 #include "stats.h"
 #include "timer.h"
 #include "NNUE.h"
+#include "config.h"
 
 class Engine;
 class Evaluator;
@@ -46,11 +47,7 @@ struct SearchResult {
 
 class Searcher {
 public:
-    static constexpr int KILL_SEARCH_RETURN = -5 * MATE_SCORE;
-    static constexpr int MAX_DELTA = 1000;
-
     // --- Search Reduction Parameters ---
-    const int R_nmp = 3; // null move pruning reduction
     int R_lmr(int depth, int move_order);
 
     // Object-owned state
@@ -143,6 +140,7 @@ public:
         Move& move,
         int standPat,
         int alpha,
+        int search_depth,
         int ply
     );
 

@@ -6,11 +6,6 @@
 #include <algorithm>
 #include <iostream>
 
-using namespace std;
-
-static constexpr int INF = 30000;
-
-
 // ============================================================================
 // Construction / small helpers
 // ============================================================================
@@ -22,22 +17,22 @@ void Searcher::updatePV(std::vector<Move>& pv, const Move& move, const std::vect
 }
 
 // leaf node pruning
-bool Searcher::shouldPrune(Move& move, int standPat, int alpha, int ply) {
+bool Searcher::shouldPrune(Move& move, int standPat, int alpha, int search_depth, int ply) {
     int captured = board.getCapturedPiece(move.TargetSquare());
 
-    // see pruning (excl promo and checks)
+    // see pruning (bad captures ... excl promo and checks)
     if (captured != -1 && !move.IsPromotion() && !board.is_in_check) {
         int seeGain = eval.SEE(board, move);
         if (seeGain < -50) {
-            STATS_SEE_PRUNE(ply, ply);
+            STATS_SEE_PRUNE(search_depth, ply);
             return true;
         }
     }
 
-    // delta purning
+    // delta purning (quiet moves that wont raise alpha anyway)
     if (captured != -1 && !move.IsPromotion() && !board.is_in_check) {
-        if (standPat + MAX_DELTA < alpha) {
-            STATS_DELTA_PRUNE(ply, ply);
+        if (standPat + engine.cfg.search.DELTA_PRUNE_THRESHOLD < alpha) {
+            STATS_DELTA_PRUNE(search_depth, ply);
             return true;
         }
     }
@@ -51,16 +46,9 @@ bool Searcher::shouldPrune(Move& move, int standPat, int alpha, int ply) {
 
 int Searcher::moveScore(const Move& move, const Board& boardRef,
                         int ply, const Move& ttMove, const std::vector<Move>& previousPV) {
-    constexpr int TT_BASE       = 10'000'000;
-    constexpr int PV_BASE       = 9'000'000;
-    constexpr int PROMO_BASE    = 8'500'000;
-    constexpr int GOOD_CAP_BASE = 8'000'000;
-    constexpr int KILLER_BASE   = 7'000'000;
-    constexpr int QUIET_BASE    = 0;
-    constexpr int BAD_CAP_BASE  = -1'000'000;
 
-    if (Move::SameMove(ttMove, move)) return TT_BASE;
-    if (ply < (int)previousPV.size() && Move::SameMove(move, previousPV[ply])) return PV_BASE;
+    if (Move::SameMove(ttMove, move)) return engine.cfg.scores.TT_BASE;
+    if (ply < (int)previousPV.size() && Move::SameMove(move, previousPV[ply])) return engine.cfg.scores.PV_BASE;
 
     if (move.IsPromotion()) {
         int promoBonus = 0;
@@ -73,25 +61,25 @@ int Searcher::moveScore(const Move& move, const Board& boardRef,
         int captured = boardRef.getCapturedPiece(move.TargetSquare());
         if (captured != -1) {
             int seeScore = eval.SEE(boardRef, move);
-            return seeScore >= 0 ? GOOD_CAP_BASE + seeScore + promoBonus
-                                 : BAD_CAP_BASE  + seeScore + promoBonus;
+            return seeScore >= 0 ? engine.cfg.scores.GOOD_CAP_BASE + seeScore + promoBonus
+                                 : engine.cfg.scores.BAD_CAP_BASE  + seeScore + promoBonus;
         }
-        return PROMO_BASE + promoBonus;
+        return engine.cfg.scores.PROMO_BASE + promoBonus;
     }
 
     int captured = boardRef.getCapturedPiece(move.TargetSquare());
     if (captured != -1) {
         int seeScore = eval.SEE(boardRef, move);
-        return seeScore >= 0 ? GOOD_CAP_BASE + seeScore : BAD_CAP_BASE + seeScore;
+        return seeScore >= 0 ? engine.cfg.scores.GOOD_CAP_BASE + seeScore : engine.cfg.scores.BAD_CAP_BASE + seeScore;
     }
 
-    if (Move::SameMove(killerMoves[ply][0], move)) return KILLER_BASE;
-    if (Move::SameMove(killerMoves[ply][1], move)) return KILLER_BASE - 1;
+    if (Move::SameMove(killerMoves[ply][0], move)) return engine.cfg.scores.KILLER_BASE;
+    if (Move::SameMove(killerMoves[ply][1], move)) return engine.cfg.scores.KILLER_BASE - 1;
 
     int piece = boardRef.getMovedPiece(move.StartSquare());
     int sidePiece = boardRef.is_white_move ? piece : piece + 6;
 
-    return QUIET_BASE + historyHeuristic[sidePiece][move.TargetSquare()] / 16;
+    return engine.cfg.scores.QUIET_BASE + historyHeuristic[sidePiece][move.TargetSquare()] / 16;
 }
 
 void Searcher::orderedMoves(Move moves[MAX_MOVES], size_t count,
@@ -182,7 +170,7 @@ int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int 
         if (limits.out_of_time()) break;
 
         Move m = moves[i];
-        if (shouldPrune(m, standPat, alpha, search_depth)) continue;
+        if (shouldPrune(m, standPat, alpha, search_depth, ply)) continue;
 
         // Apply NNUE incremental update then board move
         nnue.on_make_move(board, m);
@@ -196,9 +184,9 @@ int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int 
         board.UnmakeMove(m);
 
         if (score >= beta) { 
-            if (i == 0) STATS_FAILHIGH(search_depth, search_depth, "first");
-            else if (i >= count / 2) STATS_FAILHIGH(search_depth, search_depth, "late");
-            else STATS_FAILHIGH(search_depth, search_depth, ""); 
+            if (i == 0) STATS_FAILHIGH(search_depth, ply, "first");
+            else if (i >= count / 2) STATS_FAILHIGH(search_depth, ply, 0);
+            else STATS_FAILHIGH(search_depth, ply, 0); 
             return beta; 
         }
         if (score > bestEval) {
@@ -222,6 +210,7 @@ int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int 
 
 int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
                       std::vector<Move>& previousPV, SearchLimits& limits, int ply, bool use_quiescence) {
+
     STATS_NODE(depth+ply, ply); // track node per depth
     ScopedTimer timer(T_SEARCH);
     if (limits.out_of_time()) return alpha;
@@ -261,6 +250,8 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
     // if the null move fails high then we can assume the best move will also fail high
     // certain position restrictions must be used for the assumptions to hold
     if ( // not in check, and not king-pawn endgame (zugzwang prevention)
+        (depth - engine.cfg.search.R_NMP > 0)
+        &&
         !(
             board.is_in_check 
             || board.pawn_endgame 
@@ -271,7 +262,7 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
 
         // null moves just change the side to move (and last-move cache)
         board.MakeNullMove();
-        int null_score = -negamax(depth - 1 - R_nmp, -beta, -(beta - 1), emptyPV, previousPV, limits, ply + 1, use_quiescence);
+        int null_score = -negamax(depth - 1 - engine.cfg.search.R_NMP, -beta, -(beta - 1), emptyPV, previousPV, limits, ply + 1, use_quiescence);
         board.UnmakeNullMove();
 
         // null window around beta so if if null move fails high 
@@ -363,8 +354,8 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
         if (alpha >= beta) {
             
             if (i == 0) STATS_FAILHIGH(depth+ply, ply, "first");
-            else if (i >= count / 2) STATS_FAILHIGH(depth+ply, ply, "late");
-            else STATS_FAILHIGH(depth+ply, ply, "");
+            else if (i >= count / 2) STATS_FAILHIGH(depth+ply, ply, 0);
+            else STATS_FAILHIGH(depth+ply, ply, 0);
 
             if (!Move::SameMove(killerMoves[depth][0], m) && !m.IsPromotion() &&
                 !(1ULL << m.TargetSquare() & board.colorBitboards[1 - board.move_color])) {
@@ -412,8 +403,9 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
         //std::cout << "------" << std::endl; m.PrintMove(); std::cout << "------" << std::endl;
 
         int eval; PV childPV;
-        STATS_NODE(depth, 1);       // change to result.eval for proper alpha propogation
-        eval = -negamax(depth - 1, -MATE_SCORE, MATE_SCORE, childPV, previousPV, limits, 1, true);
+        int ply = 1;
+        STATS_NODE(depth, ply);       // change to result.eval for proper alpha propogation
+        eval = -negamax(depth - 1, -MATE_SCORE, MATE_SCORE, childPV, previousPV, limits, ply+1, true);
 
         // Undo
         //nnue->debug_check_incr_vs_full_after_unmake(board, m, *nnue);
@@ -436,6 +428,9 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
             result.bestMove = m;
             result.best_line.set(m, childPV);
         }
+
+        // ran through all root moves (= max_search_depth (-1 if last depth is terminated early))
+        if (i >= count - 1) g_stats.max_completed_depth = depth;
     }
 
     //std::cout << "depth: " << depth << "\tbestmove: " << result.bestMove.uci() << "\teval: " << result.eval << std::endl;
@@ -460,8 +455,9 @@ SearchResult Searcher::searchAspiration(Move legal_moves[MAX_MOVES], int count, 
         board.MakeMove(m);
 
         int eval; PV childPV;
-        STATS_NODE(depth, 1);
-        eval = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, 1, true);
+        int ply = 1;
+        STATS_NODE(depth, ply);
+        eval = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply+1, true);
 
         nnue.on_unmake_move(board, m);
         board.UnmakeMove(m);
@@ -478,6 +474,9 @@ SearchResult Searcher::searchAspiration(Move legal_moves[MAX_MOVES], int count, 
             result.bestMove = m;
             result.best_line.set(m, childPV);
         }
+
+        // ran through all root moves (= max_search_depth (-1 if last depth is terminated early))
+        if (i >= count - 1) g_stats.max_completed_depth = depth;
     }
 
     return result;
@@ -503,18 +502,12 @@ void Searcher::undo_move(const Move& move, const Board& before) {
 // -----------------------
 // log formula: constant + [log(depth) * log(move_order)] / denominator
 int Searcher::R_lmr(int depth, int move_order) {
-    int MOVE_ORDER_THRESHOLD = 3;
-    int DEPTH_THRESHOLD = 2;
-    int MAX_REDUCTION = 4;
-
-    float _const = 0.99f;
-    float _denom = 3.14f;
-
-    if (move_order <= MOVE_ORDER_THRESHOLD) return 0; // no reduction for first 3 moves
-    if (depth <= DEPTH_THRESHOLD) return 0;      // no reduction for shallow depths
+    if (move_order <= engine.cfg.search.LMR_MOVE_ORDER_THRESHOLD) return 0; // no reduction for first 3 moves
+    if (depth <= engine.cfg.search.LMR_DEPTH_THRESHOLD) return 0;      // no reduction for shallow depths
 
     // logarithmic reduction formula
     float log_depth = std::log(static_cast<float>(depth));
     float log_order = std::log(static_cast<float>(move_order));
-    return min(MAX_REDUCTION, static_cast<int>(_const + (log_depth * log_order) / _denom));
+    // unlikely to exceed 4 without heavy parameter tuning (or very deep search)
+    return static_cast<int>(engine.cfg.search.R_LMR_CONST + (log_depth * log_order) / engine.cfg.search.R_LMR_DENOM);;
 }

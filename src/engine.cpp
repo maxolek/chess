@@ -16,23 +16,23 @@ EngineMode mode = EngineMode::ANALYSIS;
 EngineSide side = EngineSide::UNKNOWN;
 GameTracker tracker;
 
-Engine::Engine()
+Engine::Engine(EngineConfig& config)
+    : cfg(config)
 {
     game_board = Board();
     search_board = game_board; //Board(game_board);
 
     movegen = std::make_unique<MoveGenerator>(search_board);
 
-    evaluator.nnue.load(options.nnue_weight_path);
-    evaluator.loadOpeningPST(options.opening_pst_path);
-    evaluator.loadEndgamePST(options.endgame_pst_path);
+    evaluator.nnue.load(cfg.engine.nnue_weight_path);
+    evaluator.loadOpeningPST(cfg.engine.opening_pst_path);
+    evaluator.loadEndgamePST(cfg.engine.endgame_pst_path);
 
     searcher = std::make_unique<Searcher>(*this, search_board, evaluator, evaluator.nnue);
     tt.clear();
 
-    book.load(options.opening_book_path);
+    book.load(cfg.engine.opening_book_path);
 
-    Logging::track_search_stats = options.showStats;
     g_stats = SearchStats();
 }
 
@@ -66,125 +66,120 @@ void Engine::setOption(const std::string& name, const std::string& value) {
 
     if (name == "Move Overhead") {
         limits.stopped = false;
-        options.moveOverhead = std::stoi(value);
-        std::cout << "info string set Move Overhead = " << options.moveOverhead << std::endl;
+        cfg.engine.MOVE_OVERHEAD_MS = std::stoi(value);
+        std::cout << "info string set Move Overhead = " << cfg.engine.MOVE_OVERHEAD_MS << std::endl;
     } 
     else if (name == "Hash") {
-        options.hashSize = std::stoi(value);
-        tt.resize(options.hashSize);
-        std::cout << "info string set Hash = " << options.hashSize << std::endl;
+        cfg.engine.HASH_SIZE_MB = std::stoi(value);
+        tt.resize(cfg.engine.HASH_SIZE_MB);
+        std::cout << "info string set Hash = " << cfg.engine.HASH_SIZE_MB << std::endl;
     } 
     else if (name == "Threads") {
-        options.threads = std::stoi(value);
+        cfg.engine.MAX_THREADS = std::stoi(value);
         // Apply threads to searcher
-        std::cout << "info string set Threads = " << options.threads << std::endl;
+        std::cout << "info string set Threads = " << cfg.engine.MAX_THREADS << std::endl;
     } 
     else if (name == "Ponder") {
-        options.ponder = boolFromString(value);
-        std::cout << "info string set Ponder = " << (options.ponder ? "true" : "false") << std::endl;
+        cfg.engine.PONDERING = boolFromString(value);
+        std::cout << "info string set Ponder = " << (cfg.engine.PONDERING ? "true" : "false") << std::endl;
     } 
     else if (name == "UCI_ShowWDL") {
-        options.uciShowWDL = boolFromString(value);
-        std::cout << "info string set UCI_ShowWDL = " << (options.uciShowWDL ? "true" : "false") << std::endl;
+        cfg.options.UCI_SHOW_WDL = boolFromString(value);
+        std::cout << "info string set UCI_ShowWDL = " << (cfg.options.UCI_SHOW_WDL ? "true" : "false") << std::endl;
     } 
     else if (name == "ShowStats") {
-        options.showStats = boolFromString(value);
-        Logging::track_search_stats = options.showStats;
-        std::cout << "info string set ShowStats = " << (options.showStats ? "true" : "false") << std::endl;
+        Logging::track_search_stats = boolFromString(value);
+        std::cout << "info string set ShowStats = " << (Logging::track_search_stats ? "true" : "false") << std::endl;
     }
 
     // -------- customization --------
     else if (name == "MagicBitboards") {
-        options.magics = boolFromString(value);
-        std::cout << "info string set MagicBitboards = " << (options.magics ? "true" : "false") << std::endl;
+        cfg.engine.MAGICS = boolFromString(value);
+        std::cout << "info string set MagicBitboards = " << (cfg.engine.MAGICS ? "true" : "false") << std::endl;
     }
     else if (name == "NNUE") {
-        options.nnue = boolFromString(value);
-        if (options.nnue) {
-            evaluator.nnue.load(options.nnue_weight_path); // load NNUE if path is set
+        cfg.options._NNUE = boolFromString(value);
+        if (cfg.options._NNUE) {
+            evaluator.nnue.load(cfg.engine.nnue_weight_path); // load NNUE if path is set
         }
-        std::cout << "info string set NNUE = " << (options.nnue ? "true" : "false") << std::endl;
+        std::cout << "info string set NNUE = " << (cfg.options._NNUE ? "true" : "false") << std::endl;
     }
 
     // -------- search --------
     else if (name == "quiescence") {
-        options.quiescence = boolFromString(value);
-        std::cout << "info string set quiescence = " << (options.quiescence ? "true" : "false") << std::endl;
+        cfg.options._QUIESCENCE = boolFromString(value);
+        std::cout << "info string set quiescence = " << (cfg.options._QUIESCENCE ? "true" : "false") << std::endl;
     }
     else if (name == "aspiration") {
-        options.aspiration = boolFromString(value);
-        std::cout << "info string set aspiration = " << (options.aspiration ? "true" : "false") << std::endl;
-    }
-    else if (name == "scorched_earth") {
-        options.scorched_earth = std::stoi(value);
-        std::cout << "info string set contempt " << options.scorched_earth << std::endl;
+        cfg.options._ASPIRATION = boolFromString(value);
+        std::cout << "info string set aspiration = " << (cfg.options._ASPIRATION ? "true" : "false") << std::endl;
     }
 
     // -------- move ordering --------
     else if (name == "moveordering") {
-        options.moveordering = boolFromString(value);
-        std::cout << "info string set moveordering = " << (options.moveordering ? "true" : "false") << std::endl;
+        cfg.options._MOVE_ORDERING = boolFromString(value);
+        std::cout << "info string set moveordering = " << (cfg.options._MOVE_ORDERING ? "true" : "false") << std::endl;
     }
     else if (name == "mvvlva_ordering") {
-        options.mvvlva = boolFromString(value);
-        std::cout << "info string set mvvlva_ordering = " << (options.mvvlva ? "true" : "false") << std::endl;
+        cfg.options._MMVLVA_ORDERING = boolFromString(value);
+        std::cout << "info string set mvvlva_ordering = " << (cfg.options._MMVLVA_ORDERING ? "true" : "false") << std::endl;
     }
     else if (name == "see_ordering") {
-        options.see = boolFromString(value);
-        std::cout << "info string set see_ordering = " << (options.see ? "true" : "false") << std::endl;
+        cfg.options._SEE_ORDERING = boolFromString(value);
+        std::cout << "info string set see_ordering = " << (cfg.options._SEE_ORDERING ? "true" : "false") << std::endl;
     }
 
     // -------- pruning --------
     else if (name == "delta_pruning") {
-        options.delta_pruning = boolFromString(value);
-        std::cout << "info string set delta_pruning = " << (options.delta_pruning ? "true" : "false") << std::endl;
+        cfg.options._DELTA_PRUNING = boolFromString(value);
+        std::cout << "info string set delta_pruning = " << (cfg.options._DELTA_PRUNING ? "true" : "false") << std::endl;
     }
     else if (name == "see_pruning") {
-        options.see_pruning = boolFromString(value);
-        std::cout << "info string set see_pruning = " << (options.see_pruning ? "true" : "false") << std::endl;
+        cfg.options._SEE_PRUNING = boolFromString(value);
+        std::cout << "info string set see_pruning = " << (cfg.options._SEE_PRUNING ? "true" : "false") << std::endl;
     }
 
     // -------- books / paths --------
     else if (name == "opening_pst_file") {
-        options.opening_pst_path = PROJECT_ROOT / fs::path("bin") / fs::path(value + ".txt");
-        if(evaluator.loadEndgamePST(options.opening_pst_path)) {
-            std::cout << "info string OpeningPST loaded successfully: " << options.opening_pst_path << std::endl;
+        cfg.engine.opening_pst_path = PROJECT_ROOT / fs::path("bin") / fs::path(value + ".txt");
+        if(evaluator.loadEndgamePST(cfg.engine.opening_pst_path)) {
+            std::cout << "info string OpeningPST loaded successfully: " << cfg.engine.opening_pst_path << std::endl;
         } else {
-            std::cout << "info string Failed to load OpeningPST: " << options.opening_pst_path << std::endl;
+            std::cout << "info string Failed to load OpeningPST: " << cfg.engine.opening_pst_path << std::endl;
         }
     }
     else if (name == "endgame_pst_file") {
-        options.endgame_pst_path = PROJECT_ROOT / fs::path("bin") / fs::path(value + ".txt");
-        if(evaluator.loadEndgamePST(options.endgame_pst_path)) {
-            std::cout << "info string EndgamePST loaded successfully: " << options.endgame_pst_path << std::endl;
+        cfg.engine.endgame_pst_path = PROJECT_ROOT / fs::path("bin") / fs::path(value + ".txt");
+        if(evaluator.loadEndgamePST(cfg.engine.endgame_pst_path)) {
+            std::cout << "info string EndgamePST loaded successfully: " << cfg.engine.endgame_pst_path << std::endl;
         } else {
-            std::cout << "info string Failed to load EndgamePST: " << options.endgame_pst_path << std::endl;
+            std::cout << "info string Failed to load EndgamePST: " << cfg.engine.endgame_pst_path << std::endl;
         }
     }
     else if (name == "nnue_weight_file") {
-        options.nnue_weight_path = PROJECT_ROOT / fs::path("bin/nnue_wgts") / fs::path(value + ".bin");
-        if (options.nnue) {
-            if(evaluator.nnue.load(options.nnue_weight_path)) {
-                std::cout << "info string NNUE loaded successfully: " << options.nnue_weight_path << std::endl;
+        cfg.engine.nnue_weight_path = PROJECT_ROOT / fs::path("bin/nnue_wgts") / fs::path(value + ".bin");
+        if (cfg.options._NNUE) {
+            if(evaluator.nnue.load(cfg.engine.nnue_weight_path)) {
+                std::cout << "info string NNUE loaded successfully: " << cfg.engine.nnue_weight_path << std::endl;
             } else {
-                std::cout << "info string Failed to load NNUE: " << options.nnue_weight_path << std::endl;
+                std::cout << "info string Failed to load NNUE: " << cfg.engine.nnue_weight_path << std::endl;
             }
         }
     }
     else if (name == "opening_book") {
-        options.opening_book_path = PROJECT_ROOT / fs::path("bin") / fs::path(value + ".bin"); // auto-construct full path
+        cfg.engine.opening_book_path = PROJECT_ROOT / fs::path("bin") / fs::path(value + ".bin"); // auto-construct full path
 
         if (!value.empty()) {
-            if (book.load(options.opening_book_path))
-                std::cout << "info string Book loaded successfully: " << options.opening_book_path << std::endl;
+            if (book.load(cfg.engine.opening_book_path))
+                std::cout << "info string Book loaded successfully: " << cfg.engine.opening_book_path << std::endl;
             else
-                std::cout << "info string Failed to load book: " << options.opening_book_path << std::endl;
+                std::cout << "info string Failed to load book: " << cfg.engine.opening_book_path << std::endl;
         }
     }
     else if (name == "SyzygyPath") {
-        options.syzygyPath = value;
+        cfg.engine.syzygy_path = value;
         //tablebases.load(value);
-        std::cout << "info string set SyzygyPath = " << options.syzygyPath << std::endl;
+        std::cout << "info string set SyzygyPath = " << cfg.engine.syzygy_path << std::endl;
     }
 
     // -------- logging --------
@@ -218,44 +213,44 @@ void Engine::setOption(const std::string& name, const std::string& value) {
 
 void Engine::print_info() {
     std::cout << "option name Hash type spin value "
-              << options.hashSize << " min 1 max 8192\n";
+              << cfg.engine.HASH_SIZE_MB << " min 1 max 8192\n";
     std::cout << "option name Threads type spin value "
-              << options.threads << " min 1 max 64\n";
+              << cfg.engine.MAX_THREADS << " min 1 max 64\n";
     std::cout << "option name Move Overhead type spin value "
-              << options.moveOverhead << " min 0 max 5000\n";
+              << cfg.engine.MOVE_OVERHEAD_MS << " min 0 max 5000\n";
     std::cout << "option name Ponder type check value "
-              << (options.ponder ? "true" : "false") << "\n";
+              << (cfg.engine.PONDERING ? "true" : "false") << "\n";
     std::cout << "option name UCI_ShowWDL type check value "
-              << (options.uciShowWDL ? "true" : "false") << "\n";
+              << (cfg.options.UCI_SHOW_WDL ? "true" : "false") << "\n";
     std::cout << "option name ShowStats type check value "
-              << (options.showStats ? "true" : "false") << "\n";
+              << (Logging::track_search_stats ? "true" : "false") << "\n";
     // feature toggles
     std::cout << "option name Magics type check value "
-              << (options.magics ? "true" : "false") << "\n";
+              << (cfg.engine.MAGICS ? "true" : "false") << "\n";
 
     std::cout << "option name NNUE type check value "
-              << (options.nnue ? "true" : "false") << "\n";
+              << (cfg.options._NNUE ? "true" : "false") << "\n";
 
     std::cout << "option name Quiescence type check value "
-              << (options.quiescence ? "true" : "false") << "\n";
+              << (cfg.options._QUIESCENCE ? "true" : "false") << "\n";
 
     std::cout << "option name Aspiration type check value "
-              << (options.aspiration ? "true" : "false") << "\n";
+              << (cfg.options._ASPIRATION? "true" : "false") << "\n";
     // paths
     std::cout << "option name OpeningPST type string value "
-              << options.opening_pst_path << "\n";
+              << cfg.engine.opening_pst_path << "\n";
 
     std::cout << "option name EndgamePST type string value "
-              << options.endgame_pst_path << "\n";
+              << cfg.engine.endgame_pst_path << "\n";
 
     std::cout << "option name NNUEWeights type string value "
-              << options.nnue_weight_path << "\n";
+              << cfg.engine.nnue_weight_path << "\n";
 
     std::cout << "option name OpeningBook type string value "
-              << options.opening_book_path << "\n";
+              << cfg.engine.opening_book_path << "\n";
 
     std::cout << "option name SyzygyPath type string value "
-              << options.syzygyPath << "\n";
+              << cfg.engine.syzygy_path << "\n";
 
     std::cout << "option name LogsDir type string value "
               << Logging::log_dir << "\n";
@@ -379,7 +374,7 @@ void Engine::computeSearchTime(const SearchSettings& settings) {
     // hard coded time/depth
     if (settings.movetime > 0 || settings.depth > 0) {
         limits = SearchLimits(
-            settings.movetime - options.moveOverhead,
+            settings.movetime - cfg.engine.MOVE_OVERHEAD_MS,
             settings.depth
         );
         return;
@@ -397,7 +392,7 @@ void Engine::computeSearchTime(const SearchSettings& settings) {
         * aggressiveness
     );
 
-    timeBudget = std::max(10, timeBudget - options.moveOverhead);
+    timeBudget = std::max(10, timeBudget - cfg.engine.MOVE_OVERHEAD_MS);
 
     limits = SearchLimits(timeBudget);
 }
@@ -407,7 +402,7 @@ void Engine::startSearch() {
     evaluator.nnue.build_accumulators(search_board);
 
     // book probe
-    if (!options.opening_book_path.empty()) {
+    if (!cfg.engine.opening_book_path.empty()) {
         uint64_t key = search_board.zobrist_hash;
         auto bookMoves = book.get_moves(key);
 
@@ -477,7 +472,7 @@ void Engine::iterativeDeepening() {
 
     // reset global stats
     if (Logging::track_search_stats) {
-        g_stats = SearchStats{};           // global-level
+        resetSearchStats();           // global-level
     }
 
     SearchResult last_result;
@@ -495,16 +490,16 @@ void Engine::iterativeDeepening() {
         return;
     }
 
-    int aspiration_start_depth = 6;
-    int delta = 50;
     int alpha = -MATE_SCORE;
     int beta = MATE_SCORE;
+    int delta = cfg.search.ASPIRATION_WINDOW;
 
     std::fill(std::begin(last_eval_table), std::end(last_eval_table), INVALID);
 
     int depth = 1;
     Move prevBest = Move::NullMove();
 
+    // --- iterative deepening loop ---
     while (!limits.should_stop(depth)) {
         ScopedTimer timer(T_ROOT);
         auto depth_start = std::chrono::steady_clock::now();
@@ -515,8 +510,8 @@ void Engine::iterativeDeepening() {
             std::sort(first_moves, first_moves + count,
                       [&](Move a, Move b) { return get_prev_eval(a) > get_prev_eval(b); });
 
-            if (depth >= aspiration_start_depth) {
-                delta = std::max(delta, 50 + depth * 10);
+            if (depth >= cfg.search.ASPIRATION_START_DEPTH) {
+                delta = std::max(delta, cfg.search.ASPIRATION_WINDOW + depth * cfg.search.ASPIRATION_DEPTH_SCALE);
                 alpha = last_result.eval - delta;
                 beta  = last_result.eval + delta;
             }
@@ -525,7 +520,7 @@ void Engine::iterativeDeepening() {
         }
 
         // --- search ---
-        if (depth < aspiration_start_depth) {
+        if (depth < cfg.search.ASPIRATION_START_DEPTH) {
             result = searcher->search(first_moves, count, depth, limits,
                                      last_result.best_line.line);
         } else {
@@ -543,15 +538,15 @@ void Engine::iterativeDeepening() {
                 else if (result.eval >= beta) beta += delta;
                 else break;
 
-                delta *= 2;
+                delta *= cfg.search.ASPIRATION_RESEARCH_SCALE;
             }
         }
+
 
         // --- store results ---
         if (!Move::SameMove(result.bestMove, Move::NullMove())) {
             last_result = result;
             store_last_result(result);
-            g_stats.max_completed_depth = depth;
         }
 
         // --- determine best move and eval ---

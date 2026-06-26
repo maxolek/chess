@@ -1,6 +1,6 @@
 import sqlite3
 from pathlib import Path
-from .etl.paths import RAW_DB
+from ..etl.paths import RAW_DB
 
 # long form function that create the database
 # and some associated tables

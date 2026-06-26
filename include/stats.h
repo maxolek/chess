@@ -65,6 +65,7 @@ struct SearchStats {
     uint64_t fail_high_lates = 0;
     uint64_t aspiration_fail_low_researches = 0;
     uint64_t aspiration_fail_high_researches = 0;
+    uint64_t pvs_researches = 0;
     uint64_t see_prunes = 0;
     uint64_t delta_prunes = 0;
     uint64_t nmp = 0;
@@ -174,6 +175,7 @@ inline void resetSearchStats() {
     do { \
         if (Logging::track_search_stats) { \
             STATS_BOUNDS_CHECK(it_d, ply); \
+            g_stats.pvs_researches++; \
             g_stats.it_depth_pvs_researches[it_d]++; \
             g_stats.tree_depth_pvs_researches[ply]++; \
         } \
@@ -306,7 +308,7 @@ inline void logSearchStats(const std::string& fen = "") {
     static std::ofstream out(Logging::log_dir / "search.jsonl", std::ios::app);
     if (!out.is_open()) return;
 
-    size_t n = g_stats.max_completed_depth + 1;
+    size_t n = g_stats.max_depth + 1;
     size_t q_n = g_stats.max_qdepth + 1;
 
     auto moves_list_to_json = [](const std::vector<Move>& v) { 
@@ -346,6 +348,7 @@ inline void logSearchStats(const std::string& fen = "") {
         << "\"aspiration_fail_low_researches\":" << g_stats.aspiration_fail_low_researches << ","
         << "\"aspiration_fail_high_researches\":" << g_stats.aspiration_fail_high_researches << ","
 
+        << "\"pvs_researches\":" << g_stats.pvs_researches << ","
         << "\"nmp\":" << g_stats.nmp << ","
         << "\"nmp_fail\":" << g_stats.nmp_fail << ","
 
@@ -396,9 +399,118 @@ inline void logSearchStats(const std::string& fen = "") {
 
     out.flush();
 
-    resetSearchStats();
+    //resetSearchStats();
 }
 
+inline void dumpSearchStats()
+{
+    const uint64_t total_nodes = g_stats.nodes + g_stats.qnodes;
+
+    const double nps =
+        g_stats.time_ms > 0
+            ? (1000.0 * static_cast<double>(total_nodes)) /
+              static_cast<double>(g_stats.time_ms)
+            : 0.0;
+
+    const double tt_hit_pct =
+        (g_stats.tt_hits + g_stats.tt_stores) > 0
+            ? 100.0 * static_cast<double>(g_stats.tt_hits) /
+              static_cast<double>(g_stats.tt_hits + g_stats.tt_stores)
+            : 0.0;
+
+    const double fh_first_pct =
+        g_stats.fail_highs > 0
+            ? 100.0 * static_cast<double>(g_stats.fail_high_firsts) /
+              static_cast<double>(g_stats.fail_highs)
+            : 0.0;
+
+    const double nmp_success_pct =
+        g_stats.nmp > 0
+            ? 100.0 * static_cast<double>(g_stats.nmp - g_stats.nmp_fail) /
+              static_cast<double>(g_stats.nmp)
+            : 0.0;
+
+    std::cout << std::fixed << std::setprecision(2);
+
+    // ===================== GLOBAL SUMMARY =====================
+    std::cout
+        << "\n============================================================\n"
+        << "SEARCH STATS\n"
+        << "============================================================\n\n"
+
+        << "--- Search ---\n"
+        << "Best Move        : " << g_stats.move.uci() << "\n"
+        << "Eval             : " << g_stats.eval << "\n"
+        << "Time (ms)        : " << g_stats.time_ms << "\n"
+        << "Depth            : " << g_stats.max_depth << "\n"
+        << "Completed Depth  : " << g_stats.max_completed_depth << "\n\n"
+
+        << "--- Nodes ---\n"
+        << "Nodes            : " << g_stats.nodes << "\n"
+        << "QNodes           : " << g_stats.qnodes << "\n"
+        << "Total            : " << total_nodes << "\n"
+        << "NPS              : " << (uint64_t)nps << "\n\n"
+
+        << "--- TT ---\n"
+        << "Hits             : " << g_stats.tt_hits << "\n"
+        << "Stores           : " << g_stats.tt_stores << "\n"
+        << "Overwritten      : " << g_stats.tt_overwritten << "\n"
+        << "Fill Ratio       : " << (g_stats.tt_fill_ratio * 100.0) << "%\n"
+        << "Hit Rate         : " << tt_hit_pct << "%\n\n"
+
+        << "--- Cutoffs ---\n"
+        << "Fail Highs       : " << g_stats.fail_highs << "\n"
+        << "Fail Lows        : " << g_stats.fail_lows << "\n"
+        << "FH First         : " << g_stats.fail_high_firsts << "\n"
+        << "FH Late          : " << g_stats.fail_high_lates << "\n"
+        << "FH First %       : " << fh_first_pct << "%\n\n"
+
+        << "--- Pruning ---\n"
+        << "SEE              : " << g_stats.see_prunes << "\n"
+        << "Delta            : " << g_stats.delta_prunes << "\n\n"
+
+        << "--- Null Move ---\n"
+        << "Attempts         : " << g_stats.nmp << "\n"
+        << "Fails            : " << g_stats.nmp_fail << "\n"
+        << "Success %        : " << nmp_success_pct << "%\n\n"
+
+        << "--- Aspiration ---\n"
+        << "Fail High Re     : " << g_stats.aspiration_fail_high_researches << "\n"
+        << "Fail Low Re      : " << g_stats.aspiration_fail_low_researches << "\n\n"
+
+        << "--- PV ---\n";
+
+    for (const Move& m : g_stats.principal_variation)
+        std::cout << m.uci() << " ";
+    std::cout << "\n\n";
+
+    // ===================== ITERATIVE DEEPENING =====================
+    std::cout
+        << "------------------------------------------------------------\n"
+        << "D  Eval  Move   Time  Nodes    FH   FL   NMP  SEE  PVS\n"
+        << "------------------------------------------------------------\n";
+
+    const size_t max_d = g_stats.max_completed_depth;
+
+    for (size_t d = 0; d <= max_d; ++d)
+    {
+        std::cout
+            << std::setw(2) << d << " "
+            << std::setw(5) << g_stats.it_depth_eval[d] << " "
+            << std::setw(6) << g_stats.it_depth_move[d].uci() << " "
+            << std::setw(5) << g_stats.it_depth_time_ms[d] << " "
+            << std::setw(7) << g_stats.it_depth_nodes[d] << " "
+            << std::setw(4) << g_stats.it_depth_fail_highs[d] << " "
+            << std::setw(4) << g_stats.it_depth_fail_lows[d] << " "
+            << std::setw(4) << g_stats.it_depth_nmp[d] << " "
+            << std::setw(4) << g_stats.it_depth_see_prunes[d] << " "
+            << std::setw(4) << g_stats.it_depth_pvs_researches[d]
+            << "\n";
+    }
+
+    std::cout
+        << "------------------------------------------------------------\n\n";
+}
 
 
 #endif // STATS_H

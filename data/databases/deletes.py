@@ -1,7 +1,7 @@
 import sqlite3
 from pathlib import Path
 import argparse
-from .etl.paths import RAW_DB
+from ..etl.paths import RAW_DB
 
 def drop_all_tables(db_path=str(RAW_DB)) -> None:
     """

@@ -117,8 +117,7 @@ public:
     }
 
     size_t entriesCount = 0;
-
+    size_t filledCount = 0;   
 private:
     std::vector<TTEntry> table;
-    size_t filledCount = 0;   
 };

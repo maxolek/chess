@@ -10,8 +10,8 @@ Usage:
 """
 import duckdb
 import argparse
-from . import etl
-from .etl.paths import RAW_DB, ANALYTICS_DB
+from .. import etl
+from ..etl.paths import RAW_DB, ANALYTICS_DB
 
 # ─────────────────────────────────────────────────────────────────────────────
 # UDFs

@@ -596,7 +596,7 @@ import duckdb
 import shutil
 import os
 from pathlib import Path
-from .etl.paths import ANALYTICS_DB
+from ..etl.paths import ANALYTICS_DB
 
 if __name__ == "__main__":
     DB = os.environ.get('CHESS_ANALYTICS_DB') or str(ANALYTICS_DB)
