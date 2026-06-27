@@ -22,13 +22,13 @@ Engine::Engine(EngineConfig& config)
     game_board = Board();
     search_board = game_board; //Board(game_board);
 
-    movegen = std::make_unique<MoveGenerator>(search_board);
+    movegen = std::make_unique<MoveGenerator>(cfg, search_board);
 
-    evaluator.nnue.load(cfg.engine.nnue_weight_path);
+    nnue.load(cfg.engine.nnue_weight_path);
     evaluator.loadOpeningPST(cfg.engine.opening_pst_path);
     evaluator.loadEndgamePST(cfg.engine.endgame_pst_path);
 
-    searcher = std::make_unique<Searcher>(*this, search_board, evaluator, evaluator.nnue);
+    searcher = std::make_unique<Searcher>(*this, search_board, evaluator, nnue);
     tt.clear();
 
     book.load(cfg.engine.opening_book_path);
@@ -100,7 +100,7 @@ void Engine::setOption(const std::string& name, const std::string& value) {
     else if (name == "NNUE") {
         cfg.options._NNUE = boolFromString(value);
         if (cfg.options._NNUE) {
-            evaluator.nnue.load(cfg.engine.nnue_weight_path); // load NNUE if path is set
+            nnue.load(cfg.engine.nnue_weight_path); // load NNUE if path is set
         }
         std::cout << "info string set NNUE = " << (cfg.options._NNUE ? "true" : "false") << std::endl;
     }
@@ -121,8 +121,8 @@ void Engine::setOption(const std::string& name, const std::string& value) {
         std::cout << "info string set moveordering = " << (cfg.options._MOVE_ORDERING ? "true" : "false") << std::endl;
     }
     else if (name == "mvvlva_ordering") {
-        cfg.options._MMVLVA_ORDERING = boolFromString(value);
-        std::cout << "info string set mvvlva_ordering = " << (cfg.options._MMVLVA_ORDERING ? "true" : "false") << std::endl;
+        cfg.options._MVVLVA_ORDERING = boolFromString(value);
+        std::cout << "info string set mvvlva_ordering = " << (cfg.options._MVVLVA_ORDERING ? "true" : "false") << std::endl;
     }
     else if (name == "see_ordering") {
         cfg.options._SEE_ORDERING = boolFromString(value);
@@ -159,7 +159,7 @@ void Engine::setOption(const std::string& name, const std::string& value) {
     else if (name == "nnue_weight_file") {
         cfg.engine.nnue_weight_path = PROJECT_ROOT / fs::path("bin/nnue_wgts") / fs::path(value + ".bin");
         if (cfg.options._NNUE) {
-            if(evaluator.nnue.load(cfg.engine.nnue_weight_path)) {
+            if(nnue.load(cfg.engine.nnue_weight_path)) {
                 std::cout << "info string NNUE loaded successfully: " << cfg.engine.nnue_weight_path << std::endl;
             } else {
                 std::cout << "info string Failed to load NNUE: " << cfg.engine.nnue_weight_path << std::endl;
@@ -399,7 +399,7 @@ void Engine::computeSearchTime(const SearchSettings& settings) {
 
 
 void Engine::startSearch() {
-    evaluator.nnue.build_accumulators(search_board);
+    nnue.build_accumulators(search_board);
 
     // book probe
     if (!cfg.engine.opening_book_path.empty()) {
@@ -509,21 +509,17 @@ void Engine::iterativeDeepening() {
         if (depth > 1) {
             std::sort(first_moves, first_moves + count,
                       [&](Move a, Move b) { return get_prev_eval(a) > get_prev_eval(b); });
-
-            if (depth >= cfg.search.ASPIRATION_START_DEPTH) {
-                delta = std::max(delta, cfg.search.ASPIRATION_WINDOW + depth * cfg.search.ASPIRATION_DEPTH_SCALE);
-                alpha = last_result.eval - delta;
-                beta  = last_result.eval + delta;
-            }
         } else {
             searcher->orderedMoves(first_moves, count, game_board, 0, {});
         }
 
         // --- search ---
-        if (depth < cfg.search.ASPIRATION_START_DEPTH) {
-            result = searcher->search(first_moves, count, depth, limits,
-                                     last_result.best_line.line);
-        } else {
+        if (cfg.options._ASPIRATION && (depth >= cfg.search.ASPIRATION_START_DEPTH)) {
+            
+            delta = std::max(delta, cfg.search.ASPIRATION_WINDOW + depth * cfg.search.ASPIRATION_DEPTH_SCALE);
+            alpha = last_result.eval - delta;
+            beta  = last_result.eval + delta;
+            
             while (true) {
                 result = searcher->searchAspiration(first_moves, count, depth, limits,
                                                    last_result.best_line.line,
@@ -540,7 +536,10 @@ void Engine::iterativeDeepening() {
 
                 delta *= cfg.search.ASPIRATION_RESEARCH_SCALE;
             }
-        }
+        } else { 
+            result = searcher->search(first_moves, count, depth, limits,
+                                     last_result.best_line.line);
+        } 
 
 
         // --- store results ---
@@ -689,7 +688,7 @@ bool Engine::checkGameEnd() {
     g_game_end_time = std::chrono::steady_clock::now();
     g_gamelog.totalTimeSeconds = std::chrono::duration<double>(g_game_end_time - g_game_start_time).count();
     g_gamelog.moves = game_board.allGameMoves;
-    g_gamelog.finalEval = evaluator.nnue.full_eval(game_board);
+    g_gamelog.finalEval = nnue.full_eval(game_board);
     logGameLog();
     g_gamelog.finalized = true;
 
@@ -721,7 +720,7 @@ void Engine::trackGame() {
 }
 
 void Engine::finalizeGameLog() {
-    g_gamelog.finalEval = evaluator.nnue.full_eval(game_board);
+    g_gamelog.finalEval = nnue.full_eval(game_board);
     logGameLog();
 }
 
@@ -823,8 +822,8 @@ void Engine::staticEvalTest() {
 
 
 void Engine::nnueEvalTest() {
-    evaluator.nnue.build_accumulators(search_board);
-    int eval = evaluator.nnue.evaluate(search_board.is_white_move);
+    nnue.build_accumulators(search_board);
+    int eval = nnue.evaluate(search_board.is_white_move);
 
     if (!search_board.is_white_move) eval = -eval;
 

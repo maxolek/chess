@@ -8,6 +8,10 @@ U64 PrecomputedMoveData::fullPawnAttacks[64][2] = {};
 U64 PrecomputedMoveData::blankKnightAttacks[64] = {};
 U64 PrecomputedMoveData::blankKingAttacks[64] = {};
 
+SMasks PrecomputedMoveData::blankBishopAttacks[64][2] = {};
+SMasks PrecomputedMoveData::blankRookAttacks[64][2] = {};
+SMasks PrecomputedMoveData::blankQueenAttacks[64][4] = {};
+
 U64 PrecomputedMoveData::passedPawnMasks[64][2] = {};
 U64 PrecomputedMoveData::rayMasks[64][64] = {};
 U64 PrecomputedMoveData::alignMasks[64][64] = {};
@@ -20,6 +24,10 @@ void PrecomputedMoveData::init() {
     generateFullPawnAttacks();
     generateBlankKnightAttacks();
     generateBlankKingAttacks();
+
+    generateBlankBishopAttacks();
+    generateBlankRookAttacks();
+    generateBlankQueenAttacks();
 
     generatePassedPawnsMasks();
     generateKingDistances();
@@ -138,6 +146,102 @@ void PrecomputedMoveData::generateBlankKingAttacks() {
         }
         blankKingAttacks[square] = bitboard;
         bitboard = 0ULL;
+    }
+}
+
+
+void PrecomputedMoveData::generateBlankBishopAttacks() {
+    SMasks mask;
+    int file;
+    int rank;
+    int left_bound; int right_bound;
+    U64 bitboard = 0ULL;
+    
+    for (int square = a1; square <= h8; square++) {
+        file = square % 8;
+        rank = square / 8; // int trunc in division gives multiple of 8
+        for (int direction = 0; direction < 2; direction++) {
+            if (direction) {
+                    // BR -> UL    changes of 7
+                left_bound = std::min(file, 7 - rank); // distance from left or top
+                right_bound = std::min(rank, 7 - file); // distance from right or bottom
+                for (int i = -right_bound; i <= left_bound; i++) {
+                    if (i==0) {
+                        mask.lower = bitboard;
+                        continue;
+                    }
+                    set_bit(bitboard, square + 7*i);
+                }
+                mask.upper = bitboard ^ mask.lower;
+            } else {
+                    // BL -> UR    changes of 9
+                left_bound = std::min(file,rank); // distance from left or bottom
+                right_bound = 7 - std::max(file,rank); // distance from right or top
+                for (int i = -left_bound; i <= right_bound; i++) {
+                    if (i==0) {
+                        mask.lower = bitboard;
+                        continue;
+                    }
+                    set_bit(bitboard, square + 9*i);
+                }
+                mask.upper = bitboard ^ mask.lower;
+            }
+            
+            mask.lineEx = mask.lower | mask.upper;
+            blankBishopAttacks[square][direction] = mask;
+            bitboard = 0ULL;
+        }
+    }
+}
+
+void PrecomputedMoveData::generateBlankRookAttacks() {
+    SMasks mask;
+    int file;
+    int rank;
+    U64 bitboard = 0ULL;
+
+    for (int square = a1; square <= h8; square++) {
+        file = square % 8;
+        rank = square / 8;
+        for (int direction = 0; direction < 2; direction++) {
+            if (direction) {
+                for (int i = -file; i < 8-file; i++) {
+                    if (i==0) {
+                        mask.lower = bitboard;
+                        continue;
+                    }
+                    set_bit(bitboard, square + i);
+                }
+                mask.upper = bitboard ^ mask.lower;
+            } else {
+                for (int i = -rank; i < 8-rank; i++) {
+                    if (i==0) {
+                        mask.lower = bitboard;
+                        continue;
+                    }
+                    set_bit(bitboard, square + 8*i);
+                }
+                mask.upper = bitboard ^ mask.lower;
+            }
+
+            mask.lineEx = mask.lower | mask.upper;
+            blankRookAttacks[square][direction] = mask;
+            bitboard = 0ULL;
+        }
+    }
+
+}
+
+void PrecomputedMoveData::generateBlankQueenAttacks() {
+    SMasks mask;
+    for (int square = a1; square <= h8; square++) {
+        for (int direction = 0; direction < 4; direction++) {
+            if (direction < 2)
+                mask = blankBishopAttacks[square][direction];
+            else
+                mask = blankRookAttacks[square][direction-2];
+            blankQueenAttacks[square][direction] = mask;
+        }
     }
 }
 

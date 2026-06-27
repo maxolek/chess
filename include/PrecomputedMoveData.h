@@ -13,6 +13,11 @@ public:
     static U64 blankKnightAttacks[64];
     static U64 blankKingAttacks[64];
 
+    static SMasks blankBishopAttacks[64][2]; // lower, upper, lineEx=lower|upper // direction
+    static SMasks blankRookAttacks[64][2]; // lower, upper, lineEx=lower|upper // direction
+    static SMasks blankQueenAttacks[64][4]; // bishop | rook // direction
+    
+
     static U64 passedPawnMasks[64][2];   // [square][white/black]
 
     static U64 rayMasks[64][64];         // line connecting square_a -> square_b
@@ -30,6 +35,9 @@ private:
     static void generateFullPawnMoves();
     static void generateFullPawnAttacks();
     static void generateBlankKnightAttacks();
+    static void generateBlankBishopAttacks();
+    static void generateBlankRookAttacks();
+    static void generateBlankQueenAttacks();
     static void generateBlankKingAttacks();
     static void generatePassedPawnsMasks();
     static void generateKingDistances();

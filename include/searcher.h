@@ -54,7 +54,7 @@ public:
     Engine& engine;
     Board& board; //= engine.search_board;
     Evaluator& eval; // = engine.evaluator;
-    NNUE& nnue; // = engine.evaluator.nnue;
+    NNUE& nnue; // = engine.nnue;
 
     bool stop = false;
 
@@ -143,10 +143,6 @@ public:
         int search_depth,
         int ply
     );
-
-    // ------------------------------- Make/unmake w/ NNUE -------------------------------
-    void do_move(const Move& move);
-    void undo_move(const Move& move, const Board& before);
 };
 
 #endif // SEARCHER_H

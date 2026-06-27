@@ -5,9 +5,10 @@
 
 #include <moveGenerator.h>
 
-MoveGenerator::MoveGenerator(const Board& _board) {
+MoveGenerator::MoveGenerator(const EngineConfig& config, const Board& _board) {
     // load movegen at given state
     //board = _board;
+    use_magics = config.engine.MAGICS;
     updateBitboards(_board);
     side = _board.is_white_move ? 0 : 1;
     in_check = false; // board.is_in_check;
@@ -34,7 +35,8 @@ int MoveGenerator::generateMoves(const Board& _board, bool _quiescence) {
     // detect checks, pins, etc.
     generatePawnAttacks(false); // false, false normally
     generateKnightMoves(false);
-    generateSlidingMoves(false);
+    if (use_magics) generateSlidingMovesMagics(false);
+    else generateSlidingMovesClassic(false);
     generateKingMoves(false);
 
     //if (check_ray_mask) {in_check = true;}
@@ -47,7 +49,8 @@ int MoveGenerator::generateMoves(const Board& _board, bool _quiescence) {
         generatePawnPushes(true);
         generatePawnAttacks(true);
         generateKnightMoves(true);
-        generateSlidingMoves(true);
+        if (use_magics) generateSlidingMovesMagics(true);
+        else generateSlidingMovesClassic(true);
         generateKingMoves(true);
     }
 
@@ -65,7 +68,8 @@ bool MoveGenerator::hasLegalMoves(const Board& _board) {
     // detect checks, pins, etc.
     generatePawnAttacks(false); // false, false normally
     generateKnightMoves(false);
-    generateSlidingMoves(false);
+    if (use_magics) generateSlidingMovesMagics(false);
+    else generateSlidingMovesClassic(false);
     generateKingMoves(false);
 
     //if (check_ray_mask) {in_check = true;}
@@ -80,8 +84,11 @@ bool MoveGenerator::hasLegalMoves(const Board& _board) {
         if (count > 0) {return true;}
         generateKnightMoves(true);
         if (count > 0) {return true;}
-        generateSlidingMoves(true);
+
+        if (use_magics) generateSlidingMovesMagics(false);
+        else generateSlidingMovesClassic(false);
         if (count > 0) {return true;}
+
         generateKingMoves(true);
         if (count > 0) {return true;}
     }
@@ -169,9 +176,11 @@ bool MoveGenerator::isEnpassantPinned(int start_square, int target_file) {
     return false;
 }
 
-// post_move_attacks_only is used to update postEnpassantOpponentAttackMap without updating other vars
-//      since this is used to ensure enpassant legality it is only necessary for rook/queen pieces
-void MoveGenerator::generateSlidingMoves(bool ours) {
+// -----------------------
+// ---- sliding moves ----
+// -----------------------
+
+void MoveGenerator::generateSlidingMovesMagics(bool ours) {
     U64 occ = own | opp;
     Move potential_move;
 
@@ -214,6 +223,64 @@ void MoveGenerator::generateSlidingMoves(bool ours) {
         }
     }
 }
+
+U64 MoveGenerator::odiff(U64 occ, SMasks pMask) {
+    U64 lower, upper, ms1b, odiff_board;
+    lower = pMask.lower & occ;
+    upper = pMask.upper & occ;
+
+    ms1b = U64(0x8000000000000000) >> __builtin_clzll(lower | 1); // ms1b of lower (at least bit zero)
+    odiff_board = upper ^ (upper - ms1b);
+
+    return pMask.lineEx & odiff_board;
+}
+
+void MoveGenerator::generateSlidingMovesClassic(bool ours) {
+
+    auto processSlider = [&](U64 pieces, int num_dirs, auto attack_fn) {
+        while (pieces) {
+            int start_square = getLSB(pieces);
+            pieces &= pieces - 1;
+
+            for (int dir = 0; dir < num_dirs; dir++) {
+                const auto& atk = attack_fn(start_square, dir);
+                U64 potential = Bits::fullSet;
+
+                if (!ours) {
+                     U64 o_diff = odiff(own | opp, atk);
+                    potential &= o_diff & ~opp;
+                    opponentAttackMap |= o_diff;
+
+                    if (potential & (own & kings)) {
+                        in_double_check = in_check;
+                        check_ray_mask     |= PrecomputedMoveData::rayMasks[start_square][own_king_square];
+                        check_ray_mask_ext |= PrecomputedMoveData::alignMasks[start_square][own_king_square];
+                        in_check = true;
+                    }
+                    if (atk.lineEx & (own & kings))
+                        pin_rays |= PrecomputedMoveData::rayMasks[start_square][own_king_square] & ~(1ULL << own_king_square);
+
+                } else {
+                    potential &= odiff(own | opp, atk) & ~own;
+                    ownAttackMap |= potential;
+
+                    potential = limitPinnedMoves(start_square, potential);
+                    potential = restrictCheckMoves(potential);
+
+                    addMovesFromBitboard(start_square, potential);
+                }
+            }
+        }
+    };
+
+    processSlider(rooks   & (ours ? own : opp), 2, [](int s, int d) -> const auto& { return PrecomputedMoveData::blankRookAttacks[s][d];   });
+    processSlider(bishops & (ours ? own : opp), 2, [](int s, int d) -> const auto& { return PrecomputedMoveData::blankBishopAttacks[s][d]; });
+    processSlider(queens  & (ours ? own : opp), 4, [](int s, int d) -> const auto& { return PrecomputedMoveData::blankQueenAttacks[s][d];  });
+}
+
+// ----------------------------
+// -- static move generation --
+// ----------------------------
 
 void MoveGenerator::generateKnightMoves(bool ours) {
     U64 valid_knights = ours ? knights & own : knights & opp;

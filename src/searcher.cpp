@@ -21,7 +21,11 @@ bool Searcher::shouldPrune(Move& move, int standPat, int alpha, int search_depth
     int captured = board.getCapturedPiece(move.TargetSquare());
 
     // see pruning (bad captures ... excl promo and checks)
-    if (captured != -1 && !move.IsPromotion() && !board.is_in_check) {
+    if (engine.cfg.options._SEE_PRUNING 
+        && captured != -1 
+        && !move.IsPromotion() 
+        && !board.is_in_check
+    ) {
         int seeGain = eval.SEE(board, move);
         if (seeGain < -50) {
             STATS_SEE_PRUNE(search_depth, ply);
@@ -30,7 +34,12 @@ bool Searcher::shouldPrune(Move& move, int standPat, int alpha, int search_depth
     }
 
     // delta purning (quiet moves that wont raise alpha anyway)
-    if (captured != -1 && !move.IsPromotion() && !board.is_in_check) {
+    if (
+        engine.cfg.options._DELTA_PRUNING
+        && captured != -1 
+        && !move.IsPromotion() 
+        && !board.is_in_check
+    ) {
         if (standPat + engine.cfg.search.DELTA_PRUNE_THRESHOLD < alpha) {
             STATS_DELTA_PRUNE(search_depth, ply);
             return true;
@@ -47,9 +56,11 @@ bool Searcher::shouldPrune(Move& move, int standPat, int alpha, int search_depth
 int Searcher::moveScore(const Move& move, const Board& boardRef,
                         int ply, const Move& ttMove, const std::vector<Move>& previousPV) {
 
+    // TT + PV
     if (Move::SameMove(ttMove, move)) return engine.cfg.scores.TT_BASE;
     if (ply < (int)previousPV.size() && Move::SameMove(move, previousPV[ply])) return engine.cfg.scores.PV_BASE;
 
+    // promotions
     if (move.IsPromotion()) {
         int promoBonus = 0;
         switch (move.PromotionPieceType()) {
@@ -67,15 +78,27 @@ int Searcher::moveScore(const Move& move, const Board& boardRef,
         return engine.cfg.scores.PROMO_BASE + promoBonus;
     }
 
+    // captures (scored via SEE or MVVLVA)
     int captured = boardRef.getCapturedPiece(move.TargetSquare());
     if (captured != -1) {
-        int seeScore = eval.SEE(boardRef, move);
-        return seeScore >= 0 ? engine.cfg.scores.GOOD_CAP_BASE + seeScore : engine.cfg.scores.BAD_CAP_BASE + seeScore;
+        // SEE
+        if (engine.cfg.options._SEE_ORDERING) {
+            int seeScore = eval.SEE(boardRef, move);
+            return seeScore >= 0 ? engine.cfg.scores.GOOD_CAP_BASE + seeScore : engine.cfg.scores.BAD_CAP_BASE + seeScore;
+        }
+        // MVVLVA
+        if (engine.cfg.options._MVVLVA_ORDERING) {
+            int attacker = board.getMovedPiece(move.StartSquare());
+            int victim = board.getMovedPiece(move.TargetSquare());
+            return 100000 + 10 * victim - attacker;
+        }
     }
 
+    // killer moves
     if (Move::SameMove(killerMoves[ply][0], move)) return engine.cfg.scores.KILLER_BASE;
     if (Move::SameMove(killerMoves[ply][1], move)) return engine.cfg.scores.KILLER_BASE - 1;
 
+    // quiet moves (history heuristic)
     int piece = boardRef.getMovedPiece(move.StartSquare());
     int sidePiece = boardRef.is_white_move ? piece : piece + 6;
 
@@ -88,6 +111,7 @@ void Searcher::orderedMoves(Move moves[MAX_MOVES], size_t count,
     ScopedTimer timer(T_SCORE_ORDER);
     U64 hash = boardRef.zobrist_hash;
 
+    // TT move choice
     Move ttMove = Move::NullMove();
     TTEntry* entry = engine.tt.probe(hash);
     if (entry && entry->key == hash && !Move::SameMove(Move::NullMove(), entry->bestMove)) {
@@ -95,6 +119,7 @@ void Searcher::orderedMoves(Move moves[MAX_MOVES], size_t count,
             if (Move::SameMove(moves[i], entry->bestMove)) ttMove = entry->bestMove;
     }
 
+    // sorting
     std::vector<std::pair<int, Move>> scored; scored.reserve(count);
     for (size_t i = 0; i < count; ++i)
         scored.emplace_back(moveScore(moves[i], boardRef, ply, ttMove, previousPV), moves[i]);
@@ -111,7 +136,8 @@ int Searcher::generateAndOrderMoves(Move moves[MAX_MOVES], int ply, const std::v
     int count = engine.movegen->generateMoves(board, false); // the bool flag for captures-only or not — adapt if signature differs
     std::copy_n(engine.movegen->moves, count, moves);
 
-    orderedMoves(moves, static_cast<size_t>(count), board, ply, previousPV);
+    if (engine.cfg.options._MOVE_ORDERING) orderedMoves(moves, static_cast<size_t>(count), board, ply, previousPV);
+    
     return count;
 }
 
@@ -127,7 +153,7 @@ int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int 
     // draw detection
     if (board.isThreefold() || board.currentGameState.fiftyMoveCounter >= 50) {
         //engine.tt.store(board.zobrist_hash, depth, ply, 0, EXACT, Move::NullMove());
-        return 0;
+        return engine.cfg.search.DRAW_EVAL;
     }
 
 
@@ -146,7 +172,8 @@ int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int 
 
     // Use incremental NNUE output (accumulators must be kept in sync)
     //boardallGameMoves.back().PrintMove();
-    int standPat = nnue.evaluate(board.is_white_move);
+    int standPat = (engine.cfg.options._NNUE) ? nnue.evaluate(board.is_white_move)
+                                            : eval.taperedEval(board);
     if (standPat >= beta) return beta;
     if (standPat > alpha) alpha = standPat;
 
@@ -173,14 +200,14 @@ int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int 
         if (shouldPrune(m, standPat, alpha, search_depth, ply)) continue;
 
         // Apply NNUE incremental update then board move
-        nnue.on_make_move(board, m);
+        if (engine.cfg.options._NNUE) nnue.on_make_move(board, m);
         board.MakeMove(m);
 
         int score; PV childPV;
         score = -quiescence(-beta, -alpha, childPV, limits, ply+1, depth, search_depth);
 
         // Undo board & NNUE (capture before must be reconstructed from states)
-        nnue.on_unmake_move(board, m);
+        if (engine.cfg.options._NNUE) nnue.on_unmake_move(board, m);
         board.UnmakeMove(m);
 
         if (score >= beta) { 
@@ -219,11 +246,13 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
 
     if (board.isThreefold() || board.currentGameState.fiftyMoveCounter >= 50) {
         //engine.tt.store(board.zobrist_hash, depth, ply, 0, EXACT, Move::NullMove());
-        return 0;
+        return engine.cfg.search.DRAW_EVAL;
     }
 
     if (depth == 0) {
-        return use_quiescence ? quiescence(alpha, beta, pv, limits, ply, depth, ply) : nnue.evaluate(board.is_white_move);
+        return use_quiescence ? quiescence(alpha, beta, pv, limits, ply, depth, ply) 
+                            : engine.cfg.options._NNUE ? nnue.evaluate(board.is_white_move)
+                                                        : eval.taperedEval(board);
     }
 
     // --- TT probe ---
@@ -299,7 +328,7 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
 
         // Apply NNUE/update & board
         U64 pre_hash = board.zobrist_hash;
-        nnue.on_make_move(board, m);
+        if (engine.cfg.options._NNUE) nnue.on_make_move(board, m);
         board.MakeMove(m);
         U64 mid_hash = board.zobrist_hash;
 
@@ -338,7 +367,7 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
         } else {
             ScopedTimer timer(T_PVS_SEARCH);
             score = -negamax(depth - 1 - _lmr_R, -(alpha+1), -alpha, childPV, previousPV, limits, ply + 1, use_quiescence);
-            // fail-high --> re-search with full window
+            // fail-high --> re-search with full window (can raise alpha)
             // beta-alpha>1 is a redudancy check
             if (score > alpha && beta-alpha > 1) {
                 STATS_PVS_RESEARCH(depth+ply, ply);
@@ -346,7 +375,7 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
             }
         }
 
-        nnue.on_unmake_move(board, m);
+        if (engine.cfg.options._NNUE) nnue.on_unmake_move(board, m);
         board.UnmakeMove(m);
 
         if (score > bestEval) {
@@ -394,7 +423,7 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
     SearchResult result;
 
     // Build NNUE accumulators for root position
-    nnue.build_accumulators(board);
+    if (engine.cfg.options._NNUE) nnue.build_accumulators(board);
 
     for (int i = 0; i < count; ++i) {
         if (limits.out_of_time()) break;
@@ -402,7 +431,7 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
         if (Move::SameMove(m, Move::NullMove())) continue;
 
         //nnue->debug_check_incr_vs_full_after_make(board, m, *nnue);
-        nnue.on_make_move(board, m);
+        if (engine.cfg.options._NNUE) nnue.on_make_move(board, m);
         board.MakeMove(m);
 
         //std::cout << "------" << std::endl; m.PrintMove(); std::cout << "------" << std::endl;
@@ -410,11 +439,11 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
         int eval; PV childPV;
         int ply = 1;
         STATS_NODE(depth, ply);       // change to result.eval for proper alpha propogation
-        eval = -negamax(depth - 1, -MATE_SCORE, MATE_SCORE, childPV, previousPV, limits, ply+1, true);
+        eval = -negamax(depth - 1, -MATE_SCORE, MATE_SCORE, childPV, previousPV, limits, ply+1, engine.cfg.options._QUIESCENCE);
 
         // Undo
         //nnue->debug_check_incr_vs_full_after_unmake(board, m, *nnue);
-        nnue.on_unmake_move(board, m);
+        if (engine.cfg.options._NNUE) nnue.on_unmake_move(board, m);
         board.UnmakeMove(m);
 
         //std::cout << "after unmake - should be init position" << std::endl;
@@ -449,22 +478,22 @@ SearchResult Searcher::searchAspiration(Move legal_moves[MAX_MOVES], int count, 
     SearchResult result;
 
     // Build NNUE accumulators for root position
-    nnue.build_accumulators(board);
+    if (engine.cfg.options._NNUE) nnue.build_accumulators(board);
 
     for (int i = 0; i < count; ++i) {
         if (limits.out_of_time()) break;
         Move m = legal_moves[i];
         if (Move::SameMove(m, Move::NullMove())) continue;
 
-        nnue.on_make_move(board, m);
+        if (engine.cfg.options._NNUE) nnue.on_make_move(board, m);
         board.MakeMove(m);
 
         int eval; PV childPV;
         int ply = 1;
         STATS_NODE(depth, ply);
-        eval = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply+1, true);
+        eval = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply+1, engine.cfg.options._QUIESCENCE);
 
-        nnue.on_unmake_move(board, m);
+        if (engine.cfg.options._NNUE) nnue.on_unmake_move(board, m);
         board.UnmakeMove(m);
 
         if (limits.out_of_time() && i > 0) break;
@@ -485,21 +514,6 @@ SearchResult Searcher::searchAspiration(Move legal_moves[MAX_MOVES], int count, 
     }
 
     return result;
-}
-
-// -----------------------
-// make/undo move helpers
-// -----------------------
-
-void Searcher::do_move(const Move& move) {
-    nnue.on_make_move(board, move);
-    board.MakeMove(move);
-}
-
-void Searcher::undo_move(const Move& move, const Board& before) {
-    // board currently contains the position AFTER the move, so Unmake it then call on_unmake_move
-    nnue.on_unmake_move(board, move);
-    board.UnmakeMove(move);
 }
 
 // -----------------------

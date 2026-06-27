@@ -28,12 +28,15 @@ public:
     // Storage Type
     // -----------------------
     bool quiescence = false;
-    
+    bool use_magics = true;
 
     // ------------------------
     // Constructor
     // ------------------------
-    MoveGenerator(const Board& _board);
+    MoveGenerator(
+        const EngineConfig& config,
+        const Board& _board
+    );
 
     // ------------------------
     // Public Move Generation
@@ -43,11 +46,14 @@ public:
     // quiescence limited generation (check-evasions, captures, promotions, limited quiet moves)
     // Check if side has any legal moves (accelerated generation)
     bool hasLegalMoves(const Board& _board);
+    // classic move generation method
+    U64 odiff(U64 occ, SMasks pMask);
 
     // ------------------------
     // Individual Piece Move Generators
     // ------------------------
-    void generateSlidingMoves(bool ours);
+    void generateSlidingMovesMagics(bool ours); // magic bitboards
+    void generateSlidingMovesClassic(bool ours); // odiff to generate legal sliding moves
     void generateKnightMoves(bool ours);
     void generatePawnPushes(bool ours);
     void generatePawnAttacks(bool ours);

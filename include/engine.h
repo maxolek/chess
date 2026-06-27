@@ -95,10 +95,11 @@ public:
     int get_prev_eval(Move m) const;
 
     // constructors
-    explicit Engine(EngineConfig& config);
+    Engine(EngineConfig& config);
 
     // search + eval
     std::unique_ptr<Searcher> searcher;
+    NNUE nnue; 
     Evaluator evaluator;                // preload PST tables, eval
     TranspositionTable tt; // outside searcher for future multi-thread
 

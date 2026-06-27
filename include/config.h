@@ -40,7 +40,7 @@ struct SearchOptions {
     bool _DELTA_PRUNING        = true;
     bool _SEE_PRUNING          = true;
     bool _MOVE_ORDERING        = true;
-    bool _MMVLVA_ORDERING       = false;
+    bool _MVVLVA_ORDERING       = false;
     bool _SEE_ORDERING          = true;
     // eval
     bool UCI_SHOW_WDL       = false;
@@ -134,7 +134,7 @@ inline void apply_config_file(EngineConfig& cfg, const fs::path& path) {
     if (auto* v = get("delta_pruning"))   cfg.options._DELTA_PRUNING  = b(*v);
     if (auto* v = get("see_pruning"))     cfg.options._SEE_PRUNING    = b(*v);
     if (auto* v = get("move_ordering"))   cfg.options._MOVE_ORDERING   = b(*v);
-    if (auto* v = get("mvvlva_ordering")) cfg.options._MMVLVA_ORDERING = b(*v);
+    if (auto* v = get("mvvlva_ordering")) cfg.options._MVVLVA_ORDERING = b(*v);
     if (auto* v = get("see_ordering"))    cfg.options._SEE_ORDERING    = b(*v);
     if (auto* v = get("uci_show_wdl"))   cfg.options.UCI_SHOW_WDL    = b(*v);
     if (auto* v = get("nnue"))            cfg.options._NNUE             = b(*v);
@@ -154,7 +154,7 @@ inline void apply_config_file(EngineConfig& cfg, const fs::path& path) {
     if (auto* v = get("pondering"))        cfg.engine.PONDERING         = b(*v);
     if (auto* v = get("nnue_weight_path"))  cfg.engine.nnue_weight_path  = Logging::project_root / *v;
     if (auto* v = get("opening_book_path")) cfg.engine.opening_book_path = Logging::project_root / *v;
-    if (auto* v = get("syzygy_path"))       cfg.engine.syzygy_path       = Logging::project_root / *v;
+    if (auto* v = get("syzygy_path"))       cfg.engine.syzygy_path       = Logging::project_root / *v;  
 }
 
 inline void create_config_file(const EngineConfig& cfg, std::string config_name) {
@@ -209,7 +209,7 @@ inline void create_config_file(const EngineConfig& cfg, std::string config_name)
       << "delta_pruning     = " << b(cfg.options._DELTA_PRUNING)   << "\n"
       << "see_pruning       = " << b(cfg.options._SEE_PRUNING)     << "\n"
       << "move_ordering     = " << b(cfg.options._MOVE_ORDERING)   << "\n"
-      << "mvvlva_ordering   = " << b(cfg.options._MMVLVA_ORDERING) << "\n"
+      << "mvvlva_ordering   = " << b(cfg.options._MVVLVA_ORDERING) << "\n"
       << "see_ordering      = " << b(cfg.options._SEE_ORDERING)    << "\n\n"
       << "uci_show_wdl      = " << b(cfg.options.UCI_SHOW_WDL)    << "\n"
       << "nnue              = " << b(cfg.options._NNUE)             << "\n\n\n";

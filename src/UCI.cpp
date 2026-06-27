@@ -57,7 +57,7 @@ void UCI::handleCommand(const std::string& line) {
             std::cout << "option name aspiration type check default " << engine->cfg.options._ASPIRATION << "\n";
             // move ordering
             std::cout << "option name moveordering type check default " << engine->cfg.options._MOVE_ORDERING << "\n";
-            std::cout << "option name mvvlva_ordering type check default " << engine->cfg.options._MMVLVA_ORDERING << "\n";
+            std::cout << "option name mvvlva_ordering type check default " << engine->cfg.options._MVVLVA_ORDERING << "\n";
             std::cout << "option name see_ordering type check default " << engine->cfg.options._SEE_ORDERING << "\n";
             // pruning
             std::cout << "option name delta_pruning type check default " << engine->cfg.options._DELTA_PRUNING<< "\n";
@@ -137,6 +137,9 @@ void UCI::handleCommand(const std::string& line) {
 
         // apply config
         apply_config_file(engine->cfg, configs[choice - 1]);
+
+        // apply specifics (e.g. tt.resize)
+        engine->tt.resize(engine->cfg.engine.HASH_SIZE_MB);
     }
     else if (token == "apply_config") { // apply config option (without seeing options)
         std::string name; 
@@ -146,6 +149,9 @@ void UCI::handleCommand(const std::string& line) {
         if (path.extension() != ".ini") path += ".ini";
         
         apply_config_file(engine->cfg, path);
+
+        // apply specifics (e.g. tt.resize)
+        engine->tt.resize(engine->cfg.engine.HASH_SIZE_MB);
     }
     else if (token == "save_config") { // save current config
         std::string name;
