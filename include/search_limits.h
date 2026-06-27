@@ -6,7 +6,7 @@
 struct SearchLimits {
     std::chrono::steady_clock::time_point start_time;
     int time_limit_ms;
-    int max_depth = 30;
+    int max_depth = 32;
     bool stopped;
 
     SearchLimits(int ms = 0, int depth = -1)

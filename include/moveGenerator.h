@@ -10,7 +10,7 @@
 #include "PrecomputedMoveData.h"
 #include "move.h"
 #include "board.h"
-#include "config.h"
+
 
 class MoveGenerator {
 public:
@@ -28,15 +28,11 @@ public:
     // Storage Type
     // -----------------------
     bool quiescence = false;
-    bool use_magics = true;
 
     // ------------------------
     // Constructor
     // ------------------------
-    MoveGenerator(
-        const EngineConfig& config,
-        const Board& _board
-    );
+    MoveGenerator(const Board& _board);
 
     // ------------------------
     // Public Move Generation
@@ -47,13 +43,12 @@ public:
     // Check if side has any legal moves (accelerated generation)
     bool hasLegalMoves(const Board& _board);
     // classic move generation method
-    U64 odiff(U64 occ, SMasks pMask);
+    //U64 odiff(U64 occ, SMasks pMask);
 
     // ------------------------
     // Individual Piece Move Generators
     // ------------------------
-    void generateSlidingMovesMagics(bool ours); // magic bitboards
-    void generateSlidingMovesClassic(bool ours); // odiff to generate legal sliding moves
+    void generateSlidingMoves(bool ours); // magic bitboards
     void generateKnightMoves(bool ours);
     void generatePawnPushes(bool ours);
     void generatePawnAttacks(bool ours);

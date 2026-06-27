@@ -83,8 +83,7 @@ int main() {
     Magics::initMagics();
 
     // engine
-    EngineConfig config = EngineConfig();
-    Engine engine(config);
+    Engine engine;
     UCI uci(engine);
 
     // uci loop

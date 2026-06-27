@@ -15,7 +15,7 @@
 #include "game_log.h"
 #include "NNUE.h"
 #include "book.h"
-#include "config.h"
+
 #include <filesystem>
 
 class Searcher;
@@ -53,7 +53,7 @@ struct GameTracker {
 // SEARCH
 
 struct SearchSettings {
-    int depth = 0;         // max depth (0 = no limit)
+    int depth = 0;         // max depth (0 = no limit besides global engine limit)
     int nodes = 0;         // max nodes
     int movetime = 0;      // fixed search time (ms)
     int mate = 0;          // search for mate in N
@@ -67,6 +67,19 @@ struct SearchSettings {
     bool send_eval = false; // send evaluation instead of move
 };
 
+struct EngineOptions {
+    int  MOVE_OVERHEAD_MS = 30;
+    int  MAX_THREADS      = 1;
+    int  HASH_SIZE_MB     = 512;
+    bool PONDERING        = false;
+    bool UCI_SHOW_WDL     = false;
+
+    fs::path opening_pst_path  = Logging::project_root / "bin/pst/pst_opening.txt";
+    fs::path endgame_pst_path  = Logging::project_root / "bin/pst/pst_endgame.txt";
+    fs::path nnue_weight_path  = Logging::project_root / "bin/nnue_wgts/768_128x2.bin";
+    fs::path opening_book_path = Logging::project_root / "bin/Titans.bin";
+    fs::path syzygy_path       = Logging::project_root;
+};
 
 // ------------------
 // -- Engine Class --
@@ -76,7 +89,7 @@ class Engine {
 private:
 public:
     // precomp data
-    EngineConfig& cfg;
+    EngineOptions engine_options;
     PolyglotBook book;
     
     // search info
@@ -95,7 +108,7 @@ public:
     int get_prev_eval(Move m) const;
 
     // constructors
-    Engine(EngineConfig& config);
+    Engine();
 
     // search + eval
     std::unique_ptr<Searcher> searcher;
@@ -160,6 +173,10 @@ public:
     void staticEvalTest();
     void nnueEvalTest();
     void moveOrderingTest(int depth);
+
+    // --- Config ---
+    void apply_config_file(const fs::path& path);
+    void create_config_file(std::string config_name);
 };
 
 #endif // ENGINE_H

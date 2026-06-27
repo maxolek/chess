@@ -3,7 +3,7 @@
 #include <string>
 #include <iostream>
 #include <stats.h>
-#include <config.h>
+
 
 namespace fs = std::filesystem;
 
@@ -41,31 +41,18 @@ void UCI::handleCommand(const std::string& line) {
             std::cout << "id author max oleksa\n";
 
             // engine options
-            std::cout << "option name Move Overhead type spin default " << engine->cfg.engine.MOVE_OVERHEAD_MS << " min 0 max 1000\n";
-            std::cout << "option name Threads type spin default " << engine->cfg.engine.MAX_THREADS<< " min 1 max 1\n";
-            std::cout << "option name Hash type spin default " << engine->cfg.engine.HASH_SIZE_MB<< " min 1 max 1024\n";
-            std::cout << "option name Ponder type check default " << engine->cfg.engine.PONDERING << "\n";
+            std::cout << "option name Move Overhead type spin default " << engine->engine_options.MOVE_OVERHEAD_MS << " min 0 max 1000\n";
+            std::cout << "option name Threads type spin default " << engine->engine_options.MAX_THREADS<< " min 1 max 1\n";
+            std::cout << "option name Hash type spin default " << engine->engine_options.HASH_SIZE_MB<< " min 1 max 1024\n";
+            std::cout << "option name Ponder type check default " << engine->engine_options.PONDERING << "\n";
             // stats tracking
             std::cout << "option name ShowStats type check default " << Logging::track_search_stats << "\n";
             // Required for lichess
-            std::cout << "option name UCI_ShowWDL type check default " << engine->cfg.options.UCI_SHOW_WDL << "\n";
-            // -------- customization --------
-            std::cout << "option name MagicBitboards type check default " << engine->cfg.engine.MAGICS << "\n";
-            std::cout << "option name NNUE type check default " << engine->cfg.options._NNUE << "\n";
-            // search
-            std::cout << "option name quiescence type check default " << engine->cfg.options._QUIESCENCE << "\n";
-            std::cout << "option name aspiration type check default " << engine->cfg.options._ASPIRATION << "\n";
-            // move ordering
-            std::cout << "option name moveordering type check default " << engine->cfg.options._MOVE_ORDERING << "\n";
-            std::cout << "option name mvvlva_ordering type check default " << engine->cfg.options._MVVLVA_ORDERING << "\n";
-            std::cout << "option name see_ordering type check default " << engine->cfg.options._SEE_ORDERING << "\n";
-            // pruning
-            std::cout << "option name delta_pruning type check default " << engine->cfg.options._DELTA_PRUNING<< "\n";
-            std::cout << "option name see_pruning type check default " << engine->cfg.options._SEE_PRUNING << "\n";
+            std::cout << "option name UCI_ShowWDL type check default " << engine->engine_options.UCI_SHOW_WDL << "\n";
             // books
-            std::cout << "option name nnue_weight_file type string default " << engine->cfg.engine.nnue_weight_path << "\n";
-            std::cout << "option name opening_book type string default " << engine->cfg.engine.opening_book_path << "\n";
-            std::cout << "option name syzygy type string default " << engine->cfg.engine.syzygy_path << "\n";
+            std::cout << "option name nnue_weight_file type string default " << engine->engine_options.nnue_weight_path << "\n";
+            std::cout << "option name opening_book type string default " << engine->engine_options.opening_book_path << "\n";
+            std::cout << "option name syzygy type string default " << engine->engine_options.syzygy_path << "\n";
             // logging
             std::cout << "option name log_dir type string default " << Logging::log_dir << "\n";
             std::cout << "option name uci_logging type check default " << Logging::track_uci << "\n";
@@ -136,10 +123,10 @@ void UCI::handleCommand(const std::string& line) {
         }
 
         // apply config
-        apply_config_file(engine->cfg, configs[choice - 1]);
+        engine->apply_config_file(configs[choice - 1]);
 
         // apply specifics (e.g. tt.resize)
-        engine->tt.resize(engine->cfg.engine.HASH_SIZE_MB);
+        engine->tt.resize(engine->engine_options.HASH_SIZE_MB);
     }
     else if (token == "apply_config") { // apply config option (without seeing options)
         std::string name; 
@@ -148,16 +135,16 @@ void UCI::handleCommand(const std::string& line) {
         fs::path path = fs::path(PROJECT_ROOT) / "bin/configs" / name;
         if (path.extension() != ".ini") path += ".ini";
         
-        apply_config_file(engine->cfg, path);
+        engine->apply_config_file(path);
 
         // apply specifics (e.g. tt.resize)
-        engine->tt.resize(engine->cfg.engine.HASH_SIZE_MB);
+        engine->tt.resize(engine->engine_options.HASH_SIZE_MB);
     }
     else if (token == "save_config") { // save current config
         std::string name;
         iss >> name;
 
-        create_config_file(engine->cfg, name);
+        engine->create_config_file(name);
     }
     else if (token == "ponderhit") {
         //
