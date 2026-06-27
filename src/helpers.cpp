@@ -152,6 +152,7 @@ int countBits(U64 x) {
 }
 
 int getMSB(U64 x) {
+    if (x == 0) {return -1;}
     return 63 - __builtin_clzll(x);
 }
 

@@ -553,7 +553,7 @@ void Board::setBoardFEN() {
 // ------------------------------------------------------------
 // print board
 // ------------------------------------------------------------
-void Board::print_board() const {
+void Board::print_board() {
     char pieces[64];
     for (int i=63;i>=0;i--) pieces[i]='.';
 
@@ -571,20 +571,22 @@ void Board::print_board() const {
 
     if (!allGameMoves.empty()) allGameMoves.back().PrintMove();
     std::cout << "\n\n";
-    for (int row=7;row>=0;row++){
+    for (int row=7;row>=0;row--){
         std::cout << row+1 << "  ";
         for (int col=0;col<8;col++) std::cout << "[" << pieces[row*8+col] << "] ";
         std::cout << "\n";
     }
     std::cout << "\n    a   b   c   d   e   f   g   h\n\n";
 
+    setBoardFEN();
     std::cout << fen << "\n";
     std::cout << "\nMove: " << plyCount/2 << "\n";
     std::cout << (is_white_move?"White to move":"Black to move") << "\n";
     std::cout << (is_in_check?"Check":"") << "\n";
     std::cout << "Castling Rights: " << currentGameState.castlingRights << "\n";
     std::cout << "50 Move Counter: " << currentGameState.fiftyMoveCounter << "\n";
-    std::cout << "En Passant: " << currentGameState.enPassantFile << "\n\n";
+    std::cout << "En Passant: " << currentGameState.enPassantFile << "\n";
+    std::cout << "Captured Piece: " << currentGameState.capturedPieceType << "\n\n";
 }
 
 // ------------------------------------------------------------

@@ -249,6 +249,7 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
     // so we pass the move (null move) and perform a null-window search with reduced depth around beta
     // if the null move fails high then we can assume the best move will also fail high
     // certain position restrictions must be used for the assumptions to hold
+    /*/
     if ( // not in check, and not king-pawn endgame (zugzwang prevention)
         (depth - engine.cfg.search.R_NMP > 0)
         &&
@@ -257,6 +258,7 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
             || board.pawn_endgame 
         )
     ) {
+        ScopedTimer timer(T_NMP_SEARCH);
         STATS_NMP(depth+ply, ply);
         PV emptyPV;
 
@@ -272,6 +274,7 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
             return beta;
         }
     }
+    */
 
     // --- search ---
 
@@ -330,8 +333,10 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
         // if a move fails high then we can re-search it with a full window 
         // else it fails low and is not going to be a better move than what has been found
         // null window searches are cheap and so the re-searches are worth the speedup
-        if (!i) score = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply + 1, use_quiescence);
-        else {
+        if (!i) { // first move (full window)
+            score = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply + 1, use_quiescence);
+        } else {
+            ScopedTimer timer(T_PVS_SEARCH);
             score = -negamax(depth - 1 - _lmr_R, -(alpha+1), -alpha, childPV, previousPV, limits, ply + 1, use_quiescence);
             // fail-high --> re-search with full window
             // beta-alpha>1 is a redudancy check

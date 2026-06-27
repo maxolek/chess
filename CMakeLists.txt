@@ -92,6 +92,19 @@ elseif (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
         -g
     )
 
+# ASAN
+elseif (CMAKE_BUILD_TYPE STREQUAL "Asan")
+    target_compile_options(tomahawk PRIVATE 
+        -O1
+        -g
+        -fsanitize=address,undefined
+        -fno-omit-frame-pointer
+    )
+    target_link_options(tomahawk PRIVATE
+        -fsanitize=address,undefined
+    )
+    target_compile_definitions(tomahawk PRIVATE DEBUG)
+
 # RELEASE
 else()
     target_compile_options(tomahawk PRIVATE

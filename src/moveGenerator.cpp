@@ -245,21 +245,32 @@ void MoveGenerator::generatePawnPushes(bool ours) {
     if (!ours) {return;}
 
     U64 valid_pawns = ours ? pawns & own : pawns & opp;
+    U64 potential_moves_bb;
     Move potential_move;
+    int start_square;
+
+    bool on_starting_rank;
+    int one_step, two_step;
+
+    bool print_output = false;
 
     while (valid_pawns) {
-        int start_square = getLSB(valid_pawns);
+        start_square = getLSB(valid_pawns);
         valid_pawns &= valid_pawns - 1;
+
+        print_output = false;
 
         // Start with the pawn's forward move mask
         // do not update attacks as pawn pushes cannot be direct attacks
-        U64 potential_moves_bb = PrecomputedMoveData::blankPawnMoves[start_square][side];
+        potential_moves_bb = PrecomputedMoveData::blankPawnMoves[start_square][side];
         potential_moves_bb &= ~(own|opp);  // cannot push into pieces
 
         // Remove double push if blocked
-        int one_step = start_square + ((side == 0) ? 8 : -8);
-        int two_step = start_square + ((side == 0) ? 16 : -16);
-        if (!get_bit(potential_moves_bb, one_step)) {
+        on_starting_rank = (side == 0) ? (((1ULL << start_square) & Bits::mask_rank_2) != 0) 
+                                        : (((1ULL << start_square) & Bits::mask_rank_7) != 0);
+        one_step = start_square + ((side == 0) ? 8 : -8);
+        two_step = start_square + ((side == 0) ? 16 : -16);
+        if (on_starting_rank && !get_bit(potential_moves_bb, one_step)) {
             potential_moves_bb &= ~(1ULL << two_step);
         }
 

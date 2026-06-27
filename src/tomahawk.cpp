@@ -13,8 +13,11 @@
     #include <unistd.h>
     #include <sched.h>
     #include <pthread.h>
-    #include <mach/mach.h>
-    #include <mach/thread_policy.h>
+    #ifdef __APPLE__
+        #include <mach/mach.h>
+        #include <mach/thread_policy.h>
+
+    #endif
 #endif
 
 // version name set at compile time
@@ -33,14 +36,15 @@ void pin_to_pcores() {
     HANDLE hProc = GetCurrentProcess();
     if (!SetProcessAffinityMask(hProc, mask)) 
         std::cerr << "Failed to set CPU affinity, error " << GetLastError() << "\n";
-#else
+#elif defined(__APPLE__)
     thread_port_t thread = mach_thread_self();
-    // HIGH priority hint (scheduler may pick P-cores)
-    thread_precedence_policy_data_t policy = {63}; // max precedence
+    thread_precedence_policy_data_t policy = {63};
     thread_policy_set(thread,
                     THREAD_PRECEDENCE_POLICY,
                     (thread_policy_t)&policy,
                     THREAD_PRECEDENCE_POLICY_COUNT);
+#else
+    // Linux - no-op or use sched_setaffinity if needed
 #endif
 }
 

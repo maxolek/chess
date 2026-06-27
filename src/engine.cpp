@@ -728,7 +728,7 @@ void Engine::finalizeGameLog() {
 // TESTING
 
 uint64_t Engine::perft(int depth) {
-    ScopedTimer timer(T_PERFT);
+    //ScopedTimer timer(T_PERFT);
     if (depth == 0) {return 1;}
 
     uint64_t nodes = 0;

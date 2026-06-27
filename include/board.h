@@ -118,7 +118,7 @@ public:
     //U64 polyglotCastlingHash(int castling_rights); ///< Hash from castling rights
 
     // ==================== Debug ====================
-    void print_board() const; ///< Pretty-print board with FEN and additional info
+    void print_board(); ///< Pretty-print board with FEN and additional info
 };
 
 #endif // BOARD_H

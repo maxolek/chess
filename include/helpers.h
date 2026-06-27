@@ -22,6 +22,7 @@
 #include <cstring>
 #include <cassert>
 #include <mutex>
+#include <climits>
 
 typedef uint64_t U64;
 typedef unsigned short ushort;
