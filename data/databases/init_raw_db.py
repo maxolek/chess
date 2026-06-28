@@ -241,6 +241,24 @@ def init_engine_db(db_dir=None) -> None:
         );
     """
 
+    # per-root-move timing and node counts
+    root_moves_str = """
+        CREATE TABLE IF NOT EXISTS root_moves (
+            id                          INTEGER PRIMARY KEY AUTOINCREMENT,
+            search_id                   INTEGER NOT NULL,
+            depth                       INTEGER NOT NULL,
+            move_index                  INTEGER NOT NULL,
+            move                        TEXT NOT NULL,
+            eval                        INTEGER,
+            time_ms                     INTEGER,
+            nodes                       INTEGER,
+
+            ingestion_timestamp_utc     DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+            FOREIGN KEY (search_id) REFERENCES searches(id)
+        );
+    """
+
     # game info
     game_stats_str = """
         CREATE TABLE IF NOT EXISTS games (
@@ -384,7 +402,8 @@ def init_engine_db(db_dir=None) -> None:
         search_summary_stats_str,   # FK(engines.id) + FK(games.id) + FK(sprt.id) + FK(sts.id)
         search_depth_stats_str,     # FK(searches.id)
         search_ply_stats_str,       # FK(searches.id)
-        timing_stats_str            # FK(searches.id)
+        timing_stats_str,           # FK(searches.id)
+        root_moves_str              # FK(searches.id)
     ]:
         cur.executescript(script)
 
