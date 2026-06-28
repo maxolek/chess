@@ -289,6 +289,10 @@ def run_cutechess_tournament(candidate_path, opponents, tc, games_per_pair, cute
         cutechess_cli,
     ] + engine_blocks + [
         "-each", "proto=uci", f"tc={tc}",
+        f"option.log_dir={TOURNAMENT_LOG_DIR}",
+        "option.stats_logging=true",
+        "option.timer_logging=true",
+        "option.game_logging=true",
         "-tournament", "round-robin",
         "-games", str(games_per_pair),
         "-rounds", str(games_per_pair),
