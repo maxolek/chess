@@ -152,10 +152,10 @@ def log_engine_ratings(cnxn, engine_id, ratings, experiment_id=None):
         """
         INSERT INTO engine_ratings (
             engine_id, experiment_id,
-            elo_bullet, elo_blitz, elo_rapid, elo_classical,
-            games_bullet, games_blitz, games_rapid, games_classical
+            elo_ultra_fast, elo_bullet, elo_blitz, elo_rapid, elo_classical,
+            games_ultra_fast, games_bullet, games_blitz, games_rapid, games_classical
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
     )
     cnxn.commit()

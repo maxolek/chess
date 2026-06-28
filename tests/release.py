@@ -169,10 +169,12 @@ def main():
 
     # Tournament (Elo rating)
     parser.add_argument("--tournament_tc", nargs="+", default=["blitz"],
-                        choices=["bullet", "blitz", "rapid", "classical"],
+                        choices=["ultra_fast", "bullet", "blitz", "rapid", "classical"],
                         help="Time control categories for rating tournament")
     parser.add_argument("--tournament_games", type=int, default=20,
                         help="Games per opponent per time control")
+    parser.add_argument("--tournament_engines", type=int, default=3,
+                        help="# Engines (1st version + n-1 latest version) to play against")
 
     args = parser.parse_args()
 
