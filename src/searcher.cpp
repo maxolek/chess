@@ -304,21 +304,24 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
 
     int _lmr_R = 0;
 
+    bool in_check, is_pawn_endgame, was_capture;
+    Move m; int score; PV childPV;
+
     for (int i = 0; i < count; i++) {
         if (limits.out_of_time()) break;
 
-        Move m = moves[i];
+        m = moves[i];
 
         // current board state info
-        bool in_check = board.is_in_check;
-        bool is_pawn_endgame = board.pawn_endgame;
-        bool was_capture = board.currentGameState.capturedPieceType != -1;
+        in_check = board.is_in_check;
+        is_pawn_endgame = board.pawn_endgame;
+        was_capture = board.currentGameState.capturedPieceType != -1;
 
         // Apply NNUE/update & board
         nnue.on_make_move(board, m);
         board.MakeMove(m);
         
-        int score; PV childPV;
+        score = 0; childPV = {};
 
         // -----------------------------
         // Late Move Reduction
@@ -327,6 +330,7 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
         // if the reduced search returns > alpha then we can re-search it with full depth
         // integration with PVS: use PVS+LMR concurrently
         //    if the move returns > alpha then do full-search (depth+window)
+        /*
         if (
             // positional conditions apply
             board.currentGameState.capturedPieceType == -1
@@ -339,6 +343,7 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
         } else {
             _lmr_R = 0;
         }
+        */
 
         // -----------------------------
         // principal variation search 
@@ -348,9 +353,9 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
         // if a move fails high then we can re-search it with a full window 
         // else it fails low and is not going to be a better move than what has been found
         // null window searches are cheap and so the re-searches are worth the speedup
-        if (!i) { // first move (full window)
+        //if (!i) { // first move (full window)
             score = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply + 1);
-        } else {
+        /*} else {
             ScopedTimer timer(T_PVS_SEARCH);
             score = -negamax(depth - 1 - _lmr_R, -(alpha+1), -alpha, childPV, previousPV, limits, ply + 1);
             // fail-high --> re-search with full window (can raise alpha)
@@ -360,6 +365,7 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
                 score = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply + 1);
             }
         }
+         */
 
         nnue.on_unmake_move(board, m);
         board.UnmakeMove(m);
@@ -407,7 +413,7 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
 
 SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth, SearchLimits& limits, std::vector<Move>& previousPV, int previousEval) {
     int eval;
-    int ply = 1;
+    int ply = 0; // root moves are depth=0, ply+1 in arg call makes made moves depth=1
     PV childPV;
     SearchResult result;
     
@@ -439,7 +445,7 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
             board.MakeMove(m);
 
             STATS_NODE(depth, ply);       // change to result.eval for proper alpha propogation
-            eval = -negamax(depth - 1, -MATE_SCORE, MATE_SCORE, childPV, previousPV, limits, ply+1);
+            eval = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply+1);
 
             nnue.on_unmake_move(board, m);
             board.UnmakeMove(m);
@@ -454,7 +460,7 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
                 iter_result.eval = eval;
                 iter_result.bestMove = m;
                 iter_result.best_line.set(m, childPV); // propagate raised alpha across root moves (in non-aspiration search)
-                if (depth < params.ASPIRATION_START_DEPTH) alpha = iter_result.eval; 
+                //if (depth < params.ASPIRATION_START_DEPTH) alpha = iter_result.eval; 
             }
         }
 

@@ -6,13 +6,13 @@
 struct SearchLimits {
     std::chrono::steady_clock::time_point start_time;
     int time_limit_ms;
-    int max_depth = 32;
+    int max_depth = MAX_DEPTH;
     bool stopped;
 
     SearchLimits(int ms = 0, int depth = -1)
         : start_time(std::chrono::steady_clock::now()),
           time_limit_ms(ms),
-          max_depth(depth),
+          max_depth(depth < 0 ? MAX_DEPTH : depth),
           stopped(false) {}
 
     inline bool out_of_time() {
@@ -27,8 +27,8 @@ struct SearchLimits {
         return false;
     }
 
-    inline bool depth_reached(int current_depth) const {
-        return (max_depth >= 0 && current_depth >= max_depth);
+    inline bool depth_reached(int current_depth) {
+        return (max_depth >= 0 && current_depth > max_depth);
     }
 
     inline bool should_stop(int current_depth) {

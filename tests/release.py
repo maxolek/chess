@@ -203,6 +203,16 @@ def main():
             return float(o["default"])
         except (ValueError, KeyError):
             return None
+        
+    def opt_float_scaled(name, scale=100):
+        """for params stored as int(val*scale) in UCI, recover the float (e.g. pi=314)"""
+        o = opts.get(name)
+        if o is None:
+            return None
+        try:
+            return float(o["default"]) / scale
+        except (ValueError, KeyError):
+            return None
 
     engine_id = etl.register_engine(
         cnxn,
@@ -225,18 +235,10 @@ def main():
             "draw_eval": opt_int("DRAW_EVAL"),
             "contempt": opt_int("CONTEMPT"),
             "r_nmp": opt_int("R_NMP"),
-            "r_lmr_const": opt_float("R_LMR_CONST"),
-            "r_lmr_denom": opt_float("R_LMR_DENOM"),
+            "r_lmr_const": opt_float_scaled("R_LMR_CONST", 100),
+            "r_lmr_denom": opt_float_scaled("R_LMR_DENOM", 100),
             "lmr_move_order_threshold": opt_int("LMR_MOVE_ORDER_THRESHOLD"),
             "lmr_depth_threshold": opt_int("LMR_DEPTH_THRESHOLD"),
-            # move ordering
-            "tt_base": opt_int("TT_BASE"),
-            "pv_base": opt_int("PV_BASE"),
-            "promo_base": opt_int("PROMO_BASE"),
-            "good_cap_base": opt_int("GOOD_CAP_BASE"),
-            "killer_base": opt_int("KILLER_BASE"),
-            "quiet_base": opt_int("QUIET_BASE"),
-            "bad_cap_base": opt_int("BAD_CAP_BASE"),
         }
     )
 

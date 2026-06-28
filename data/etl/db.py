@@ -91,7 +91,7 @@ def probe_engine_metadata(engine_path, timeout=10.0):
             line = line.strip()
             if line.startswith("id version"):
                 meta["version"] = line[len("id version"):].strip()
-            elif line.startswith("opption name "):
+            elif line.startswith("option name "):
                 # parse: option name <NAME> type <TYPE> dfeault <VALUE> ..
                 parts = line[len("option name "):].split(" type ")
                 if len(parts) == 2:

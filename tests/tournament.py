@@ -25,7 +25,7 @@ import subprocess
 import sqlite3
 import platform
 from pathlib import Path
-from data import etl
+from ..data import etl
 
 system = platform.system()
 
