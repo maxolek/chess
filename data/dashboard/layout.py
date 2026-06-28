@@ -29,6 +29,7 @@ TABS = [
     ("tab-openings",   "OPENINGS"),
     ("tab-quality",    "MOVE QUALITY"),
     ("tab-timing",     "TIMING"),
+    ("tab-root-moves", "ROOT MOVES"),
     ("tab-time-mgmt",  "TIME MGMT"),
     ("tab-tt",         "TT ANALYSIS"),
     ("tab-calibration","CALIBRATION"),

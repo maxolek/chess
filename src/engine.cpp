@@ -455,11 +455,8 @@ void Engine::ponderHit() {
 // ------ principle move ordering
 
 void Engine::iterativeDeepening() {
-    ScopedTimer engineTimer(T_SEARCH); // top-level engine timer
+    ScopedTimer timer(T_ROOT);
     auto start_time = std::chrono::steady_clock::now();
-    //limits.start_time = start_time;
-    //limits.max_depth = (limits.max_depth < 0) ? 30 : std::min(limits.max_depth, 30);
-    //limits.stopped = false;
     g_run_context.search_uuid = generate_uuid();
 
     // reset global stats
@@ -475,13 +472,6 @@ void Engine::iterativeDeepening() {
     int count = movegen->generateMoves(game_board, false);
     std::copy_n(movegen->moves, count, first_moves);
 
-    // play only-legal-move immediately
-    if (count == 1) {
-        bestMove = first_moves[0];
-        bestEval = -MATE_SCORE-100; // not concerned with eval here
-        return;
-    }
-
     std::fill(std::begin(last_eval_table), std::end(last_eval_table), INVALID);
 
     int depth = 1;
@@ -489,15 +479,14 @@ void Engine::iterativeDeepening() {
 
     // --- iterative deepening loop ---
     while (!limits.should_stop(depth)) {
-        ScopedTimer timer(T_ROOT);
         auto depth_start = std::chrono::steady_clock::now();
         g_stats.max_depth = depth;
 
         // --- move ordering ---
-        if (depth > 1) {
+        if (depth > 1) { // sort by prev iteration elos
             std::sort(first_moves, first_moves + count,
                       [&](Move a, Move b) { return get_prev_eval(a) > get_prev_eval(b); });
-        } else {
+        } else { // first search: order like typical mid-tree ordering
             searcher->orderedMoves(first_moves, count, game_board, 0, {});
         }
 
@@ -524,6 +513,7 @@ void Engine::iterativeDeepening() {
         // --- update per-depth stats ---
         auto depth_end = std::chrono::steady_clock::now();
 
+        // --- logging --- 
         if (Logging::track_search_stats) {
             //g_stats.max_completed_depth = depth;
             g_stats.it_depth_eval[depth] = result.eval;
@@ -531,10 +521,19 @@ void Engine::iterativeDeepening() {
             g_stats.it_depth_time_ms[depth] = std::chrono::duration<double, std::milli>(depth_end - depth_start).count();
             //if (Move::SameMove(bestMove, prevBest)) g_stats.bestmoveStable++;
         }
+        // log per-root-move timing data
+        if (Logging::track_timers && result.root_count > 0) {
+            logRootMoves(result, depth);
+        }
 
         prevBest = bestMove;
         if (std::abs(result.eval) >= MATE_SCORE - 10) break;
         depth++;
+        // if only 1 legal move, perform depth 2 search then play move
+        // depth 2 to get fair eval with recaptures, etc. (very fast)
+        // but quit early since we know what were going to play anyway
+        // still want fair eval for continuation metrics, etc.
+        if ((count == 1) && (depth == 3)) break;
     }
 
     // --- finalize cumulative stats ---

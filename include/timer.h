@@ -17,10 +17,11 @@
 
 // Timer IDs
 enum TimerID {
+    T_ROOT,
     T_MOVEGEN, T_MAKEMOVE, T_UNMAKE_MOVE,
-    T_ROOT, T_SEARCH, T_QSEARCH,  
-    T_PVS_SEARCH, T_NMP_SEARCH,
-    T_SCORE_ORDER, T_TT_PROBE, T_TT_STORE, 
+    T_SEARCH, T_PVS_SEARCH, T_PVS_RESEARCH, T_NMP_SEARCH,
+    T_SCORE_ORDER,
+    T_TT_PROBE, T_TT_STORE, 
     T_EVAL, T_NNUE, 
     T_SEE,
     T_BOOK_PROBE, 
@@ -29,10 +30,11 @@ enum TimerID {
 
 // C++17 inline variable avoids multiple definitions
 inline const char* TimerNames[T_COUNT] = {
+    "ROOT",
     "MOVEGEN", "MAKEMOVE", "UNMAKE_MOVE",
-    "ROOT", "SEARCH", "QSEARCH",
-    "PVS_SEARCH", "NMP_SEARCH",
-    "SCORE_ORDER", "TT_PROBE", "TT_STORE",
+    "SEARCH", "PVS_SEARCH", "PVS_RESEARCH", "NMP_SEARCH",
+    "SCORE_ORDER",
+    "TT_PROBE", "TT_STORE",
     "EVAL", "NNUE",
     "SEE",
     "BOOK_PROBE"

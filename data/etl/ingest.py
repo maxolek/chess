@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 
-from .paths import GAME_JSON, SEARCH_JSON, TIMING_JSON, GAMES_LOG_DIR
+from .paths import GAME_JSON, SEARCH_JSON, TIMING_JSON, ROOT_MOVES_JSON, GAMES_LOG_DIR
 from .utils import safe_val, safe
 from .db import get_engine_id, clear_log_dir, extract_engine_id_from_search
 
@@ -25,7 +25,8 @@ def log_games_directory(cnxn):
             cnxn,
             SEARCH_JSON,
             game_map,
-            timing_path=TIMING_JSON if Path(TIMING_JSON).is_file() else None
+            timing_path=TIMING_JSON if Path(TIMING_JSON).is_file() else None,
+            root_moves_path=ROOT_MOVES_JSON if Path(ROOT_MOVES_JSON).is_file() else None
         )
     else:
         print(f"[INFO] No search log found: {SEARCH_JSON}")
@@ -337,6 +338,7 @@ def bulk_log_search_and_timing(
     game_map,
     engine_id=None,
     timing_path=None,
+    root_moves_path=None,
     sts_id=None
 ):
     """Bulk-load searches, per-depth iterations, tree stats, and timing from JSONL."""
@@ -541,9 +543,39 @@ def bulk_log_search_and_timing(
             timing_rows
         )
 
+    # -- ROOT MOVES --
+    root_moves_rows = []
+    if root_moves_path and Path(root_moves_path).is_file():
+        with open(root_moves_path, "r") as f:
+            for line in f:
+                data = json.loads(line.strip())
+                search_id = uuid_map.get(data.get("search_uuid"))
+                if search_id is None:
+                    continue
+                depth = data.get("depth", 0)
+                for idx, mv in enumerate(data.get("moves", [])):
+                    root_moves_rows.append((
+                        search_id,
+                        depth,
+                        idx,
+                        mv.get("move", ""),
+                        mv.get("eval"),
+                        mv.get("time_ms"),
+                        mv.get("nodes"),
+                    ))
+
+        cursor.executemany(
+            """
+            INSERT INTO root_moves (search_id, depth, move_index, move, eval, time_ms, nodes)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            root_moves_rows
+        )
+
     cnxn.commit()
     print(
         f"[INFO] Inserted {len(searches_rows)} searches, "
         f"{len(depth_rows), len(ply_rows)} depth rows, "
         f"{len(timing_rows)} timing rows."
+        f"{len(root_moves_rows)} root move rows"
     )

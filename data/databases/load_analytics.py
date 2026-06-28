@@ -165,6 +165,10 @@ def load_full(cnxn):
     cnxn.execute("DROP TABLE IF EXISTS search_timings")
     cnxn.execute("CREATE TABLE search_timings AS SELECT * FROM raw.timing")
 
+    print("  [full] Loading root_moves...")
+    cnxn.execute("DROP TABLE IF EXISTS root_moves")
+    cnxn.execute("CREATE TABLE root_moves AS SELECT * FROM raw.root_moves")
+
     print("  [full] Loading dim_positions...")
     cnxn.execute("DROP TABLE IF EXISTS dim_positions")
     cnxn.execute("""
@@ -390,6 +394,20 @@ def load_incremental(cnxn):
         cnxn.execute("COMMIT")
         after = cnxn.execute("SELECT COUNT(*) FROM search_timings").fetchone()[0]
         totals['search_timings'] = after - before
+
+    # ── root_moves ──
+    print("  [incr] Syncing root_moves...")
+    if not _table_exists(cnxn, 'root_moves'):
+        cnxn.execute("CREATE TABLE root_moves AS SELECT * FROM raw.root_moves")
+        totals['root_moves'] = cnxn.execute("SELECT COUNT(*) FROM root_moves").fetchone()[0]
+    else:
+        max_id = _max_id(cnxn, 'root_moves')
+        before = cnxn.execute("SELECT COUNT(*) FROM root_moves").fetchone()[0]
+        cnxn.execute("BEGIN TRANSACTION")
+        cnxn.execute(f"INSERT INTO root_moves SELECT * FROM raw.root_moves WHERE id > {max_id}")
+        cnxn.execute("COMMIT")
+        after = cnxn.execute("SELECT COUNT(*) FROM root_moves").fetchone()[0]
+        totals['root_moves'] = after - before
 
     # ── dim_positions (derived from search_stats) ──
     print("  [incr] Syncing dim_positions...")

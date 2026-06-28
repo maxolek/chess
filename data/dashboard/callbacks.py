@@ -24,7 +24,7 @@ from .data_loader import (
 )
 from .tabs import (
     tab_overview, tab_trends, tab_games, tab_search, tab_iter, tab_tree,
-    tab_compare, tab_openings, tab_quality, tab_timing, tab_time_mgmt, tab_tt,
+    tab_compare, tab_openings, tab_quality, tab_timing, tab_root_moves, tab_time_mgmt, tab_tt,
     tab_calibration, tab_stability, tab_move_ordering, tab_pruning,
     tab_ratings, tab_sprt, tab_sts, tab_perft, tab_positions, tab_corr,
     _build_calibration_charts,
@@ -63,6 +63,7 @@ def render_tab(tab, engine_ids, result_vals, opening_vals, side_vals, pos_type_v
     if tab == "tab-openings": return tab_openings(sf)
     if tab == "tab-quality":  return tab_quality(sf)
     if tab == "tab-timing":   return tab_timing()
+    if tab == "tab-root-moves": return tab_root_moves()
     if tab == "tab-time-mgmt": return tab_time_mgmt(sf)
     if tab == "tab-tt":       return tab_tt(sf)
     if tab == "tab-calibration": return tab_calibration(sf, gf)

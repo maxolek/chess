@@ -16,6 +16,8 @@ class NNUE;
 struct RootMove {
     Move move;
     int eval;
+    int64_t time_ms = 0;
+    uint64_t nodes = 0;
 };
 
 // ---- search constants ----

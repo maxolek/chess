@@ -50,6 +50,7 @@ bool Searcher::shouldPrune(Move& move, int standPat, int alpha, int search_depth
 
 int Searcher::moveScore(const Move& move, const Board& boardRef,
                         int ply, const Move& ttMove, const std::vector<Move>& previousPV) {
+    int seeScore;
 
     // TT + PV
     if (Move::SameMove(ttMove, move)) return move_scores.TT_BASE;
@@ -65,19 +66,20 @@ int Searcher::moveScore(const Move& move, const Board& boardRef,
             case bishop: promoBonus = 100; break;
         }
         int captured = boardRef.getCapturedPiece(move.TargetSquare());
+        seeScore = 0;
         if (captured != -1) {
             int seeScore = eval.SEE(boardRef, move);
             return seeScore >= 0 ? move_scores.GOOD_CAP_BASE + seeScore + promoBonus
                                  : move_scores.BAD_CAP_BASE  + seeScore + promoBonus;
         }
-        return move_scores.PROMO_BASE + promoBonus;
+        return move_scores.PROMO_BASE + promoBonus + seeScore;
     }
 
     // captures (scored via SEE or MVVLVA)
     int captured = boardRef.getCapturedPiece(move.TargetSquare());
     if (captured != -1) {
         // SEE
-        int seeScore = eval.SEE(boardRef, move);
+        seeScore = eval.SEE(boardRef, move);
         return seeScore >= 0 ? move_scores.GOOD_CAP_BASE + seeScore : move_scores.BAD_CAP_BASE + seeScore;
         // MVVLVA
         //int attacker = board.getMovedPiece(move.StartSquare());
@@ -137,8 +139,6 @@ int Searcher::generateAndOrderMoves(Move moves[MAX_MOVES], int ply, const std::v
 // ============================================================================
 
 int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int ply, int depth, int search_depth) {
-    ScopedTimer timer(T_QSEARCH);
-    
     if (limits.out_of_time()) return alpha;
 
     // draw detection
@@ -229,7 +229,6 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
                       std::vector<Move>& previousPV, SearchLimits& limits, int ply) {
 
     STATS_NODE(depth+ply, ply); // track node per depth
-    ScopedTimer timer(T_SEARCH);
     if (limits.out_of_time()) return alpha;
 
     // --- end of search conditions ---
@@ -356,11 +355,14 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
         //if (!i) { // first move (full window)
             score = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply + 1);
         /*} else {
+            {
             ScopedTimer timer(T_PVS_SEARCH);
             score = -negamax(depth - 1 - _lmr_R, -(alpha+1), -alpha, childPV, previousPV, limits, ply + 1);
+            }
             // fail-high --> re-search with full window (can raise alpha)
             // beta-alpha>1 is a redudancy check
             if (score > alpha && beta-alpha > 1) {
+                ScopedTimer timer(T_PVS_RESEARCH)
                 STATS_PVS_RESEARCH(depth+ply, ply);
                 score = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply + 1);
             }
@@ -440,6 +442,10 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
             Move m = legal_moves[i];
             if (Move::SameMove(m, Move::NullMove())) continue;
 
+            // root move stat tracking
+            uint64_t nodes_before = g_stats.nodes;
+            auto move_start = std::chrono::steady_clock::now();
+
             nnue.on_make_move(board, m);
             board.MakeMove(m);
 
@@ -449,6 +455,14 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
 
             nnue.on_unmake_move(board, m);
             board.UnmakeMove(m);
+
+            if (Logging::track_timers) {
+                auto move_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now() - move_start).count();
+                int64_t move_nodes = g_stats.nodes - nodes_before;
+                iter_result.root_moves[i].time_ms = move_ms;
+                iter_result.root_moves[i].nodes = move_nodes;
+            }
 
             if (limits.out_of_time() && i > 0) break;
 

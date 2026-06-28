@@ -10,6 +10,7 @@ GAMES_LOG_DIR = LOGS_DIR / "game_logs"
 GAME_JSON = GAMES_LOG_DIR / "game.jsonl"
 SEARCH_JSON = GAMES_LOG_DIR / "search.jsonl"
 TIMING_JSON = GAMES_LOG_DIR / "timing.jsonl"
+ROOT_MOVES_JSON = GAMES_LOG_DIR / "root_moves.jsonl"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Database paths — configurable via CHESS_RAW_DB / CHESS_ANALYTICS_DB env vars

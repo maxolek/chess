@@ -443,7 +443,6 @@ def run_tournament(args, cnxn, engine_id):
         elo_deltas = {name: 0.0 for name in elo_map}
         games_count = {name: 0 for name in elo_map}
 
-
         for name_a, results_a in pairwise.items():
             if name_a not in elo_map: continue
 
@@ -467,16 +466,15 @@ def run_tournament(args, cnxn, engine_id):
             
         print(f"\n[RATINGS] Updating ratings from all round-robin results:")
         for name, delta in elo_deltas.items():
-            if games_count[name] == 0 or name == "Candidate": continue 
+            if games_count[name] == 0: continue 
             old_elo = elo_map[name]
             new_elo = round(old_elo + delta, 1)
             print(f"  {name:12s}: {old_elo:.0f} -> {new_elo:.0f} "
                   f"(delta={delta:+.1f}, games={games_count[name]})")
-            # update in DB
+            # update engine ratings in DB
             update_engine_rating(cnxn, opp['id'], actual_cat, new_elo, games)
 
-    # Log to DB
-    etl.log_engine_ratings(cnxn, engine_id, ratings, experiment_id)
+    # Log experiment to DB
     etl.update_experiment(
         cnxn, experiment_id,
         {"end_time_utc": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()}

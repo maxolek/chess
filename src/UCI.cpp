@@ -85,7 +85,7 @@ void UCI::handleCommand(const std::string& line) {
             std::cout << "option name timer_logging type check default " << Logging::track_timers << "\n";
             std::cout << "option name stats_logging type check default " << Logging::track_search_stats << "\n";
             std::cout << "option name stats_nodes_only type check default " << Logging::track_search_nodes << "\n";
-            std::cout << "option name game_logging type check default " << Logging::track_game_log << "\n\n";
+            std::cout << "option name game_logging type check default " << Logging::track_game_log << "\n";
 
             std::cout << "uciok\n";
     }
