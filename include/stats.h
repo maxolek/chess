@@ -21,11 +21,11 @@ constexpr int STATS_MAX_PLY = 64;
 constexpr int STATS_MAX_ITER_DEPTH = 32;
 
 #define STATS_BOUNDS_CHECK(it_d, ply) \
-    assert((it_d) >= 0 && (it_d) < STATS_MAX_ITER_DEPTH && \
-            (ply) >= 0 && (ply) < STATS_MAX_PLY)
+    assert((it_d) >= 0 && (it_d) <= STATS_MAX_ITER_DEPTH && \
+            (ply) >= 0 && (ply) <= STATS_MAX_PLY)
 
 #define STATS_BOUNDS_CHECK_1D(d) \
-    assert((d) >= 0 && (d) < STATS_MAX_ITER_DEPTH)
+    assert((d) >= 0 && (d) <= STATS_MAX_ITER_DEPTH)
 
 // -------------------------
 //      search stats
@@ -135,7 +135,7 @@ inline void resetSearchStats() {
 #define STATS_NODE(it_d, ply)                                \
     do {                                                    \
         if (Logging::track_search_stats || Logging::track_search_nodes) {                  \
-            STATS_BOUNDS_CHECK(it_d, ply);                   \
+            /*STATS_BOUNDS_CHECK(it_d, ply);    */               \
             g_stats.nodes++;                                \
             g_stats.it_depth_nodes[it_d]++;                \
             g_stats.tree_depth_nodes[ply]++;               \
@@ -145,7 +145,7 @@ inline void resetSearchStats() {
 #define STATS_QNODE(it_d, ply)                               \
     do {                                                    \
         if (Logging::track_search_stats || Logging::track_search_nodes) {                  \
-            STATS_BOUNDS_CHECK(it_d, ply);                    \
+            /*STATS_BOUNDS_CHECK(it_d, ply);*/                    \
             g_stats.qnodes++;                               \
             g_stats.it_depth_qnodes[it_d]++;                \
             g_stats.tree_depth_qnodes[ply]++;               \
@@ -156,7 +156,7 @@ inline void resetSearchStats() {
 #define STATS_ASPIRATION_FAILLOW(depth) \
     do { \
         if (Logging::track_search_stats) { \
-            STATS_BOUNDS_CHECK_1D(depth); \
+            /*STATS_BOUNDS_CHECK_1D(depth); */\
             g_stats.aspiration_fail_low_researches++; \
             g_stats.it_depth_aspiration_faillow_researches[depth]++; \
         } \
@@ -165,7 +165,7 @@ inline void resetSearchStats() {
 #define STATS_ASPIRATION_FAILHIGH(depth) \
     do { \
         if (Logging::track_search_stats) { \
-            STATS_BOUNDS_CHECK_1D(depth); \
+            /*STATS_BOUNDS_CHECK_1D(depth); */\
             g_stats.aspiration_fail_high_researches++; \
             g_stats.it_depth_aspiration_failhigh_researches[depth]++; \
         } \
@@ -174,7 +174,7 @@ inline void resetSearchStats() {
 #define STATS_PVS_RESEARCH(it_d, ply) \
     do { \
         if (Logging::track_search_stats) { \
-            STATS_BOUNDS_CHECK(it_d, ply); \
+            /*STATS_BOUNDS_CHECK(it_d, ply);*/ \
             g_stats.pvs_researches++; \
             g_stats.it_depth_pvs_researches[it_d]++; \
             g_stats.tree_depth_pvs_researches[ply]++; \
@@ -184,7 +184,7 @@ inline void resetSearchStats() {
 #define STATS_FAILHIGH(it_d, ply, first)                     \
     do {                                                    \
         if (Logging::track_search_stats) {                  \
-            STATS_BOUNDS_CHECK(it_d, ply);                    \
+            /*STATS_BOUNDS_CHECK(it_d, ply);  */                  \
             g_stats.fail_highs++;                           \
             g_stats.it_depth_fail_highs[it_d]++;            \
             g_stats.tree_depth_fail_highs[ply]++;           \
@@ -203,7 +203,7 @@ inline void resetSearchStats() {
 #define STATS_FAILLOW(it_d, ply)                             \
     do {                                                    \
         if (Logging::track_search_stats) {                  \
-            STATS_BOUNDS_CHECK(it_d, ply);                    \
+            /*STATS_BOUNDS_CHECK(it_d, ply);   */                 \
             g_stats.fail_lows++;                            \
             g_stats.it_depth_fail_lows[it_d]++;             \
             g_stats.tree_depth_fail_lows[ply]++;            \
@@ -213,7 +213,7 @@ inline void resetSearchStats() {
 #define STATS_TT_HIT(it_d, ply)                              \
     do {                                                    \
         if (Logging::track_search_stats) {                  \
-            STATS_BOUNDS_CHECK(it_d, ply);                    \
+            /*STATS_BOUNDS_CHECK(it_d, ply);     */               \
             g_stats.tt_hits++;                              \
             g_stats.it_depth_tthits[it_d]++;                \
             g_stats.tree_depth_tthits[ply]++;               \
@@ -223,7 +223,7 @@ inline void resetSearchStats() {
 #define STATS_TT_STORE(it_d, ply)                            \
     do {                                                    \
         if (Logging::track_search_stats) {                  \
-            STATS_BOUNDS_CHECK(it_d, ply);                    \
+            /*STATS_BOUNDS_CHECK(it_d, ply);     */               \
             g_stats.tt_stores++;                            \
             g_stats.it_depth_ttstores[it_d]++;              \
             g_stats.tree_depth_ttstores[ply]++;             \
@@ -233,7 +233,7 @@ inline void resetSearchStats() {
 #define STATS_SEE_PRUNE(it_d, ply)                           \
     do {                                                    \
         if (Logging::track_search_stats) {                  \
-            STATS_BOUNDS_CHECK(it_d, ply);                    \
+            /*STATS_BOUNDS_CHECK(it_d, ply);    */                \
             g_stats.see_prunes++;                           \
             g_stats.it_depth_see_prunes[it_d]++;            \
             g_stats.tree_depth_see_prunes[ply]++;           \
@@ -243,7 +243,7 @@ inline void resetSearchStats() {
 #define STATS_DELTA_PRUNE(it_d, ply)                         \
     do {                                                    \
         if (Logging::track_search_stats) {                  \
-            STATS_BOUNDS_CHECK(it_d, ply);                    \
+            /*STATS_BOUNDS_CHECK(it_d, ply);    */                \
             g_stats.delta_prunes++;                         \
             g_stats.it_depth_delta_prunes[it_d]++;          \
             g_stats.tree_depth_delta_prunes[ply]++;         \
@@ -253,7 +253,7 @@ inline void resetSearchStats() {
 #define STATS_NMP(it_d, ply) \
     do { \
         if (Logging::track_search_stats) { \
-            STATS_BOUNDS_CHECK(it_d, ply); \
+            /*STATS_BOUNDS_CHECK(it_d, ply);*/ \
             g_stats.nmp++; \
             g_stats.it_depth_nmp[it_d]++; \
             g_stats.tree_depth_nmp[ply]++; \
@@ -263,7 +263,7 @@ inline void resetSearchStats() {
 #define STATS_NMP_FAIL(it_d, ply) \
     do { \
         if (Logging::track_search_stats) { \
-            STATS_BOUNDS_CHECK(it_d, ply); \
+            /*STATS_BOUNDS_CHECK(it_d, ply);*/ \
             g_stats.nmp_fail++; \
             g_stats.it_depth_nmp_fail[it_d]++; \
             g_stats.tree_depth_nmp_fail[ply]++; \

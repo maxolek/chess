@@ -95,12 +95,14 @@ def init_engine_db(db_dir=None) -> None:
             experiment_id               INTEGER NULL,
 
             -- elo by time control
+            elo_ultra_fast              INTEGER, -- < 15 sec/game
             elo_bullet                  INTEGER, -- < 1 min/game
             elo_blitz                   INTEGER, -- < 10 min/game
             elo_rapid                   INTEGER, -- < 30 min/game
             elo_classical               INTEGER, -- >= 30 min/game
 
             -- supporting stats
+            games_ultra_fast            INTEGER DEFAULT 0,
             games_bullet                INTEGER DEFAULT 0,
             games_blitz                 INTEGER DEFAULT 0,
             games_rapid                 INTEGER DEFAULT 0,

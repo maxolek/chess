@@ -205,8 +205,8 @@ def load_incremental(cnxn):
             r.id, r.engine_id, r.experiment_id,  
             e.name as engine_name, 
             e.version as engine_version,
-            r.elo_bullet, r.elo_blitz, r.elo_rapid, r.elo_classical,
-            r.games_bullet, r.games_blitz, r.games_rapid, r.games_classical,
+            r.elo_ultra_fast, r.elo_bullet, r.elo_blitz, r.elo_rapid, r.elo_classical,
+            r.games_ultra_fast, r.games_bullet, r.games_blitz, r.games_rapid, r.games_classical,
             r.ingestion_timestamp_utc
         FROM raw.engine_ratings r
         LEFT JOIN raw.engines e 

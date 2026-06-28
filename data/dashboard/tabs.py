@@ -583,8 +583,8 @@ def tab_ratings() -> html.Div:
     )
 
     # Melt Elo columns into long form for grouped bar chart
-    elo_cols = [c for c in ["elo_bullet", "elo_blitz", "elo_rapid", "elo_classical"] if c in df.columns]
-    games_cols = [c for c in ["games_bullet", "games_blitz", "games_rapid", "games_classical"] if c in df.columns]
+    elo_cols = [c for c in ["elo_ultra_fast", "elo_bullet", "elo_blitz", "elo_rapid", "elo_classical"] if c in df.columns]
+    games_cols = [c for c in ["games_ultra_fast", "games_bullet", "games_blitz", "games_rapid", "games_classical"] if c in df.columns]
 
     figs = []
 
@@ -601,6 +601,7 @@ def tab_ratings() -> html.Div:
                 elo_long, x=label_col, y="elo", color="time_control",
                 barmode="group",
                 color_discrete_map={
+                    "ULTRA_FAST": "#d61811",
                     "BULLET": "#ff6b35",
                     "BLITZ": "#00d2ff",
                     "RAPID": "#7fff6b",
@@ -619,6 +620,7 @@ def tab_ratings() -> html.Div:
                     elo_long, x=label_col, y="elo", color="time_control",
                     markers=True,
                     color_discrete_map={
+                        "ULTRA_FAST": "#d61811",
                         "BULLET": "#ff6b35",
                         "BLITZ": "#00d2ff",
                         "RAPID": "#7fff6b",
@@ -643,6 +645,7 @@ def tab_ratings() -> html.Div:
                 games_long, x=label_col, y="games", color="time_control",
                 barmode="stack",
                 color_discrete_map={
+                    "ULTRA_FAST": "#d61811",
                     "BULLET": "#ff6b35",
                     "BLITZ": "#00d2ff",
                     "RAPID": "#7fff6b",
@@ -657,9 +660,9 @@ def tab_ratings() -> html.Div:
     # KPI cards for latest engine
     latest = df.iloc[-1]
     kpi_items = []
-    tc_labels = {"bullet": "BULLET", "blitz": "BLITZ", "rapid": "RAPID", "classical": "CLASSICAL"}
-    tc_colors = {"bullet": "#ff6b35", "blitz": "#00d2ff", "rapid": "#7fff6b", "classical": "#f7b731"}
-    for tc in ["bullet", "blitz", "rapid", "classical"]:
+    tc_labels = {"ultra_fast": "ULTRA_FAST", "bullet": "BULLET", "blitz": "BLITZ", "rapid": "RAPID", "classical": "CLASSICAL"}
+    tc_colors = {"ultra_fast": "#d61811","bullet": "#ff6b35", "blitz": "#00d2ff", "rapid": "#7fff6b", "classical": "#f7b731"}
+    for tc in ["ultra_fast", "bullet", "blitz", "rapid", "classical"]:
         elo_val = latest.get(f"elo_{tc}")
         games_val = latest.get(f"games_{tc}", 0)
         if pd.notna(elo_val):
@@ -675,8 +678,8 @@ def tab_ratings() -> html.Div:
     }) if kpi_items else html.Div()
 
     # Table
-    display_cols = [c for c in [label_col, "elo_bullet", "elo_blitz", "elo_rapid", "elo_classical",
-                                "games_bullet", "games_blitz", "games_rapid", "games_classical",
+    display_cols = [c for c in [label_col, "elo_ultra_fast", "elo_bullet", "elo_blitz", "elo_rapid", "elo_classical",
+                                "games_ultra_fast", "games_bullet", "games_blitz", "games_rapid", "games_classical",
                                 "ingestion_timestamp_utc"] if c in df.columns]
 
     return html.Div([
