@@ -13,13 +13,6 @@ class Engine;
 class Evaluator;
 class NNUE;
 
-struct RootMove {
-    Move move;
-    int eval;
-    int64_t time_ms = 0;
-    uint64_t nodes = 0;
-};
-
 // ---- search constants ----
 struct SearchParams {
     // delta / SEE
@@ -50,33 +43,6 @@ struct MoveScores {
     int KILLER_BASE   =   7'000'000;
     int QUIET_BASE    =           0;
     int BAD_CAP_BASE  =  -1'000'000;
-};
-
-// ---- principal variation tracking ----
-struct PV {
-    std::vector<Move> line;
-    void clear() { line.clear(); }
-    inline void set(Move first, const PV& child) {
-        line.clear();
-        line.reserve(1 + child.line.size());
-        line.push_back(first);
-        line.insert(line.end(), child.line.begin(), child.line.end());
-    }
-};
-
-// ---- search returns move / eval / PV ----
-struct SearchResult {
-    Move bestMove = Move::NullMove();
-    int eval = -MATE_SCORE;
-    //TaperedEvalReport eval_report;
-    PV best_line;
-    
-    RootMove root_moves[MAX_MOVES];
-    int root_count = 0;
-
-    inline void setPV(Move first, const PV& child) {
-        best_line.set(first, child);
-    }
 };
 
 class Searcher {

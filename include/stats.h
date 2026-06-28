@@ -9,6 +9,7 @@
 #include "move.h"
 #include "session.h"
 #include "logging.h"
+#include "search_result.h"
 #include <vector>
 #include <array>
 #include <cstdint>
@@ -303,17 +304,17 @@ std::string moves_to_json(const std::array<Move, N>& v, size_t len)
 };
 
 
-inline void logRootMoves(SearchResult result, int depth) {
+inline void logRootMoves(const SearchResult& result, int depth) {
     static std::ofstream root_log(Logging::log_dir / "root_moves.jsonl", std::ios::app);
     if (root_log.is_open()) {
         root_log << "{\"search_uuid\":\"" << g_run_context.search_uuid << "\","
-                    << "\"depth\":" << depth << ",\"moves\":[";
+                 << "\"depth\":" << depth << ",\"moves\":[";
         for (int rm = 0; rm < result.root_count; ++rm) {
             if (rm) root_log << ",";
             root_log << "{\"move\":\"" << result.root_moves[rm].move.uci() << "\","
-                    << "\"eval\":" << result.root_moves[rm].eval << ","
-                    << "\"time_ms\":" << result.root_moves[rm].time_ms << ","
-                    << "\"nodes\":" << result.root_moves[rm].nodes << "}";
+                     << "\"eval\":" << result.root_moves[rm].eval << ","
+                     << "\"time_ms\":" << result.root_moves[rm].time_ms << ","
+                     << "\"nodes\":" << result.root_moves[rm].nodes << "}";
         }
         root_log << "]}\n";
         root_log.flush();
