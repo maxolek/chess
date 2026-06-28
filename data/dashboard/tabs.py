@@ -24,7 +24,7 @@ from .components import apply_theme, empty_fig, section, panel, metric_card, gra
 from .data_loader import (
     engines_df, experiments_df, searches_df,
     sprt_df, sts_df, perft_df, ratings_df,
-    query_iter, query_tree, query_timing, query_iter_agg,
+    query_iter, query_tree, query_timing, query_root_moves, query_iter_agg,
     _iter_nums, _tree_nums,
 )
 
@@ -491,6 +491,82 @@ def tab_timing() -> html.Div:
         *extra,
         html.Div(style={"height": "12px"}),
         panel(section("TIMING TABLE"), table(tsum)),
+    ])
+
+
+def tab_root_moves() -> html.Div:
+    rdf = query_root_moves()
+    if rdf.empty:
+        return html.Div("No root move data found.", style={"color": TEXT_SEC})
+
+    # Time distribution by move index (how much time does move #1,2,3... take)
+    idx_agg = rdf.groupby("move_index", as_index=False).agg(
+        avg_time_ms=("time_ms", "mean"),
+        avg_nodes=("nodes", "mean"),
+        count=("move_index", "count"),
+    )
+    idx_agg = idx_agg[idx_agg["move_index"] < 30]  # cap at first 30 moves
+
+    time_fig = px.bar(idx_agg, x="move_index", y="avg_time_ms",
+                      color_discrete_sequence=[ACCENT],
+                      labels={"move_index": "Root Move Index", "avg_time_ms": "Avg Time (ms)"})
+    time_fig.update_layout(title="Avg Search Time by Root Move Index")
+    apply_theme(time_fig)
+
+    node_fig = px.bar(idx_agg, x="move_index", y="avg_nodes",
+                      color_discrete_sequence=[ACCENT2],
+                      labels={"move_index": "Root Move Index", "avg_nodes": "Avg Nodes"})
+    node_fig.update_layout(title="Avg Nodes by Root Move Index")
+    apply_theme(node_fig)
+
+    # Time share: what % of total search time goes to move #1 vs the rest
+    if "search_id" in rdf.columns and "depth" in rdf.columns:
+        total_per_search = rdf.groupby(["search_id", "depth"], as_index=False)["time_ms"].sum()
+        total_per_search.rename(columns={"time_ms": "total_time"}, inplace=True)
+        merged = rdf.merge(total_per_search, on=["search_id", "depth"], how="left")
+        merged["time_pct"] = 100.0 * merged["time_ms"] / merged["total_time"].replace(0, np.nan)
+
+        pct_agg = merged.groupby("move_index", as_index=False)["time_pct"].mean()
+        pct_agg = pct_agg[pct_agg["move_index"] < 30]
+
+        pct_fig = px.bar(pct_agg, x="move_index", y="time_pct",
+                         color_discrete_sequence=["#7fff6b"],
+                         labels={"move_index": "Root Move Index", "time_pct": "% of Search Time"})
+        pct_fig.update_layout(title="Time Share by Root Move Index")
+        apply_theme(pct_fig)
+        pct_panel = panel(section("TIME SHARE (%)"), graph(pct_fig, 300))
+    else:
+        pct_panel = html.Div()
+
+    # By depth: show how time concentrates as depth increases
+    if "depth" in rdf.columns:
+        depth_agg = rdf[rdf["move_index"] == 0].groupby("depth", as_index=False).agg(
+            first_move_ms=("time_ms", "mean"),
+        )
+        depth_rest = rdf[rdf["move_index"] > 0].groupby("depth", as_index=False).agg(
+            other_moves_ms=("time_ms", "mean"),
+        )
+        depth_cmp = depth_agg.merge(depth_rest, on="depth", how="outer").fillna(0)
+
+        depth_fig = go.Figure()
+        depth_fig.add_trace(go.Bar(x=depth_cmp["depth"], y=depth_cmp["first_move_ms"],
+                                   name="Move #1", marker_color=ACCENT))
+        depth_fig.add_trace(go.Bar(x=depth_cmp["depth"], y=depth_cmp["other_moves_ms"],
+                                   name="Others (avg)", marker_color=ACCENT2))
+        depth_fig.update_layout(title="First Move vs Others by Depth", barmode="group",
+                                xaxis_title="Depth", yaxis_title="Avg Time (ms)")
+        apply_theme(depth_fig)
+        depth_panel = panel(section("BY DEPTH"), graph(depth_fig, 300))
+    else:
+        depth_panel = html.Div()
+
+    return html.Div([
+        html.Div([
+            panel(section("TIME BY MOVE INDEX"), graph(time_fig, 300), flex="1"),
+            panel(section("NODES BY MOVE INDEX"), graph(node_fig, 300), flex="1"),
+        ], style={"display": "grid", "gridTemplateColumns": "1fr 1fr", "gap": "12px"}),
+        html.Div([pct_panel, depth_panel],
+                 style={"display": "grid", "gridTemplateColumns": "1fr 1fr", "gap": "12px"}),
     ])
 
 
