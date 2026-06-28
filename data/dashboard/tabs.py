@@ -23,7 +23,7 @@ from .config import (
 from .components import apply_theme, empty_fig, section, panel, metric_card, graph, table
 from .data_loader import (
     engines_df, experiments_df, searches_df,
-    sprt_df, sts_df, perft_df,
+    sprt_df, sts_df, perft_df, ratings_df,
     query_iter, query_tree, query_timing, query_iter_agg,
     _iter_nums, _tree_nums,
 )
@@ -491,6 +491,123 @@ def tab_timing() -> html.Div:
         *extra,
         html.Div(style={"height": "12px"}),
         panel(section("TIMING TABLE"), table(tsum)),
+    ])
+
+
+def tab_ratings() -> html.Div:
+    if ratings_df.empty:
+        return html.Div("No engine ratings found. Run a tournament to generate Elo ratings.",
+                        style={"color": TEXT_SEC})
+
+    df = ratings_df.copy()
+
+    # Use engine_version if available, else engine_name
+    label_col = "engine_version" if "engine_version" in df.columns else (
+        "engine_name" if "engine_name" in df.columns else "engine_id"
+    )
+
+    # Melt Elo columns into long form for grouped bar chart
+    elo_cols = [c for c in ["elo_bullet", "elo_blitz", "elo_rapid", "elo_classical"] if c in df.columns]
+    games_cols = [c for c in ["games_bullet", "games_blitz", "games_rapid", "games_classical"] if c in df.columns]
+
+    figs = []
+
+    if elo_cols:
+        elo_long = df[[label_col] + elo_cols].melt(
+            id_vars=label_col, var_name="time_control", value_name="elo"
+        )
+        elo_long["time_control"] = elo_long["time_control"].str.replace("elo_", "").str.upper()
+        elo_long = elo_long.dropna(subset=["elo"])
+
+        if not elo_long.empty:
+            # Grouped bar chart
+            bar_fig = px.bar(
+                elo_long, x=label_col, y="elo", color="time_control",
+                barmode="group",
+                color_discrete_map={
+                    "BULLET": "#ff6b35",
+                    "BLITZ": "#00d2ff",
+                    "RAPID": "#7fff6b",
+                    "CLASSICAL": "#f7b731",
+                },
+                labels={label_col: "Engine", "elo": "Elo", "time_control": "Time Control"},
+            )
+            bar_fig.update_layout(title="Engine Elo by Time Control")
+            bar_fig.add_hline(y=0, line_dash="dot", line_color=TEXT_SEC)
+            apply_theme(bar_fig)
+            figs.append(panel(section("ELO RATINGS"), graph(bar_fig, 380)))
+
+            # Line chart: Elo progression across versions
+            if len(df) > 1:
+                line_fig = px.line(
+                    elo_long, x=label_col, y="elo", color="time_control",
+                    markers=True,
+                    color_discrete_map={
+                        "BULLET": "#ff6b35",
+                        "BLITZ": "#00d2ff",
+                        "RAPID": "#7fff6b",
+                        "CLASSICAL": "#f7b731",
+                    },
+                    labels={label_col: "Engine", "elo": "Elo", "time_control": "Time Control"},
+                )
+                line_fig.update_layout(title="Elo Progression Across Versions")
+                apply_theme(line_fig)
+                figs.append(panel(section("ELO PROGRESSION"), graph(line_fig, 320)))
+
+    # Games played summary
+    if games_cols:
+        games_long = df[[label_col] + games_cols].melt(
+            id_vars=label_col, var_name="time_control", value_name="games"
+        )
+        games_long["time_control"] = games_long["time_control"].str.replace("games_", "").str.upper()
+        games_long = games_long.dropna(subset=["games"])
+
+        if not games_long.empty:
+            games_fig = px.bar(
+                games_long, x=label_col, y="games", color="time_control",
+                barmode="stack",
+                color_discrete_map={
+                    "BULLET": "#ff6b35",
+                    "BLITZ": "#00d2ff",
+                    "RAPID": "#7fff6b",
+                    "CLASSICAL": "#f7b731",
+                },
+                labels={label_col: "Engine", "games": "Games Played", "time_control": "Time Control"},
+            )
+            games_fig.update_layout(title="Games Played per Time Control")
+            apply_theme(games_fig)
+            figs.append(panel(section("GAMES PLAYED"), graph(games_fig, 280)))
+
+    # KPI cards for latest engine
+    latest = df.iloc[-1]
+    kpi_items = []
+    tc_labels = {"bullet": "BULLET", "blitz": "BLITZ", "rapid": "RAPID", "classical": "CLASSICAL"}
+    tc_colors = {"bullet": "#ff6b35", "blitz": "#00d2ff", "rapid": "#7fff6b", "classical": "#f7b731"}
+    for tc in ["bullet", "blitz", "rapid", "classical"]:
+        elo_val = latest.get(f"elo_{tc}")
+        games_val = latest.get(f"games_{tc}", 0)
+        if pd.notna(elo_val):
+            kpi_items.append(
+                metric_card(f"{elo_val:+.0f}", f"{tc_labels[tc]} ({int(games_val)} games)",
+                            accent=tc_colors[tc])
+            )
+
+    kpi_row = html.Div(kpi_items, style={
+        "display": "grid",
+        "gridTemplateColumns": f"repeat({len(kpi_items)},1fr)",
+        "gap": "10px", "marginBottom": "12px",
+    }) if kpi_items else html.Div()
+
+    # Table
+    display_cols = [c for c in [label_col, "elo_bullet", "elo_blitz", "elo_rapid", "elo_classical",
+                                "games_bullet", "games_blitz", "games_rapid", "games_classical",
+                                "ingestion_timestamp_utc"] if c in df.columns]
+
+    return html.Div([
+        kpi_row,
+        *figs,
+        html.Div(style={"height": "12px"}),
+        panel(section("RATINGS TABLE"), table(df[display_cols])),
     ])
 
 

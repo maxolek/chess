@@ -8,7 +8,7 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 from data import etl
-from tests import perft, sprt, sts
+from tests import perft, sprt, sts, tournament
 import platform
 
 system = platform.system()
@@ -167,6 +167,13 @@ def main():
     parser.add_argument("--perft_positions", default=os.path.join(BIN_DIR, "test_positions", "perft.epd"))
     parser.add_argument("--perft_depth", type=int, default=5)
 
+    # Tournament (Elo rating)
+    parser.add_argument("--tournament_tc", nargs="+", default=["blitz"],
+                        choices=["bullet", "blitz", "rapid", "classical"],
+                        help="Time control categories for rating tournament")
+    parser.add_argument("--tournament_games", type=int, default=20,
+                        help="Games per opponent per time control")
+
     args = parser.parse_args()
 
     args.engine = os.path.join(ENGINES_DIR, f"{args.version}.exe")
@@ -175,12 +182,61 @@ def main():
 
     run_make(args)
 
+    # Probe engine options and search params via UCI
+    engine_meta = etl.probe_engine_metadata(args.engine)
+    opts = engine_meta.get("options", {})
+
+    def opt_int(name):
+        o = opts.get(name)
+        if o is None:
+            return None
+        try:
+            return int(o["default"])
+        except (ValueError, KeyError):
+            return None
+
+    def opt_float(name):
+        o = opts.get(name)
+        if o is None:
+            return None
+        try:
+            return float(o["default"])
+        except (ValueError, KeyError):
+            return None
+
     engine_id = etl.register_engine(
         cnxn,
         {
             "name": args.name,
             "version": args.version,
             "description": args.description,
+            # UCI engine options
+            "move_overhead_ms": opt_int("Move Overhead"),
+            "max_threads": opt_int("Threads"),
+            "hash_size_mb": opt_int("Hash"),
+            "pondering": opt_int("Ponder"),
+            # search params
+            "delta_prune_threshold": opt_int("DELTA_PRUNE_THRESHOLD"),
+            "see_prune_threshold": opt_int("SEE_PRUNE_THRESHOLD"),
+            "aspiration_window": opt_int("ASPIRATION_WINDOW"),
+            "aspiration_start_depth": opt_int("ASPIRATION_START_DEPTH"),
+            "aspiration_depth_scale": opt_int("ASPIRATION_DEPTH_SCALE"),
+            "aspiration_research_scale": opt_float("ASPIRATION_RESEARCH_SCALE"),
+            "draw_eval": opt_int("DRAW_EVAL"),
+            "contempt": opt_int("CONTEMPT"),
+            "r_nmp": opt_int("R_NMP"),
+            "r_lmr_const": opt_float("R_LMR_CONST"),
+            "r_lmr_denom": opt_float("R_LMR_DENOM"),
+            "lmr_move_order_threshold": opt_int("LMR_MOVE_ORDER_THRESHOLD"),
+            "lmr_depth_threshold": opt_int("LMR_DEPTH_THRESHOLD"),
+            # move ordering
+            "tt_base": opt_int("TT_BASE"),
+            "pv_base": opt_int("PV_BASE"),
+            "promo_base": opt_int("PROMO_BASE"),
+            "good_cap_base": opt_int("GOOD_CAP_BASE"),
+            "killer_base": opt_int("KILLER_BASE"),
+            "quiet_base": opt_int("QUIET_BASE"),
+            "bad_cap_base": opt_int("BAD_CAP_BASE"),
         }
     )
 
@@ -189,6 +245,9 @@ def main():
     if (args.perft): run_perft(args)
     run_sprt(args)
     if (args.sts_files): run_sts(args)
+
+    # Rating tournament against all engines in DB
+    tournament.run_tournament(args, cnxn, engine_id)
 
     print("[PIPELINE] ✅ release complete")
 
