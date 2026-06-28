@@ -73,6 +73,7 @@ def probe_engine_metadata(engine_path, timeout=10.0):
     )
 
     meta = {}
+    options = {}
     start = time.time()
     try:
         p.stdin.write("uci\n")
@@ -90,6 +91,19 @@ def probe_engine_metadata(engine_path, timeout=10.0):
             line = line.strip()
             if line.startswith("id version"):
                 meta["version"] = line[len("id version"):].strip()
+            elif line.startswith("opption name "):
+                # parse: option name <NAME> type <TYPE> dfeault <VALUE> ..
+                parts = line[len("option name "):].split(" type ")
+                if len(parts) == 2:
+                    opt_name = parts[0].strip()
+                    rest = parts[1].strip()
+                    # extract default value
+                    if " default " in rest:
+                        opt_type, default_rest = rest.split(" default ", 1)
+                        opt_type = opt_type.strip()
+                        # default value ends at " min" or end of string
+                        default_val = default_rest.split(" min ")[0].strip()
+                        options[opt_name] = {"type": opt_type, "default": default_val}
             elif line == "uciok":
                 break
 
@@ -107,6 +121,7 @@ def probe_engine_metadata(engine_path, timeout=10.0):
     if "version" not in meta:
         raise RuntimeError(f"Failed to probe engine metadata: {engine_path}")
 
+    meta["options"] = options
     return meta
 
 

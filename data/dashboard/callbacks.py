@@ -26,7 +26,7 @@ from .tabs import (
     tab_overview, tab_trends, tab_games, tab_search, tab_iter, tab_tree,
     tab_compare, tab_openings, tab_quality, tab_timing, tab_time_mgmt, tab_tt,
     tab_calibration, tab_stability, tab_move_ordering, tab_pruning,
-    tab_sprt, tab_sts, tab_perft, tab_positions, tab_corr,
+    tab_ratings, tab_sprt, tab_sts, tab_perft, tab_positions, tab_corr,
     _build_calibration_charts,
 )
 
@@ -69,6 +69,7 @@ def render_tab(tab, engine_ids, result_vals, opening_vals, side_vals, pos_type_v
     if tab == "tab-stability": return tab_stability(sf)
     if tab == "tab-ordering": return tab_move_ordering(sf)
     if tab == "tab-pruning":  return tab_pruning(sf)
+    if tab == "tab-ratings":  return tab_ratings()
     if tab == "tab-sprt":     return tab_sprt()
     if tab == "tab-sts":      return tab_sts()
     if tab == "tab-perft":    return tab_perft()

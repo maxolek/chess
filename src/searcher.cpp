@@ -405,98 +405,79 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
 // ROOT SEARCH
 // ============================================================================
 
-SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth, SearchLimits& limits, std::vector<Move>& previousPV) {
+SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth, SearchLimits& limits, std::vector<Move>& previousPV, int previousEval) {
+    int eval;
+    int ply = 1;
+    PV childPV;
     SearchResult result;
-
-    // Build NNUE accumulators for root position
-    nnue.build_accumulators(board);
-
-    for (int i = 0; i < count; ++i) {
-        if (limits.out_of_time()) break;
-        Move m = legal_moves[i];
-        if (Move::SameMove(m, Move::NullMove())) continue;
-
-        //nnue->debug_check_incr_vs_full_after_make(board, m, *nnue);
-        nnue.on_make_move(board, m);
-        board.MakeMove(m);
-
-        //std::cout << "------" << std::endl; m.PrintMove(); std::cout << "------" << std::endl;
-
-        int eval; PV childPV;
-        int ply = 1;
-        STATS_NODE(depth, ply);       // change to result.eval for proper alpha propogation
-        eval = -negamax(depth - 1, -MATE_SCORE, MATE_SCORE, childPV, previousPV, limits, ply+1);
-
-        // Undo
-        //nnue->debug_check_incr_vs_full_after_unmake(board, m, *nnue);
-        nnue.on_unmake_move(board, m);
-        board.UnmakeMove(m);
-
-        //std::cout << "after unmake - should be init position" << std::endl;
-        //boardprint_board();
-        //nnue->evaluate(boardis_white_move);
-        //exit(0);
-
-        if (limits.out_of_time() && i > 0) break;
-
-        result.root_moves[i].move = m;
-        result.root_moves[i].eval = eval;
-        result.root_count++;
-
-        if (i == 0 || eval > result.eval) {
-            result.eval = eval;
-            result.bestMove = m;
-            result.best_line.set(m, childPV);
-        }
-
-        // ran through all root moves (= max_search_depth (-1 if last depth is terminated early))
-        if (i >= count - 1) g_stats.max_completed_depth = depth;
+    
+    int delta = params.ASPIRATION_WINDOW;
+    int alpha = -MATE_SCORE;
+    int beta = MATE_SCORE;
+    
+    // aspiration search .. window generation
+    if (depth >= params.ASPIRATION_START_DEPTH) {
+        delta = std::max(delta, params.ASPIRATION_WINDOW + depth * params.ASPIRATION_DEPTH_SCALE);
+        alpha = previousEval - delta;
+        beta  = previousEval + delta;
     }
 
-    //std::cout << "depth: " << depth << "\tbestmove: " << result.bestMove.uci() << "\teval: " << result.eval << std::endl;
+    // root move loop for both aspiration + regular search
+    while (true) {
+        SearchResult iter_result;
+        // Build NNUE accumulators for root position
+        nnue.build_accumulators(board);
 
-    return result;
-}
+        // explore (our) root moves
+        int i = 0; // for stats check later
+        for (i; i < count; ++i) {
+            if (limits.out_of_time()) break;
+            Move m = legal_moves[i];
+            if (Move::SameMove(m, Move::NullMove())) continue;
 
-// same as ^^search as the only diff with aspirtation is the alpha_beta args
-SearchResult Searcher::searchAspiration(Move legal_moves[MAX_MOVES], int count, int depth, SearchLimits& limits, std::vector<Move>& previousPV, int alpha, int beta) {
-    // Simple wrapper using existing negamax with given alpha/beta window
-    SearchResult result;
+            nnue.on_make_move(board, m);
+            board.MakeMove(m);
 
-    // Build NNUE accumulators for root position
-    nnue.build_accumulators(board);
+            STATS_NODE(depth, ply);       // change to result.eval for proper alpha propogation
+            eval = -negamax(depth - 1, -MATE_SCORE, MATE_SCORE, childPV, previousPV, limits, ply+1);
 
-    for (int i = 0; i < count; ++i) {
-        if (limits.out_of_time()) break;
-        Move m = legal_moves[i];
-        if (Move::SameMove(m, Move::NullMove())) continue;
+            nnue.on_unmake_move(board, m);
+            board.UnmakeMove(m);
 
-        nnue.on_make_move(board, m);
-        board.MakeMove(m);
+            if (limits.out_of_time() && i > 0) break;
 
-        int eval; PV childPV;
-        int ply = 1;
-        STATS_NODE(depth, ply);
-        eval = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply+1);
+            iter_result.root_moves[i].move = m;
+            iter_result.root_moves[i].eval = eval;
+            iter_result.root_count++;
 
-        nnue.on_unmake_move(board, m);
-        board.UnmakeMove(m);
-
-        if (limits.out_of_time() && i > 0) break;
-
-        result.root_moves[i].move = m;
-        result.root_moves[i].eval = eval;
-        result.root_count++;
-
-
-        if (i == 0 || eval > result.eval) { 
-            result.eval = eval;
-            result.bestMove = m;
-            result.best_line.set(m, childPV);
+            if (i == 0 || eval > iter_result.eval) {
+                iter_result.eval = eval;
+                iter_result.bestMove = m;
+                iter_result.best_line.set(m, childPV); // propagate raised alpha across root moves (in non-aspiration search)
+                if (depth < params.ASPIRATION_START_DEPTH) alpha = iter_result.eval; 
+            }
         }
 
-        // ran through all root moves (= max_search_depth (-1 if last depth is terminated early))
-        if (i >= count - 1) g_stats.max_completed_depth = depth;
+        // aspiration check
+        if (!limits.should_stop(depth) && (depth >= params.ASPIRATION_START_DEPTH)) {
+            if (iter_result.eval <= alpha) {
+                if (Logging::track_search_stats) STATS_ASPIRATION_FAILLOW(depth);
+                alpha -= delta;
+                delta *= params.ASPIRATION_RESEARCH_SCALE;
+                continue;
+            } else if (iter_result.eval >= beta) {
+                if (Logging::track_search_stats) STATS_ASPIRATION_FAILHIGH(depth);
+                beta += delta;
+                delta *= params.ASPIRATION_RESEARCH_SCALE;
+                continue;
+            }
+        } 
+
+        // ran through all root moves 
+        // (= max_search_depth (-1 if last depth is terminated early))
+        if (i >= count - 1) g_stats.max_completed_depth = depth;  
+        result = iter_result;
+        break;
     }
 
     return result;

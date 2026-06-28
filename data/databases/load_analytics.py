@@ -74,6 +74,22 @@ def load_full(cnxn):
     cnxn.execute("DROP TABLE IF EXISTS experiments")
     cnxn.execute("CREATE TABLE experiments AS SELECT * FROM raw.experiments")
 
+    print("  [full] Loading engine_ratings...")
+    cnxn.execute("DROP TABLE IF EXISTS engine_ratings")
+    cnxn.execute("""
+        CREATE TABLE engine_ratings AS
+        SELECT
+            r.id, r.engine_id, r.experiment_id,  
+            e.name as engine_name, 
+            e.version as engine_version,
+            r.elo_bullet, r.elo_blitz, r.elo_rapid, r.elo_classical,
+            r.games_bullet, r.games_blitz, r.games_rapid, r.games_classical,
+            r.ingestion_timestamp_utc
+        FROM raw.engine_ratings r
+        LEFT JOIN raw.engines e 
+            ON e.id = r.engine_id
+    """)
+
     print("  [full] Loading sprt_runs...")
     cnxn.execute("DROP TABLE IF EXISTS sprt_runs")
     cnxn.execute("""
@@ -179,6 +195,23 @@ def load_incremental(cnxn):
     print("  [incr] Syncing experiments...")
     cnxn.execute("DROP TABLE IF EXISTS experiments")
     cnxn.execute("CREATE TABLE experiments AS SELECT * FROM raw.experiments")
+
+    # -- engine_ratings (small, full-refresh) --
+    print("  [incr] Syncing engine_ratings...")
+    cnxn.execute("DROP TABLE IF EXISTS engine_ratings")
+    cnxn.execute("""
+        CREATE TABLE engine_ratings AS
+        SELECT
+            r.id, r.engine_id, r.experiment_id,  
+            e.name as engine_name, 
+            e.version as engine_version,
+            r.elo_bullet, r.elo_blitz, r.elo_rapid, r.elo_classical,
+            r.games_bullet, r.games_blitz, r.games_rapid, r.games_classical,
+            r.ingestion_timestamp_utc
+        FROM raw.engine_ratings r
+        LEFT JOIN raw.engines e 
+            ON e.id = r.engine_id
+    """)
 
     # ── sprt_runs ──
     print("  [incr] Syncing sprt_runs...")

@@ -13,6 +13,7 @@ def init_engine_db(db_dir=None) -> None:
 
         executed: creates the engine database and 6 tables
             engines         -- information about engines and versions
+            engine_ratings  -- ratings for ^^ calculated from round-robin tournament
             experiments     -- information about engine processes (e.g. sprt/sts)
             search_summary  -- high level search info (e.g. nodes, time)
             search_depth    -- per-depth search info (e.g. eval per depth)
@@ -42,7 +43,29 @@ def init_engine_db(db_dir=None) -> None:
             version                     TEXT NOT NULL,
             description                 TEXT,
             compile_flags               TEXT,
-            uci_options                 TEXT, 
+            
+            -- UCI engine options
+            move_overhead_ms            INTEGER,
+            max_threads                 INTEGER,
+            hash_size_mb                INTEGER,
+            pondering                   BOOLEAN,
+
+            -- search params
+            delta_prune_threshold       INTEGER,
+            see_prune_threshold         INTEGER,
+            aspiration_window           INTEGER,
+            aspiration_start_depth      INTEGER,
+            aspiration_depth_scale      INTEGER,
+            aspiration_research_scale   REAL,
+            draw_eval                   INTEGER,
+            contempt                    INTEGER,
+            r_nmp                       INTEGER,
+            r_lmr_const                 REAL,
+            r_lmr_denom                 REAL,
+            lmr_move_order_threshold    INTEGER,
+            lmr_depth_threshold         INTEGER,
+
+            --
 
             ingestion_timestamp_utc   DATETIME DEFAULT CURRENT_TIMESTAMP
         );
@@ -62,6 +85,31 @@ def init_engine_db(db_dir=None) -> None:
             metadata                TEXT, 
 
             FOREIGN KEY (engine_id) REFERENCES engines(id)
+        );
+    """
+
+    engine_ratings_str = """
+        CREATE TABLE IF NOT EXISTS engine_ratings (
+            id                          INTEGER PRIMARY KEY AUTOINCREMENT,
+            engine_id                   INTEGER NOT NULL,
+            experiment_id               INTEGER NULL,
+
+            -- elo by time control
+            elo_bullet                  INTEGER, -- < 1 min/game
+            elo_blitz                   INTEGER, -- < 10 min/game
+            elo_rapid                   INTEGER, -- < 30 min/game
+            elo_classical               INTEGER, -- >= 30 min/game
+
+            -- supporting stats
+            games_bullet                INTEGER DEFAULT 0,
+            games_blitz                 INTEGER DEFAULT 0,
+            games_rapid                 INTEGER DEFAULT 0,
+            games_classical             INTEGER DEFAULT 0,
+
+            ingestion_timestamp_utc     DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+            FOREIGN KEY (engine_id) REFERENCES engines(id),
+            FOREIGN KEY (experiment_id) REFERENCES experiments(id)
         );
     """
 

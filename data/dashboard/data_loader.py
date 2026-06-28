@@ -100,6 +100,7 @@ engines_df      = safe_query("SELECT * FROM engines")
 experiments_df  = safe_query("SELECT * FROM experiments")
 sprt_df         = safe_query("SELECT * FROM sprt_runs")
 sts_df          = safe_query("SELECT * FROM sts_runs")
+ratings_df      = safe_query("SELECT * FROM engine_ratings") if "engine_ratings" in _tables else pd.DataFrame()
 perft_df        = pd.DataFrame()
 
 # Engine name lookup (small, always in memory)

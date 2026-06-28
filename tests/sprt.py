@@ -222,7 +222,7 @@ def parse_args():
 
     # Opening book
     p.add_argument("--book", default= PROJECT_ROOT / "bin" / "opening_books" / "8moves_v3.pgn" , help="Opening book file")
-    p.add_argument("--book-depth", type=int, default=8)
+    p.add_argument("--book-depth", type=int, default=16) # 8 full moves
 
     # Logging
     p.add_argument('--log', action="store_true", help="Flag to turn on logging for candidate engine")

@@ -80,16 +80,40 @@ def register_engine(cnxn, engine):
     cur = cnxn.execute(
         """
         INSERT INTO engines (
-            name, version, description, compile_flags, uci_options
+            name, version, description, compile_flags,
+            move_overhead_ms, max_threads, hash_size_mb, pondering,
+            delta_prune_threshold, see_prune_threshold,
+            aspiration_window, aspiration_start_depth, aspiration_depth_scale,
+            aspiration_research_scale, draw_eval, contempt,
+            r_nmp, r_lmr_const, r_lmr_denom,
+            lmr_move_order_threshold, lmr_depth_threshold,
         )
-        VALUES (?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             engine["name"],
             engine["version"],
             engine.get("description"),
             engine.get("compile_flags"),
-            json.dumps(engine.get("uci_options")),
+            # uci engine options
+            engine.get('move_overhead_ms'),
+            engine.get('max_threads'),
+            engine.get('hash_size_mb'),
+            engine.get('pondering'),
+            # search params
+            engine.get('delta_prune_threshold'),
+            engine.get('see_prune_threshold'),
+            engine.get('aspiration_window'),
+            engine.get('aspiration_start_depth'),
+            engine.get('aspiration_depth_scale'),
+            engine.get('aspiration_research_scale'),
+            engine.get('draw_eval'),
+            engine.get('contempt'),
+            engine.get('r_nmp'),
+            engine.get('r_lmr_const'),
+            engine.get('r_lmr_denom'),
+            engine.get('lmr_move_order_threshold'),
+            engine.get('lmr_depth_threshold')
         )
     )
     cnxn.commit()
@@ -118,6 +142,24 @@ def log_perft(cnxn, perft_info):
     cnxn.commit()
     return cur.lastrowid
 
+def log_engine_ratings(cnxn, engine_id, ratings, experiment_id=None):
+    """Log engine elo ratings by time control category
+    
+    ratings: dict with keys like 'bullet', 'blitz', 'rapid', 'classical'
+                each value is a dict with 'elo' and 'games'
+    """
+    cur = cnxn.execute(
+        """
+        INSERT INTO engine_ratings (
+            engine_id, experiment_id,
+            elo_bullet, elo_blitz, elo_rapid, elo_classical,
+            games_bullet, games_blitz, games_rapid, games_classical
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+    )
+    cnxn.commit()
+    return cur.lastrowid
 
 def log_sprt(cnxn, experiment_id, candidate_engine_id, baseline_engine_id, **kwargs):
     """Log an SPRT experiment result and return its row ID."""

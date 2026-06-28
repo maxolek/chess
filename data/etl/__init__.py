@@ -17,6 +17,7 @@ from .ingest import (
     update_experiment,
     register_engine,
     log_perft,
+    log_engine_ratings,
     log_sprt,
     bulk_log_sts,
     bulk_log_game,

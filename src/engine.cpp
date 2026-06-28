@@ -61,6 +61,7 @@ void Engine::setOption(const std::string& name, const std::string& value) {
         return val == "true" || val == "True" || val == "1";
     };
 
+    // --------- engine options ---------
     if (name == "Move Overhead") {
         limits.stopped = false;
         engine_options.MOVE_OVERHEAD_MS = std::stoi(value);
@@ -87,6 +88,60 @@ void Engine::setOption(const std::string& name, const std::string& value) {
     else if (name == "ShowStats") {
         Logging::track_search_stats = boolFromString(value);
         std::cout << "info string set ShowStats = " << (Logging::track_search_stats ? "true" : "false") << std::endl;
+    }
+
+    // -------- search params --------
+    else if (name == "delta_prune_threshold") {
+        searcher->params.DELTA_PRUNE_THRESHOLD = std::stoi(value);
+        std::cout << "info string set delta_prune_threshold = " << searcher->params.DELTA_PRUNE_THRESHOLD << std::endl;
+    }
+    else if (name == "see_prune_threshold") {
+        searcher->params.SEE_PRUNE_THRESHOLD = std::stoi(value);
+        std::cout << "info string set see_prune_threshold = " << searcher->params.SEE_PRUNE_THRESHOLD << std::endl;
+    }
+    else if (name == "aspiration_start_depth") {
+        searcher->params.ASPIRATION_START_DEPTH = std::stoi(value);
+        std::cout << "info string set aspiration_start_depth = " << searcher->params.ASPIRATION_START_DEPTH << std::endl;
+    }
+    else if (name == "aspiration_window") {
+        searcher->params.ASPIRATION_WINDOW = std::stoi(value);
+        std::cout << "info string set aspiration_window = " << searcher->params.ASPIRATION_WINDOW << std::endl;
+    }
+    else if (name == "aspiration_start_depth") {
+        searcher->params.ASPIRATION_START_DEPTH = std::stoi(value);
+        std::cout << "info string set aspiration_start_depth = " << searcher->params.ASPIRATION_START_DEPTH << std::endl;
+    }
+    else if (name == "aspiration_research_scale") {
+        searcher->params.ASPIRATION_RESEARCH_SCALE = std::stoi(value);
+        std::cout << "info string set aspiration_research_scale = " << searcher->params.ASPIRATION_RESEARCH_SCALE << std::endl;
+    }
+    else if (name == "draw_eval") {
+        searcher->params.DRAW_EVAL = std::stoi(value);
+        std::cout << "info string set draw_eval = " << searcher->params.DRAW_EVAL << std::endl;
+    }
+    else if (name == "contempt") {
+        searcher->params.CONTEMPT = std::stoi(value);
+        std::cout << "info string set contempt = " << searcher->params.CONTEMPT << std::endl;
+    }
+    else if (name == "r_nmp") {
+        searcher->params.R_NMP = std::stoi(value);
+        std::cout << "info string set r_nmp = " << searcher->params.R_NMP << std::endl;
+    }
+    else if (name == "lmr_move_order_threshold") {
+        searcher->params.LMR_MOVE_ORDER_THRESHOLD = std::stoi(value);
+        std::cout << "info string set lmr_move_order_threshold = " << searcher->params.LMR_MOVE_ORDER_THRESHOLD << std::endl;
+    }
+    else if (name == "lmr_depth_threshold") {
+        searcher->params.LMR_DEPTH_THRESHOLD = std::stoi(value);
+        std::cout << "info string set lmr_depth_threshold = " << searcher->params.LMR_DEPTH_THRESHOLD << std::endl;
+    }
+    else if (name == "r_lmr_const") {
+        searcher->params.R_LMR_CONST = std::stoi(value);
+        std::cout << "info string set r_lmr_const = " << searcher->params.R_LMR_CONST << std::endl;
+    }
+    else if (name == "r_lmr_denom") {
+        searcher->params.R_LMR_DENOM = std::stoi(value);
+        std::cout << "info string set r_lmr_denom = " << searcher->params.R_LMR_DENOM << std::endl;
     }
 
     // -------- books / paths --------
@@ -427,10 +482,6 @@ void Engine::iterativeDeepening() {
         return;
     }
 
-    int alpha = -MATE_SCORE;
-    int beta = MATE_SCORE;
-    int delta = searcher->params.ASPIRATION_WINDOW;
-
     std::fill(std::begin(last_eval_table), std::end(last_eval_table), INVALID);
 
     int depth = 1;
@@ -451,32 +502,8 @@ void Engine::iterativeDeepening() {
         }
 
         // --- search ---
-        if (depth >= searcher->params.ASPIRATION_START_DEPTH) {
-            
-            delta = std::max(delta, searcher->params.ASPIRATION_WINDOW + depth * searcher->params.ASPIRATION_DEPTH_SCALE);
-            alpha = last_result.eval - delta;
-            beta  = last_result.eval + delta;
-            
-            while (true) {
-                result = searcher->searchAspiration(first_moves, count, depth, limits,
-                                                   last_result.best_line.line,
-                                                   alpha, beta);
-
-                if (Logging::track_search_stats) {
-                    if (result.eval <= alpha) STATS_ASPIRATION_FAILLOW(depth);
-                    else if (result.eval >= beta) STATS_ASPIRATION_FAILHIGH(depth);
-                }
-
-                if (result.eval <= alpha) alpha -= delta;
-                else if (result.eval >= beta) beta += delta;
-                else break;
-
-                delta *= searcher->params.ASPIRATION_RESEARCH_SCALE;
-            }
-        } else { 
-            result = searcher->search(first_moves, count, depth, limits,
-                                     last_result.best_line.line);
-        } 
+        result = searcher->search(first_moves, count, depth, limits,
+                                     last_result.best_line.line, last_result.eval);
 
 
         // --- store results ---
@@ -530,7 +557,6 @@ void Engine::iterativeDeepening() {
         logSearchStats(game_board.getBoardFEN());  // JSON written once at end
     }
     if (Logging::track_timers) {logTimingStats(game_board.getBoardFEN());}
-
 }
 
 

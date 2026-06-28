@@ -44,22 +44,40 @@ void UCI::handleCommand(const std::string& line) {
             std::cout << "option name Move Overhead type spin default " << engine->engine_options.MOVE_OVERHEAD_MS << " min 0 max 1000\n";
             std::cout << "option name Threads type spin default " << engine->engine_options.MAX_THREADS<< " min 1 max 1\n";
             std::cout << "option name Hash type spin default " << engine->engine_options.HASH_SIZE_MB<< " min 1 max 1024\n";
-            std::cout << "option name Ponder type check default " << engine->engine_options.PONDERING << "\n";
+            std::cout << "option name Ponder type check default " << engine->engine_options.PONDERING << "\n\n";
             // stats tracking
             std::cout << "option name ShowStats type check default " << Logging::track_search_stats << "\n";
             // Required for lichess
-            std::cout << "option name UCI_ShowWDL type check default " << engine->engine_options.UCI_SHOW_WDL << "\n";
+            std::cout << "option name UCI_ShowWDL type check default " << engine->engine_options.UCI_SHOW_WDL << "\n\n";
             // books
             std::cout << "option name nnue_weight_file type string default " << engine->engine_options.nnue_weight_path << "\n";
             std::cout << "option name opening_book type string default " << engine->engine_options.opening_book_path << "\n";
-            std::cout << "option name syzygy type string default " << engine->engine_options.syzygy_path << "\n";
+            std::cout << "option name syzygy type string default " << engine->engine_options.syzygy_path << "\n\n";
             // logging
             std::cout << "option name log_dir type string default " << Logging::log_dir << "\n";
             std::cout << "option name uci_logging type check default " << Logging::track_uci << "\n";
             std::cout << "option name timer_logging type check default " << Logging::track_timers << "\n";
             std::cout << "option name stats_logging type check default " << Logging::track_search_stats << "\n";
             std::cout << "option name stats_nodes_only type check default " << Logging::track_search_nodes << "\n";
-            std::cout << "option name game_logging type check default " << Logging::track_game_log << "\n";
+            std::cout << "option name game_logging type check default " << Logging::track_game_log << "\n\n";
+            // search params
+            std::cout << "option name delta_prune_threshold type spin default " << engine->searcher->params.DELTA_PRUNE_THRESHOLD << " min 0 max 10000\n";
+            std::cout << "option name see_prune_threshold type spin default " << engine->searcher->params.SEE_PRUNE_THRESHOLD << " min -1000 max 1000\n";
+            //      aspiration
+            std::cout << "option name aspiration_start_depth type spin default " << engine->searcher->params.ASPIRATION_START_DEPTH << " min 1 max 32\n";
+            std::cout << "option name aspiration_window type spin default " << engine->searcher->params.ASPIRATION_WINDOW << " min 1 max 1000\n";
+            std::cout << "option name aspiration_start_depth type spin default " << engine->searcher->params.ASPIRATION_DEPTH_SCALE << " min 0 max 100\n";
+            std::cout << "option name aspiration_research_scale type spin default " << engine->searcher->params.ASPIRATION_RESEARCH_SCALE << " min 0 max 1000\n";
+            //       draw/contempt
+            std::cout << "option name draw_eval type spin default " << engine->searcher->params.DRAW_EVAL << " min 0 max 1000\n";
+            std::cout << "option name contempt type spin default " << engine->searcher->params.CONTEMPT << " min 0 max 10\n";
+            //      reductions
+            std::cout << "option name r_nmp type spin default " << engine->searcher->params.R_NMP << " min 0 max 32\n";
+            //          lmr
+            std::cout << "option name lmr_move_order_threshold type spin default " << engine->searcher->params.LMR_MOVE_ORDER_THRESHOLD << " min 0 max 256\n";
+            std::cout << "option name lmr_depth_threshold type spin default " << engine->searcher->params.LMR_DEPTH_THRESHOLD << " min 0 max 32\n";
+            std::cout << "option name r_lmr_const type spin default " << static_cast<int>(100*engine->searcher->params.R_LMR_CONST) << " min 0 max 200\n";
+            std::cout << "option name r_lmr_denom type spin default " << static_cast<int>(100*engine->searcher->params.R_LMR_DENOM) << " min 100 max 500\n";
 
             std::cout << "uciok\n";
     }

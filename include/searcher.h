@@ -109,16 +109,8 @@ public:
         int move_count,
         int depth,
         SearchLimits& limits,
-        std::vector<Move>& previousPV
-    );
-
-    SearchResult searchAspiration(
-        Move potential_moves[MAX_MOVES],
-        int move_count,
-        int depth,
-        SearchLimits& limits,
         std::vector<Move>& previousPV,
-        int alpha, int beta
+        int previousEval
     );
 
     // --------------------------- Negamax & Quiescence --------------------------

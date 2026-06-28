@@ -35,6 +35,7 @@ TABS = [
     ("tab-stability",  "STABILITY"),
     ("tab-ordering",   "MOVE ORDER"),
     ("tab-pruning",    "PRUNING"),
+    ("tab-ratings",    "RATINGS"),
     ("tab-sprt",       "SPRT"),
     ("tab-sts",        "STS"),
     ("tab-perft",      "PERFT"),

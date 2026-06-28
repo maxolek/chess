@@ -23,7 +23,7 @@ from .config import (
 from .components import apply_theme, empty_fig, section, panel, metric_card, graph, table
 from .data_loader import (
     engines_df, experiments_df, searches_df,
-    sprt_df, sts_df, perft_df,
+    sprt_df, sts_df, perft_df, ratings_df,
     query_iter, query_tree, query_timing, query_iter_agg,
     _iter_nums, _tree_nums,
 )
