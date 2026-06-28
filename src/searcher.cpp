@@ -414,7 +414,6 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
 SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth, SearchLimits& limits, std::vector<Move>& previousPV, int previousEval) {
     int eval;
     int ply = 0; // root moves are depth=0, ply+1 in arg call makes made moves depth=1
-    PV childPV;
     SearchResult result;
     
     int delta = params.ASPIRATION_WINDOW;
@@ -445,6 +444,7 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
             board.MakeMove(m);
 
             STATS_NODE(depth, ply);       // change to result.eval for proper alpha propogation
+            PV childPV; // must be declared per root_move
             eval = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply+1);
 
             nnue.on_unmake_move(board, m);
@@ -460,7 +460,7 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
                 iter_result.eval = eval;
                 iter_result.bestMove = m;
                 iter_result.best_line.set(m, childPV); // propagate raised alpha across root moves (in non-aspiration search)
-                //if (depth < params.ASPIRATION_START_DEPTH) alpha = iter_result.eval; 
+                //alpha = std::max(alpha, eval); 
             }
         }
 
