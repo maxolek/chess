@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 
-from .paths import GAME_JSON, SEARCH_JSON, TIMING_JSON, ROOT_MOVES_JSON, GAMES_LOG_DIR
+from .paths import GAME_JSON, SEARCH_JSON, TIMING_JSON, ROOT_MOVES_JSON, GAMES_LOG_DIR, LOG_DIRS, get_jsonl_paths
 from .utils import safe_val, safe
 from .db import get_engine_id, clear_log_dir, extract_engine_id_from_search
 
@@ -13,25 +13,44 @@ from .db import get_engine_id, clear_log_dir, extract_engine_id_from_search
 
 def log_games_directory(cnxn):
     """Ingest all game logs from the standard log directory."""
+    ingest_log_dir(cnxn, GAMES_LOG_DIR)
+
+
+def ingest_log_dir(cnxn, log_dir, clear=True):
+    """Ingest all JSONL files from a given log directory."""
+    paths = get_jsonl_paths(log_dir)
     game_map = {}
 
-    if Path(GAME_JSON).is_file():
-        game_map = bulk_log_game(cnxn, GAME_JSON)
+    if paths["game"].is_file():
+        game_map = bulk_log_game(cnxn, paths["game"])
     else:
-        print(f"[INFO] No game log found: {GAME_JSON}")
+        print(f"[INFO] No game log found: {paths['game']}")
 
-    if Path(SEARCH_JSON).is_file():
+    if paths["search"].is_file():
         bulk_log_search_and_timing(
             cnxn,
-            SEARCH_JSON,
+            paths["search"],
             game_map,
-            timing_path=TIMING_JSON if Path(TIMING_JSON).is_file() else None,
-            root_moves_path=ROOT_MOVES_JSON if Path(ROOT_MOVES_JSON).is_file() else None
+            timing_path=paths["timing"] if paths["timing"].is_file() else None,
+            root_moves_path=paths["root_moves"] if paths["root_moves"].is_file() else None
         )
     else:
-        print(f"[INFO] No search log found: {SEARCH_JSON}")
+        print(f"[INFO] No search log found: {paths['search']}")
 
-    clear_log_dir(GAMES_LOG_DIR)
+    if clear:
+        clear_log_dir(log_dir)
+
+
+def ingest_all_log_dirs(cnxn):
+    """Sweep all known log directories and ingest any JSONL data found."""
+    for log_dir in LOG_DIRS:
+        if not log_dir.exists():
+            continue
+        paths = get_jsonl_paths(log_dir)
+        has_data = any(p.is_file() for p in paths.values())
+        if has_data:
+            print(f"[INGEST] Processing: {log_dir}")
+            ingest_log_dir(cnxn, log_dir)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
