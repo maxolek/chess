@@ -500,6 +500,7 @@ void NNUE::debug_replay_feature_changes(const Board& before,
 }
 
 
+#ifndef NDEBUG
 bool NNUE::check_active_features_consistency(const Accumulator& incr,
                                              const Accumulator& full,
                                              const char* name,
@@ -596,3 +597,4 @@ void NNUE::debug_check_features_after_move(const Board& b) {
         abort();
     }
 }
+#endif

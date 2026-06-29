@@ -41,6 +41,8 @@ Board::Board(const Board& other) {
 void Board::MakeMove(Move move) {
     ScopedTimer timer(T_MAKEMOVE);
 
+    currentGameState.was_in_check = is_in_check;
+
     int old_castling = currentGameState.castlingRights;
     int oldEp = currentGameState.enPassantFile;
     if (oldEp > -1) zobrist_hash ^= zobrist_enpassant[oldEp];
@@ -207,9 +209,9 @@ void Board::UnmakeMove(Move move) {
     }
 
     // --- Restore previous game state ---
-    is_in_check = inCheck(true);
     gameStateHistory.pop_back();
     currentGameState = gameStateHistory.back();
+    is_in_check = currentGameState.was_in_check;
     
 
     // --- Castling hash ---

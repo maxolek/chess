@@ -113,11 +113,11 @@ void Searcher::orderedMoves(Move moves[MAX_MOVES], size_t count,
     }
 
     // sorting
-    std::vector<std::pair<int, Move>> scored; scored.reserve(count);
+    std::pair<int, Move> scored[MAX_MOVES];
     for (size_t i = 0; i < count; ++i)
-        scored.emplace_back(moveScore(moves[i], boardRef, ply, ttMove, previousPV), moves[i]);
+        scored[i] = {moveScore(moves[i], boardRef, ply, ttMove, previousPV), moves[i]};
 
-    std::sort(scored.begin(), scored.end(),
+    std::sort(scored, scored + count,
               [](const auto& a, const auto& b) { return a.first > b.first; });
 
     for (size_t i = 0; i < count; ++i) moves[i] = scored[i].second;

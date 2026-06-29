@@ -4,15 +4,6 @@
 #include "helpers.h"
 
 namespace Magics {
-    struct Magic {
-        U64 mask;       // Occupancy mask (relevant blockers)
-        U64 magic;      // Magic number
-        int shift;      // Shift value (64 - numBits in mask)
-        U64* attacks;   // Pointer to attack table
-    };
-
-    static std::mt19937_64 rng(std::random_device{}());
-
     extern U64 rookAttackTable[64][4096]; // precompute and store
     extern U64 bishopAttackTable[64][512];
     extern U64 rookMasks[64];
@@ -23,9 +14,6 @@ namespace Magics {
     extern int bishopShifts[64];
 
     void initMagics(); // call at engine startup
-    bool findMagic(int sq, int bits, bool rook, Magic& outMagic);
-    U64 randomU64();
-    U64 generateCandidateMagic();
     U64 maskRook(int sq);
     U64 maskBishop(int sq);
     std::vector<U64> generateAllOccupancies(U64 mask);
