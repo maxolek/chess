@@ -8,7 +8,7 @@ namespace Magics {
     U64 rookMagics[64];
     U64 bishopMagics[64];
     int rookShifts[64];
-    int bishopShifts[64];c
+    int bishopShifts[64];
 
     // Known-good magic numbers (from Surge engine, public domain)
     // These work at standard bit counts (popcount of mask)
