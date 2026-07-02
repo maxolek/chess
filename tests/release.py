@@ -156,6 +156,7 @@ def main():
     parser.add_argument("--cutechess-cli", default=r"C:\Program Files (x86)\Cute Chess\cutechess-cli.exe", help="Full path to cutechess-cli.exe\nUsed for game testing")
 
     # SPRT
+    parser.add_argument("--sprt", action="store_true", help="Run SPRT")
     parser.add_argument("--base_engine", default=os.path.join(ENGINES_DIR, "0.0.0.exe"))
     parser.add_argument("--concurrency", type=int, default=2, help="Number of concurrent games for SPRT")
     parser.add_argument("--elo0", type=int, default=0)
@@ -180,6 +181,7 @@ def main():
     parser.add_argument("--perft_depth", type=int, default=5)
 
     # Tournament (Elo rating)
+    parser.add_argument("--tournament", action="store_true", help="Run rating tournament against all engines in DB")
     parser.add_argument("--tournament_tc", nargs="+", default=["blitz"],
                         choices=["ultra_fast", "bullet", "blitz", "rapid", "classical"],
                         help="Time control categories for rating tournament")
@@ -258,12 +260,10 @@ def main():
 
     print('\n============================\n')
 
-    if (args.perft): run_perft(args)
-    run_sprt(args)
-    if (args.sts_files): run_sts(args)
-
-    # Rating tournament against all engines in DB
-    tournament.run_tournament(args, cnxn, engine_id)
+    if (args.perft):        run_perft(args)
+    if (args.sprt):         run_sprt(args)
+    if (args.sts_files):    run_sts(args)
+    if (args.tournament):   tournament.run_tournament(args, cnxn, engine_id)
 
     print("[PIPELINE] ✅ release complete")
 
