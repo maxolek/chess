@@ -93,7 +93,6 @@ def init_raw_db(db_dir=None) -> None:
         CREATE TABLE IF NOT EXISTS engine_ratings (
             id                          INTEGER PRIMARY KEY AUTOINCREMENT,
             engine_id                   INTEGER NOT NULL,
-            experiment_id               INTEGER NULL,
 
             -- elo by time control
             elo_ultra_fast              INTEGER, -- < 15 sec/game
@@ -111,8 +110,7 @@ def init_raw_db(db_dir=None) -> None:
 
             ingestion_timestamp_utc     DATETIME DEFAULT CURRENT_TIMESTAMP,
 
-            FOREIGN KEY (engine_id) REFERENCES engines(id),
-            FOREIGN KEY (experiment_id) REFERENCES experiments(id)
+            FOREIGN KEY (engine_id) REFERENCES engines(id)
         );
     """
 
@@ -395,6 +393,7 @@ def init_raw_db(db_dir=None) -> None:
     #   order: top -> down ... engines -> tests -> games -> searches -> timing/details
     for script in [
         engines_str,
+        engine_ratings_str,         # FK(engines.id)
         experiments_str,            # FK(engines.id)
         sprt_test_str,              # FK(engines.id)
         sts_test_str,               # FK(engines.id)

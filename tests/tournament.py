@@ -90,6 +90,9 @@ def parse_tournament_output(output, engine_names):
     score_re = re.compile(
         r"Score of (.+?) vs (.+?):\s*(\d+)\s*-\s*(\d+)\s*-\s*(\d+)"
     )
+    # Match per-game finished lines like:
+    # Finished game 1 (Candidate vs v0.2.2): 1-0 {White mates}
+    finished_re = re.compile(r"^Finished game \d+ \((.+?) vs (.+?)\):\s*(1-0|0-1|1/2-1/2|1/2 - 1/2)")
 
     for line in output.splitlines():
         m = score_re.search(line)
@@ -100,6 +103,31 @@ def parse_tournament_output(output, engine_names):
                 pairwise[name_a][name_b] = {"wins": w, "losses": l, "draws": d}
             if name_b in pairwise:
                 pairwise[name_a][name_b] = {"wins": w, "losses": l, "draws": d}
+            continue
+
+        m2 = finished_re.search(line)
+        if m2:
+            name_a, name_b = m2.group(1).strip(), m2.group(2).strip()
+            result = m2.group(3).strip()
+            # normalize names
+            if name_a not in pairwise or name_b not in pairwise:
+                continue
+            pairwise.setdefault(name_a, {})
+            pairwise.setdefault(name_b, {})
+            wa = pairwise[name_a].get(name_b, {"wins": 0, "losses": 0, "draws": 0})
+            wb = pairwise[name_b].get(name_a, {"wins": 0, "losses": 0, "draws": 0})
+            if result == '1-0':
+                wa["wins"] += 1
+                wb["losses"] += 1
+            elif result == '0-1':
+                wa["losses"] += 1
+                wb["wins"] += 1
+            else:
+                wa["draws"] += 1
+                wb["draws"] += 1
+            pairwise[name_a][name_b] = wa
+            pairwise[name_b][name_a] = wb
+            continue
 
     return pairwise
 
@@ -138,7 +166,7 @@ def get_opponent_elo(cnxn, engine_id, tc_category):
     elo_col = f"elo_{tc_category}"
     row = cnxn.execute(
         f"SELECT {elo_col} FROM engine_ratings WHERE engine_id = ? ORDER BY id DESC LIMIT 1",
-            (engine_id),
+            (engine_id,),
     ).fetchone()
     if row and row[0] is not None: return float(row[0])
     else: return ANCHOR_ELO
@@ -399,7 +427,7 @@ def run_tournament(args, cnxn, engine_id):
         )
 
         pairwise = parse_tournament_output(output, names)
-        candidate_pairwise = pairwise.get("Candidate, {}")
+        candidate_pairwise = pairwise.get("Candidate", {})
 
         # look up each opp's elo
         opponent_elos = {}

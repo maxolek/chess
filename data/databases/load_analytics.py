@@ -79,7 +79,7 @@ def load_full(cnxn):
     cnxn.execute("""
         CREATE TABLE engine_ratings AS
         SELECT
-            r.id, r.engine_id, r.experiment_id,  
+            r.id, r.engine_id  
             e.name as engine_name, 
             e.version as engine_version,
             r.elo_bullet, r.elo_blitz, r.elo_rapid, r.elo_classical,
@@ -206,7 +206,7 @@ def load_incremental(cnxn):
     cnxn.execute("""
         CREATE TABLE engine_ratings AS
         SELECT
-            r.id, r.engine_id, r.experiment_id,  
+            r.id, r.engine_id,  
             e.name as engine_name, 
             e.version as engine_version,
             r.elo_ultra_fast, r.elo_bullet, r.elo_blitz, r.elo_rapid, r.elo_classical,

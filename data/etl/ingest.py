@@ -362,7 +362,7 @@ def log_perft(cnxn, perft_info):
     cnxn.commit()
     return cur.lastrowid
 
-def log_engine_ratings(cnxn, engine_id, ratings, experiment_id=None):
+def log_engine_ratings(cnxn, engine_id, ratings):
     """Log engine elo ratings by time control category
     
     ratings: dict with keys like 'bullet', 'blitz', 'rapid', 'classical'
@@ -371,11 +371,11 @@ def log_engine_ratings(cnxn, engine_id, ratings, experiment_id=None):
     cur = cnxn.execute(
         """
         INSERT INTO engine_ratings (
-            engine_id, experiment_id,
+            engine_id,
             elo_ultra_fast, elo_bullet, elo_blitz, elo_rapid, elo_classical,
             games_ultra_fast, games_bullet, games_blitz, games_rapid, games_classical
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
     )
     cnxn.commit()
