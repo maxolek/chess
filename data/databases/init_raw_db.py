@@ -5,7 +5,7 @@ from ..etl.paths import RAW_DB
 # long form function that create the database
 # and some associated tables
 
-def init_engine_db(db_dir=None) -> None:
+def init_raw_db(db_dir=None) -> None:
 
     """
         input: directory of database
@@ -26,6 +26,7 @@ def init_engine_db(db_dir=None) -> None:
     db_dir.mkdir(parents=True, exist_ok=True)
 
     db_path = db_dir / "chess.db"
+    print(f"[DB] Initializing raw database at: {db_path}")
 
     # cnxn + cursor
     cnxn = sqlite3.connect(db_path)
@@ -408,6 +409,7 @@ def init_engine_db(db_dir=None) -> None:
         cur.executescript(script)
 
     cnxn.commit()
+    print(f"[DB] Raw database initialized with schema at {db_path}")
 
 if __name__ == "__main__":
-    init_engine_db()
+    init_raw_db()

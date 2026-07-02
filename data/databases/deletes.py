@@ -34,6 +34,7 @@ def drop_all_tables(db_path=str(RAW_DB)) -> None:
 
     cnxn.commit()
     cnxn.close()
+    print(f"[DB] Dropped all tables from {db_path}")
 
 def clear_all_tables(db_path=str(RAW_DB)) -> None:
     """
@@ -69,6 +70,7 @@ def clear_all_tables(db_path=str(RAW_DB)) -> None:
 
     cnxn.commit()
     cnxn.close()
+    print(f"[DB] Cleared all tables from {db_path}")
 
 if __name__ == "__main__":
     # clear tables or drop tables
@@ -79,6 +81,10 @@ if __name__ == "__main__":
     args = p.parse_args()
 
     if args.clear:
-        clear_all_tables(str(RAW_DB.parent / args.db))
+        db_path = str(RAW_DB.parent / args.db)
+        print(f"[DB] Clearing all tables in {db_path}")
+        clear_all_tables(db_path)
     if args.delete:
-        drop_all_tables(str(RAW_DB.parent / args.db))
+        db_path = str(RAW_DB.parent / args.db)
+        print(f"[DB] Dropping all tables in {db_path}")
+        drop_all_tables(db_path)

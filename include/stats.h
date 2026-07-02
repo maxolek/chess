@@ -305,7 +305,7 @@ std::string moves_to_json(const std::array<Move, N>& v, size_t len)
 
 
 inline void logRootMoves(const SearchResult& result, int depth) {
-    static std::ofstream root_log(Logging::log_dir / "root_moves.jsonl", std::ios::app);
+    static std::ofstream root_log(Logging::log_file_name("root_moves.jsonl"), std::ios::app);
     if (root_log.is_open()) {
         root_log << "{\"search_uuid\":\"" << g_run_context.search_uuid << "\","
                  << "\"depth\":" << depth << ",\"moves\":[";
@@ -324,7 +324,7 @@ inline void logRootMoves(const SearchResult& result, int depth) {
 inline void logSearchStats(const std::string& fen = "") {
     if (!(Logging::track_search_stats || Logging::track_search_nodes)) return;
 
-    static std::ofstream out(Logging::log_dir / "search.jsonl", std::ios::app);
+    static std::ofstream out(Logging::log_file_name("search.jsonl"), std::ios::app);
     if (!out.is_open()) return;
 
     size_t n = g_stats.max_depth + 1;

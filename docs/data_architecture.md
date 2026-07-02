@@ -18,7 +18,7 @@ graph TD
     end
 
     subgraph Builder["Analytics Builder · data/"]
-        RUN["run_pipeline.py<br/><i>Pipeline orchestrator</i>"]
+        RUN["run_analytics_pipeline.py<br/><i>Pipeline orchestrator</i>"]
 
         LOAD["load_analytics.py<br/><i>Import raw tables</i>"]
         TP["transform_positions.py<br/><i>Position features</i>"]

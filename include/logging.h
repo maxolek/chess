@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include "helpers.h"
+#include "session.h"
 #include <filesystem>
 
 namespace fs = std::filesystem;
@@ -27,21 +28,23 @@ struct Logging {
     static inline fs::path log_dir = DEFAULT_LOG_DIR;
     static inline std::ofstream uci_file;
     static inline std::ofstream search_file;
-    static inline std::ofstream game_file; 
+    static inline std::ofstream game_file;
     static inline std::ofstream timing_file;
+
+    static fs::path log_file_name(const std::string& name) {
+        fs::path file(name);
+        std::string stem = file.stem().string();
+        std::string ext = file.extension().string();
+        return log_dir / fs::path(stem + "_" + std::to_string(instanceID()) + ext);
+    }
 
     // life cycle
     static void initFiles() {
         std::filesystem::create_directories(log_dir);
 
         if (track_uci)
-            uci_file.open(log_dir / "uci.log", std::ios::app);
-        if (track_search_stats || track_search_nodes)
-            search_file.open(log_dir / "search.jsonl", std::ios::app);
-        if (track_game_log)
-            game_file.open(log_dir / "game.jsonl", std::ios::app);
-        if (track_timers)
-            timing_file.open(log_dir / "timing.jsonl", std::ios::app);
+            uci_file.open(log_file_name("uci.log"), std::ios::app);
+        // search, game, and timing file handles are managed by the modules that write them.
     }
 
     static void closeFiles() {

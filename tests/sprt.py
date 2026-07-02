@@ -6,7 +6,8 @@ import sys
 from datetime import datetime
 import sqlite3
 from data import etl
-import re 
+import re
+import shutil
 from pathlib import Path
 import time
 from datetime import datetime, timezone
@@ -23,6 +24,20 @@ SPRT_LOG_DIR = LOGS_DIR / "sprt_logs"
 GAME_JSON = SPRT_LOG_DIR / "game.jsonl"
 SEARCH_JSON = SPRT_LOG_DIR / "search.jsonl"
 TIMING_JSON = SPRT_LOG_DIR / "timing.jsonl"
+
+def _consolidate_instance_logs(logroot):
+    logroot = Path(logroot)
+    for basename in ("game", "search", "timing", "root_moves"):
+        parts = sorted(logroot.glob(f"{basename}_*.jsonl"))
+        if not parts:
+            continue
+
+        output_path = logroot / f"{basename}.jsonl"
+        with open(output_path, "w", encoding="utf-8") as out_f:
+            for part in parts:
+                with open(part, "r", encoding="utf-8") as in_f:
+                    shutil.copyfileobj(in_f, out_f)
+
 
 def parse_cutechess_output(output, candidate_name="Candidate"):
 
@@ -157,6 +172,8 @@ def upload_logs(args, cute_chess_stats, runtime=None):
         comparison_engine_id = baseline_engine_id
     )
 
+    # consolidate per-instance log files from concurrent engine processes
+    _consolidate_instance_logs(args.logroot)
 
     # map search --> game
     game_map = etl.bulk_log_game(
@@ -219,6 +236,7 @@ def parse_args():
     p.add_argument("--alpha", type=float, default=0.05)
     p.add_argument("--beta", type=float, default=0.05)
     p.add_argument("--max-games", type=int, default=1000)
+    p.add_argument("--concurrency", type=int, default=2, help="Number of concurrent games")
 
     # Opening book
     p.add_argument("--book", default= PROJECT_ROOT / "bin" / "opening_books" / "8moves_v3.pgn" , help="Opening book file")
@@ -243,6 +261,10 @@ def main(args=None):
     # Validate TC
     if sum(x is not None for x in (args.depth, args.time, args.tc)) != 1:
         raise ValueError("Specify exactly one of --depth, --time, or --tc")
+
+    if args.log and args.concurrency > 1:
+        print("[SPRT] WARNING: logging with concurrent engine writes is unsafe; forcing concurrency=1")
+        args.concurrency = 1
 
     print(f"[SPRT] Log directory: {args.logroot}")
 
@@ -316,7 +338,7 @@ def main(args=None):
 
         # Runtime
         "-repeat",
-        "-concurrency", "2",
+        "-concurrency", str(args.concurrency),
         "-pgnout", os.path.join(args.logroot, "cc_sprt.pgn"),
     ]
 

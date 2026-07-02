@@ -2,9 +2,9 @@
 """Run the full ETL pipeline from the data package.
 
 Usage:
-  python3 -m data.run_pipeline
+  python3 -m data.run_analytics_pipeline
   or
-  python3 data/run_pipeline.py
+  python3 data/run_analytics_pipeline.py
 """
 import subprocess
 import sys

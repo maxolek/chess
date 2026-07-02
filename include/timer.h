@@ -80,7 +80,7 @@ struct ScopedTimer {
 
 // Header-only logging
 inline void logTimingStats(const std::string& fen = "") {
-    static std::ofstream out(Logging::log_dir / "timing.jsonl", std::ios::app);
+    static std::ofstream out(Logging::log_file_name("timing.jsonl"), std::ios::app);
     if (!out.is_open()) return;
 
     const auto& root = g_timing.stats[T_ROOT];
