@@ -509,7 +509,7 @@ inline void dumpSearchStats()
         << "D  Eval  Move   Time  Nodes    FH   FL   NMP  SEE  PVS\n"
         << "------------------------------------------------------------\n";
 
-    const size_t max_d = g_stats.max_completed_depth;
+    const size_t max_d = g_stats.max_depth; //g_stats.max_completed_depth;
 
     for (size_t d = 0; d <= max_d; ++d)
     {

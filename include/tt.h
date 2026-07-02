@@ -26,11 +26,16 @@ enum BoundType : uint8_t {
 // -------------------------------
 // Transposition Table Entry
 // -------------------------------
+// key      16 bit
+// eval     16 bit
+// depth    16 bit
+// age      16 bit
+// flag     2 bit
+// bestMove 16 bit
 struct TTEntry {
     U64 key = 0;           // Zobrist key
     int16_t eval = 0;      // Stored evaluation (centipawns)
     int16_t depth = 0;     // iterative_depth recorded
-    int16_t horizon = 0;   // ply + depth
     uint16_t age = 0;      // Age counter
     BoundType flag = EXACT;
     uint16_t bestMove = 0; // Encoded move
@@ -79,8 +84,7 @@ public:
         bool wasEmpty   = (entry->key == 0);
         bool overwritten = (!wasEmpty && entry->key != key);
 
-        // Replace if new key or deeper horizon
-        // todo: switch to deeper depth
+        // Replace if new key or deeper search depth
         if (entry->key != key || depth >= entry->depth) {
             if (overwritten)
                 stats.overwritten++;
