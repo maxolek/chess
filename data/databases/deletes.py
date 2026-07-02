@@ -36,7 +36,7 @@ def drop_all_tables(db_path=str(RAW_DB)) -> None:
     cnxn.close()
     print(f"[DB] Dropped all tables from {db_path}")
 
-def clear_all_tables(db_path=str(RAW_DB)) -> None:
+def clear_all_tables(db_path=str(RAW_DB), exclude_engines=False) -> None:
     """
     Deletes all rows from all tables but keeps schemas intact.
     Resets AUTOINCREMENT counters.
@@ -57,8 +57,7 @@ def clear_all_tables(db_path=str(RAW_DB)) -> None:
         "sts",
         "perft",
         "experiments",
-        "engines"
-    ]
+    ] + (["engines"] if not exclude_engines else [])
 
     for table in tables:
         cur.execute(f"DELETE FROM {table};")
@@ -70,13 +69,14 @@ def clear_all_tables(db_path=str(RAW_DB)) -> None:
 
     cnxn.commit()
     cnxn.close()
-    print(f"[DB] Cleared all tables from {db_path}")
+    print(f"[DB] Cleared all tables from {db_path} {'(excluding engines)' if exclude_engines else ''}")
 
 if __name__ == "__main__":
     # clear tables or drop tables
     p = argparse.ArgumentParser(description="Clear and/or delete chess.db tables")
     p.add_argument("--db", type=str, required=True)
     p.add_argument("--clear", action="store_true")
+    p.add_argument("--clear_no_engines", action="store_true")
     p.add_argument("--delete", action="store_true")
     args = p.parse_args()
 
@@ -84,6 +84,10 @@ if __name__ == "__main__":
         db_path = str(RAW_DB.parent / args.db)
         print(f"[DB] Clearing all tables in {db_path}")
         clear_all_tables(db_path)
+    if args.clear_no_engines:
+        db_path = str(RAW_DB.parent / args.db)
+        print(f"[DB] Clearing all tables in {db_path} (excluding engines)")
+        clear_all_tables(db_path, exclude_engines=True)
     if args.delete:
         db_path = str(RAW_DB.parent / args.db)
         print(f"[DB] Dropping all tables in {db_path}")

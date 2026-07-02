@@ -16,6 +16,7 @@ inline RunContext g_run_context{};
 struct Logging {
     // ---- toggles ----
     static inline bool track_timers        = false;
+    static inline bool track_root_moves    = true;
     static inline bool track_search_stats  = true;
     static inline bool track_search_nodes  = false; // node/qnode counts only
     static inline bool track_game_log      = true;
@@ -87,6 +88,12 @@ struct Logging {
         reopenFiles();
     }
 
+    static void setTrackRootMoves(bool v) {
+        if (track_root_moves == v) return;
+        track_root_moves = v;
+        reopenFiles();
+    }
+
     static void setTrackSearchStats(bool v) {
         if (track_search_stats == v) return;
         track_search_stats = v;
@@ -113,6 +120,7 @@ struct Logging {
 
     static inline void disableAll() {
         track_timers        = false;
+        track_root_moves    = false;
         track_search_stats  = false;
         track_search_nodes  = false;
         track_game_log      = false;
@@ -121,6 +129,7 @@ struct Logging {
 
     static inline void enableAll() {
         track_timers        = true;
+        track_root_moves    = true;
         track_search_stats  = true;
         track_search_nodes  = false; // search stats covers the nodes
         track_game_log      = true;

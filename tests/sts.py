@@ -36,6 +36,11 @@ def upload_logs(args):
     meta = etl.probe_engine_metadata(args.engine)
     engine_id = etl.get_engine_id(cnxn, version=meta["version"])
 
+    # auto-register if not found
+    if engine_id is None:
+        print(f"[STS] Engine {meta['version']} not registered, registering now...")
+        engine_id = etl.register_engine(cnxn, {"engine_path": args.engine})
+
     # log
     sts_id = etl.start_experiment(
         cnxn, 

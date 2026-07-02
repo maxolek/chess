@@ -25,7 +25,7 @@ import subprocess
 import sqlite3
 import platform
 from pathlib import Path
-from ..data import etl
+from data import etl
 
 system = platform.system()
 
@@ -54,13 +54,15 @@ def get_all_engines(cnxn, n=3):
     rows = cnxn.execute(
         f"""
         WITH last_n AS (
-            SELECT id, version FROM engines ORDER BY id DESC LIMIT {n}
+            SELECT id, version FROM engines ORDER BY id DESC LIMIT {n} -- n --> n-1 due to candidate inclusion and later filtered out
         ),
-        first as (
+        first_engine AS (                                              -- this is okay since n-1 + first_engine ==> n engines total as desired
             SELECT id, version FROM engines ORDER BY id ASC LIMIT 1
         )
 
-        SELECT last_n UNION first
+        SELECT id, version FROM last_n
+        UNION
+        SELECT id, version FROM first_engine
         """
     ).fetchall()
     engines = []
@@ -295,7 +297,6 @@ def run_cutechess_tournament(candidate_path, opponents, tc, games_per_pair, cute
         "option.game_logging=true",
         "-tournament", "round-robin",
         "-games", str(games_per_pair),
-        "-rounds", str(games_per_pair),
         "-repeat",
         "-maxmoves", "200",
         "-concurrency", "2",
@@ -347,7 +348,8 @@ def classify_tc(tc_str):
     # Estimated game time in minutes (base + ~40 moves of increment per side)
     game_time_min = (base_sec + 40 * inc) / 60.0
 
-    if game_time_min < .15:
+    # ultra-fast:  < 15 seconds total game time (0.25 minutes)
+    if game_time_min < 0.25:
         return "ultra_fast"
     elif game_time_min < 1:
         return "bullet"
@@ -497,7 +499,7 @@ def main():
     parser.add_argument("--tc", nargs="+", default=["blitz"],
                         choices=["bullet", "blitz", "rapid", "classical"],
                         help="Time control categories to run")
-    parser.add_argument("--games", type=int, default=20, help="Games per opponent per TC")
+    parser.add_argument("--games", type=int, default=10, help="Games per opponent per TC")
     parser.add_argument("--book", default=str(PROJECT_ROOT / "bin" / "opening_books" / "8moves_v3.pgn"))
     parser.add_argument("--cutechess-cli",
                         default=r"C:\Program Files (x86)\Cute Chess\cutechess-cli.exe")
@@ -514,9 +516,11 @@ def main():
     # Get candidate engine ID
     meta = etl.probe_engine_metadata(args.engine)
     engine_id = etl.get_engine_id(cnxn, version=meta["version"])
+
+    # auto-register if not found
     if engine_id is None:
-        print(f"[ERROR] Engine version {meta['version']} not found in database. Register it first.")
-        return
+        print(f"[TOURNAMENT] Engine {meta['version']} not registered, registering now...")
+        engine_id = etl.register_engine(cnxn, {"engine_path": args.engine})
 
     # Build namespace for run_tournament
     ns = argparse.Namespace(

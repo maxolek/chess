@@ -193,6 +193,9 @@ void Engine::setOption(const std::string& name, const std::string& value) {
     else if (name == "timer_logging") {
         if (Logging::track_timers != boolFromString(value)) {Logging::setTrackTimers(boolFromString(value));}
     }
+    else if (name == "root_moves_logging") {
+        if (Logging::track_root_moves != boolFromString(value)) {Logging::setTrackRootMoves(boolFromString(value));}
+    }
     else if (name == "stats_logging") {
         if (Logging::track_search_stats != boolFromString(value)) {Logging::setTrackSearchStats(boolFromString(value));}
     }

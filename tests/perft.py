@@ -129,6 +129,11 @@ def main(args=None):
     engine_meta = etl.probe_engine_metadata(args.engine)
     engine_id = etl.get_engine_id(cnxn, version=engine_meta["version"])
 
+    # auto-register if not found
+    if engine_id is None:
+        print(f"[PERFT] Engine {engine_meta['version']} not registered, registering now...")
+        engine_id = etl.register_engine(cnxn, {"engine_path": args.engine})
+
     experiment_id = etl.start_experiment(
         cnxn,
         "PERFT",

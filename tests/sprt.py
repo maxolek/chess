@@ -164,6 +164,14 @@ def upload_logs(args, cute_chess_stats, runtime=None):
     candidate_engine_id = etl.get_engine_id(cnxn, version=candidate_engine_version)
     baseline_engine_id = etl.get_engine_id(cnxn, version=baseline_engine_version)
 
+    # auto-register if not found
+    if candidate_engine_id is None:
+        print(f"[SPRT] Candidate engine {candidate_engine_version} not registered, registering now...")
+        candidate_engine_id = etl.register_engine(cnxn, {"engine_path": args.engine_a})
+    if baseline_engine_id is None:
+        print(f"[SPRT] Baseline engine {baseline_engine_version} not registered, registering now...")
+        baseline_engine_id = etl.register_engine(cnxn, {"engine_path": args.engine_b})
+
     # log sprt experiment
     sprt_id = etl.start_experiment(
         cnxn, 
@@ -262,10 +270,6 @@ def main(args=None):
     if sum(x is not None for x in (args.depth, args.time, args.tc)) != 1:
         raise ValueError("Specify exactly one of --depth, --time, or --tc")
 
-    if args.log and args.concurrency > 1:
-        print("[SPRT] WARNING: logging with concurrent engine writes is unsafe; forcing concurrency=1")
-        args.concurrency = 1
-
     print(f"[SPRT] Log directory: {args.logroot}")
 
     engine_a = os.path.abspath(args.engine_a)
@@ -280,6 +284,7 @@ def main(args=None):
         f"option.timer_logging={"true" if args.log else "false"}",
         f"option.stats_logging={"true" if args.log else "false"}",
         f"option.game_logging={"true" if args.log else "false"}",
+        f"option.root_moves_logging={"true" if args.log else "false"}",
         f"option.uci_logging=true",
     ]
     log_b_block = [
@@ -401,7 +406,7 @@ def main(args=None):
     upload_logs(args, cute_chess_stats=stats, runtime=run_time)
 
     print("[SPRT] Completed successfully")
-    print(f"[SPRT] Logs written to {args.logroot}")
+    #print(f"[SPRT] Logs written to {args.logroot}")
 
 
 if __name__ == "__main__":

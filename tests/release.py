@@ -7,9 +7,11 @@ import shutil
 import sqlite3
 from datetime import datetime
 from pathlib import Path
-from data import etl
-from tests import perft, sprt, sts, tournament
 import platform
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from data import etl
+from . import perft, sprt, sts, tournament
 
 system = platform.system()
 
@@ -48,22 +50,30 @@ def run_make(args):
 
     build_dir = "build"
 
+    clear_cmd = [
+        "rm", "-rf", build_dir
+    ]
+
     configure_cmd = [
         "cmake",
         "-S", ".",                # source dir
         "-B", build_dir,           # build dir
-        f"-DVERSION={args.version}",
-        "-DCMAKE_BUILD_TYPE=Release",
+        "-G", "MinGW Makefiles",   # generator
+        "-DCMAKE_C_COMPILER=g++",
+        "-DCMAKE_CXX_COMPILER=g++",
+        f"-DVERSION={args.version}", # version
+        "-DCMAKE_BUILD_TYPE=Release", # release build type
     ]
 
     build_cmd = [
         "cmake",
         "--build", build_dir,
-        "--config", "Release",     # important for MSVC
+        #"--config", "Release",     #  MSVC
         "--parallel",
     ]
 
     try:
+        subprocess.check_call(clear_cmd)
         subprocess.check_call(configure_cmd)
         subprocess.check_call(build_cmd)
     except subprocess.CalledProcessError:
@@ -81,6 +91,7 @@ def run_sprt(args):
     sprt_args = argparse.Namespace(
         engine_a=args.engine,
         engine_b=args.base_engine, 
+        concurrency=args.concurrency,
         depth=args.sprt_depth,
         time=args.sprt_time,
         tc=args.sprt_tc,
@@ -145,7 +156,8 @@ def main():
     parser.add_argument("--cutechess-cli", default=r"C:\Program Files (x86)\Cute Chess\cutechess-cli.exe", help="Full path to cutechess-cli.exe\nUsed for game testing")
 
     # SPRT
-    parser.add_argument("--base_engine", default=os.path.join(ENGINES_DIR, "classic.exe"))
+    parser.add_argument("--base_engine", default=os.path.join(ENGINES_DIR, "0.0.0.exe"))
+    parser.add_argument("--concurrency", type=int, default=2, help="Number of concurrent games for SPRT")
     parser.add_argument("--elo0", type=int, default=0)
     parser.add_argument("--elo1", type=float, default=10)
     parser.add_argument("--alpha", type=float, default=0.05)
@@ -171,7 +183,7 @@ def main():
     parser.add_argument("--tournament_tc", nargs="+", default=["blitz"],
                         choices=["ultra_fast", "bullet", "blitz", "rapid", "classical"],
                         help="Time control categories for rating tournament")
-    parser.add_argument("--tournament_games", type=int, default=20,
+    parser.add_argument("--tournament_games", type=int, default=10,
                         help="Games per opponent per time control")
     parser.add_argument("--tournament_engines", type=int, default=3,
                         help="# Engines (1st version + n-1 latest version) to play against")

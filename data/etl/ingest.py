@@ -208,7 +208,11 @@ def _bool_option(options, key):
 
 
 def register_engine(cnxn, engine):
-    """Register an engine and return its row ID."""
+    """Register an engine and return its row ID.
+    
+    If an engine with the same version is already registered, returns its ID instead.
+    """
+    # First, extract version to check for duplicates
     if engine.get("engine_path"):
         engine_path = engine["engine_path"]
         print(f"[ETL] Probing engine UCI at: {engine_path}")
@@ -284,6 +288,13 @@ def register_engine(cnxn, engine):
         r_lmr_denom = engine.get("r_lmr_denom")
         lmr_move_order_threshold = engine.get("lmr_move_order_threshold")
         lmr_depth_threshold = engine.get("lmr_depth_threshold")
+
+    # Check if engine with this version already exists
+    if version:
+        existing_id = get_engine_id(cnxn, version=version)
+        if existing_id is not None:
+            print(f"[ETL] Engine {name} ({version}) already registered with ID {existing_id}")
+            return existing_id
 
     cur = cnxn.execute(
         """
