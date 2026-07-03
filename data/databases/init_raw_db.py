@@ -95,11 +95,11 @@ def init_raw_db(db_dir=None) -> None:
             engine_id                   INTEGER NOT NULL,
 
             -- elo by time control
-            elo_ultra_fast              INTEGER, -- < 15 sec/game
-            elo_bullet                  INTEGER, -- < 1 min/game
-            elo_blitz                   INTEGER, -- < 10 min/game
-            elo_rapid                   INTEGER, -- < 30 min/game
-            elo_classical               INTEGER, -- >= 30 min/game
+            elo_ultra_fast              REAL, -- < 15 sec/game
+            elo_bullet                  REAL, -- < 1 min/game
+            elo_blitz                   REAL, -- < 10 min/game
+            elo_rapid                   REAL, -- < 30 min/game
+            elo_classical               REAL, -- >= 30 min/game
 
             -- supporting stats
             games_ultra_fast            INTEGER DEFAULT 0,
@@ -406,7 +406,6 @@ def init_raw_db(db_dir=None) -> None:
         root_moves_str              # FK(searches.id)
     ]:
         cur.executescript(script)
-
     cnxn.commit()
     print(f"[DB] Raw database initialized with schema at {db_path}")
 

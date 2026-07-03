@@ -82,8 +82,14 @@ def load_full(cnxn):
             r.id, r.engine_id  
             e.name as engine_name, 
             e.version as engine_version,
-            r.elo_bullet, r.elo_blitz, r.elo_rapid, r.elo_classical,
-            r.games_bullet, r.games_blitz, r.games_rapid, r.games_classical,
+            cast(r.elo_bullet AS INTEGER) AS elo_bullet,
+            cast(r.elo_blitz AS INTEGER) AS elo_blitz,
+            cast(r.elo_rapid AS INTEGER) AS elo_rapid,
+            cast(r.elo_classical AS INTEGER) AS elo_classical,
+            r.games_bullet AS games_bullet,
+            r.games_blitz AS games_blitz,
+            r.games_rapid AS games_rapid,
+            r.games_classical AS games_classical,
             r.ingestion_timestamp_utc
         FROM raw.engine_ratings r
         LEFT JOIN raw.engines e 
@@ -209,8 +215,16 @@ def load_incremental(cnxn):
             r.id, r.engine_id,  
             e.name as engine_name, 
             e.version as engine_version,
-            r.elo_ultra_fast, r.elo_bullet, r.elo_blitz, r.elo_rapid, r.elo_classical,
-            r.games_ultra_fast, r.games_bullet, r.games_blitz, r.games_rapid, r.games_classical,
+            cast(r.elo_ultra_fast AS INTEGER) AS elo_ultra_fast,
+            cast(r.elo_bullet AS INTEGER) AS elo_bullet,
+            cast(r.elo_blitz AS INTEGER) AS elo_blitz,
+            cast(r.elo_rapid AS INTEGER) AS elo_rapid,
+            cast(r.elo_classical AS INTEGER) AS elo_classical,
+            r.games_ultra_fast AS games_ultra_fast,
+            r.games_bullet AS games_bullet,
+            r.games_blitz AS games_blitz,
+            r.games_rapid AS games_rapid,
+            r.games_classical AS games_classical,
             r.ingestion_timestamp_utc
         FROM raw.engine_ratings r
         LEFT JOIN raw.engines e 

@@ -13,10 +13,10 @@ import argparse
 
 
 MODULES = [
-    "data.load_analytics",
-    "data.transform_positions",
-    "data.transform_search",
-    "data.normalize_metadata",
+    "data.databases.load_analytics",
+    "data.transforms.transform_positions",
+    "data.transforms.transform_search",
+    "data.transforms.normalize_metadata",
 ]
 
 

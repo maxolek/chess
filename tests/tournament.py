@@ -586,7 +586,7 @@ def main():
     parser.add_argument("--engine", required=True, help="Candidate engine path")
     parser.add_argument("--n_engines", default=3, help="Number of last versions in tournament")
     parser.add_argument("--tc", nargs="+", default=["blitz"],
-                        choices=["bullet", "blitz", "rapid", "classical"],
+                        choices=["ultra_fast", "bullet", "blitz", "rapid", "classical"],
                         help="Time control categories to run")
     parser.add_argument("--games", type=int, default=10, help="Games per opponent per TC")
     parser.add_argument("--book", default=str(PROJECT_ROOT / "bin" / "opening_books" / "8moves_v3.pgn"))
