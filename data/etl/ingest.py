@@ -368,16 +368,52 @@ def log_engine_ratings(cnxn, engine_id, ratings):
     ratings: dict with keys like 'bullet', 'blitz', 'rapid', 'classical'
                 each value is a dict with 'elo' and 'games'
     """
-    cur = cnxn.execute(
-        """
-        INSERT INTO engine_ratings (
-            engine_id,
-            elo_ultra_fast, elo_bullet, elo_blitz, elo_rapid, elo_classical,
-            games_ultra_fast, games_bullet, games_blitz, games_rapid, games_classical
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """
+    # prepare values for each TC category (use None for missing elos, 0 for games)
+    tc_keys = ["ultra_fast", "bullet", "blitz", "rapid", "classical"]
+    elos = [None] * len(tc_keys)
+    games = [0] * len(tc_keys)
+    for i, k in enumerate(tc_keys):
+        v = ratings.get(k)
+        if isinstance(v, dict):
+            elos[i] = v.get("elo")
+            games[i] = int(v.get("games", 0) or 0)
+
+    params = (
+        elos[0], elos[1], elos[2], elos[3], elos[4],
+        games[0], games[1], games[2], games[3], games[4],
+        engine_id,
     )
+
+    # If a row for this engine already exists, update it; otherwise insert.
+    existing = cnxn.execute(
+        "SELECT id FROM engine_ratings WHERE engine_id = ? LIMIT 1",
+        (engine_id,),
+    ).fetchone()
+
+    if existing:
+        cur = cnxn.execute(
+            """
+            UPDATE engine_ratings SET
+                elo_ultra_fast = ?, elo_bullet = ?, elo_blitz = ?, elo_rapid = ?, elo_classical = ?,
+                games_ultra_fast = ?, games_bullet = ?, games_blitz = ?, games_rapid = ?, games_classical = ?
+            WHERE engine_id = ?
+            """,
+            params,
+        )
+    else:
+        cur = cnxn.execute(
+            """
+            INSERT INTO engine_ratings (
+                engine_id,
+                elo_ultra_fast, elo_bullet, elo_blitz, elo_rapid, elo_classical,
+                games_ultra_fast, games_bullet, games_blitz, games_rapid, games_classical
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (engine_id, elos[0], elos[1], elos[2], elos[3], elos[4],
+             games[0], games[1], games[2], games[3], games[4]),
+        )
+
     cnxn.commit()
     return cur.lastrowid
 

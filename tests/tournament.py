@@ -25,6 +25,7 @@ import subprocess
 import sqlite3
 import platform
 from pathlib import Path
+import shutil
 from data import etl
 
 system = platform.system()
@@ -189,7 +190,7 @@ def update_engine_rating(cnxn, engine_id, tc_category, new_elo, games_played):
     else:
         cnxn.execute(
             f"INSERT INTO engine_ratings (engine_id, {elo_col}, {games_col}) VALUES (?, ?, ?)",
-            (new_elo, games_played, engine_id)
+            (engine_id, new_elo, games_played)
         )
     cnxn.commit()
 
@@ -323,6 +324,7 @@ def run_cutechess_tournament(candidate_path, opponents, tc, games_per_pair, cute
         "option.stats_logging=true",
         "option.timer_logging=true",
         "option.game_logging=true",
+        "option.root_moves_logging=true",
         "-tournament", "round-robin",
         "-games", str(games_per_pair),
         "-repeat",
@@ -462,10 +464,18 @@ def run_tournament(args, cnxn, engine_id):
               f"avg_opp={avg_opp:.0f} games={total_games}")
 
     # update opponent ratings using standard elo formula
-    # use full round-robin results (cand=perf, opp=stored)
+    # use full round-robin results (cand=current or anchor, opp=stored)
     # K-factor: 32 for engine with fewer games, 16 for established
     if candidate_elo is not None:
-        elo_map = {'Candidate': candidate_elo}
+        elo_col = f"elo_{actual_cat}"
+        candidate_old_elo = get_opponent_elo(cnxn, engine_id, actual_cat)
+        candidate_has_rating = cnxn.execute(
+            f"SELECT 1 FROM engine_ratings WHERE engine_id = ? AND {elo_col} IS NOT NULL",
+            (engine_id,),
+        ).fetchone() is not None
+
+        candidate_start_elo = candidate_old_elo if candidate_has_rating else candidate_elo
+        elo_map = {'Candidate': candidate_start_elo}
         elo_map.update(opponent_elos)
 
         # map to engine id
@@ -490,7 +500,7 @@ def run_tournament(args, cnxn, engine_id):
                 elo_a, elo_b = elo_map[name_a], elo_map[name_b]
                 actual_a = p['wins'] + .5*p['draws']
                 actual_b = p['losses'] + .5*p['draws']
-                expected_a = games / (1.0 + 109.0 ** ((elo_b - elo_a) / 400.0))
+                expected_a = games / (1.0 + 10.0 ** ((elo_b - elo_a) / 400.0))
                 expected_b = 1.0 - expected_a 
 
                 elo_deltas[name_a] += K * (actual_a - expected_a)
@@ -501,22 +511,73 @@ def run_tournament(args, cnxn, engine_id):
         print(f"\n[RATINGS] Updating ratings from all round-robin results:")
         for name, delta in elo_deltas.items():
             if games_count[name] == 0: continue 
+            if name == 'Candidate' and not candidate_has_rating:
+                continue
+
             old_elo = elo_map[name]
             new_elo = round(old_elo + delta, 1)
             print(f"  {name:12s}: {old_elo:.0f} -> {new_elo:.0f} "
                   f"(delta={delta:+.1f}, games={games_count[name]})")
-            # update engine ratings in DB
-            update_engine_rating(cnxn, opp['id'], actual_cat, new_elo, games)
+            # update engine ratings in DB for this engine name
+            engine_db_id = id_map.get(name)
+            if engine_db_id is None:
+                print(f"[WARN] No DB id found for {name}, skipping rating update")
+                continue
+            update_engine_rating(cnxn, engine_db_id, actual_cat, new_elo, games_count[name])
 
-    # Log experiment to DB
-    etl.update_experiment(
-        cnxn, experiment_id,
-        {"end_time_utc": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()}
-    )
+        # new candidates dont have an elo_delta
+        if not candidate_has_rating and games_count.get('Candidate', 0) > 0:
+            new_elo = round(candidate_elo, 1)
+            candidate_games = games_count['Candidate']
+            print(f"  Candidate    : (new) -> {new_elo:.0f} (games={candidate_games})")
+            update_engine_rating(cnxn, engine_id, actual_cat, new_elo, candidate_games)
 
-    print(f"\n[TOURNAMENT] Ratings logged for engine {engine_id}")
-    for cat, r in ratings.items():
-        print(f"  {cat:12s}: Elo={r['elo']}, games={r['games']}")
+    # Consolidate per-instance logs and upload, like SPRT
+    for basename in ("game", "search", "timing", "root_moves"):
+        parts = sorted(TOURNAMENT_LOG_DIR.glob(f"{basename}_*.jsonl"))
+        if not parts:
+            continue
+        out_path = TOURNAMENT_LOG_DIR / f"{basename}.jsonl"
+        with open(out_path, "w", encoding="utf-8") as out_f:
+            for part in parts:
+                with open(part, "r", encoding="utf-8") as in_f:
+                    shutil.copyfileobj(in_f, out_f)
+
+    game_json = TOURNAMENT_LOG_DIR / "game.jsonl"
+    search_json = TOURNAMENT_LOG_DIR / "search.jsonl"
+    timing_json = TOURNAMENT_LOG_DIR / "timing.jsonl"
+    root_moves_json = TOURNAMENT_LOG_DIR / "root_moves.jsonl"
+
+    game_map = {}
+    if game_json.exists():
+        try:
+            game_map = etl.bulk_log_game(cnxn, game_json, experiment_id)
+        except Exception as e:
+            print(f"[DATA] bulk_log_game failed: {e}")
+
+    if search_json.exists():
+        try:
+            etl.bulk_log_search_and_timing(
+                cnxn,
+                search_json,
+                game_map,
+                timing_path=timing_json if timing_json.exists() else None,
+                root_moves_path=root_moves_json if root_moves_json.exists() else None,
+                engine_id=engine_id,
+            )
+        except Exception as e:
+            print(f"[DATA] bulk_log_search_and_timing failed: {e}")
+
+    # finalize experiment
+    from datetime import datetime, timezone
+    etl.update_experiment(cnxn, experiment_id, {"end_time_utc": datetime.now(timezone.utc).isoformat()})
+
+    etl.clear_log_dir(TOURNAMENT_LOG_DIR)
+
+    # !!! outdated ... printing perf-rating not new-rating !!!
+    #print(f"\n[TOURNAMENT] Ratings logged for new engine (id={engine_id}")
+    #for cat, r in ratings.items():
+    #    print(f"  {cat:12s}: Elo={r['elo']}, games={r['games']}")
 
 
 

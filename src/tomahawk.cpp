@@ -30,7 +30,8 @@
 // ---------------------
 void pin_to_pcores() {
 #ifdef _WIN32
-    // Windows example: P-cores (0,1,6,7,8,9,18,19)
+    // P-cores (0,1,6,7,8,9,18,19)
+    // star cores (0,6,8)
     DWORD_PTR mask = 0;
     //mask |= (1ULL << 0) | (1ULL << 6) | (1ULL << 8); // star cores
     mask |= (1ULL << 0) | (1ULL << 1) | (1ULL << 6) | (1ULL << 7) | (1ULL << 8) | (1ULL << 9) | (1ULL << 18) | (1ULL << 19); // performance cores
