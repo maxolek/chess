@@ -313,7 +313,8 @@ def run_cutechess_tournament(candidate_path, opponents, tc, games_per_pair, cute
         ext = os.path.splitext(book)[1][1:]
         book_block = [
             "-openings", f"file={os.path.abspath(book)}",
-            f"format={ext}", "order=random", "plies=8",
+            f"format={ext}", "order=random", "plies=16",
+            "order=random",
         ]
 
     cmd = [
@@ -501,7 +502,7 @@ def run_tournament(args, cnxn, engine_id):
                 actual_a = p['wins'] + .5*p['draws']
                 actual_b = p['losses'] + .5*p['draws']
                 expected_a = games / (1.0 + 10.0 ** ((elo_b - elo_a) / 400.0))
-                expected_b = 1.0 - expected_a 
+                expected_b = games - expected_a
 
                 elo_deltas[name_a] += K * (actual_a - expected_a)
                 elo_deltas[name_b] += K * (actual_b - expected_b)
