@@ -275,6 +275,13 @@ def main(args=None):
     engine_a = os.path.abspath(args.engine_a)
     engine_b = os.path.abspath(args.engine_b)
 
+    if args.time is not None:
+        fast_tc = args.time <= 0.25
+    else:  # args.tc must exist
+        base_time = int(re.split(":", args.tc)[1][:2])
+        fast_tc = base_time <= 25
+    should_log = args.log and fast_tc
+
     each_block = [
         "-each",
         "proto=uci"
@@ -288,10 +295,11 @@ def main(args=None):
         f"option.uci_logging=true",
     ]
     log_b_block = [
-        "option.timer_logging=false",
-        "option.stats_logging=false",
-        "option.game_logging=false",
-        "option.uci_logging=false",
+        f"option.timer_logging={"true" if should_log else "false"}",
+        f"option.stats_logging={"true" if should_log else "false"}",
+        f"option.game_logging={"true" if should_log else "false"}",
+        f"option.root_moves_logging={"true" if should_log else "false"}",
+        f"option.uci_logging={"true" if should_log else "false"}",
     ]
 
     # Time control

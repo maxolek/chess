@@ -314,7 +314,6 @@ def run_cutechess_tournament(candidate_path, opponents, tc, games_per_pair, cute
         book_block = [
             "-openings", f"file={os.path.abspath(book)}",
             f"format={ext}", "order=random", "plies=16",
-            "order=random",
         ]
 
     cmd = [
