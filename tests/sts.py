@@ -20,6 +20,7 @@ STS_LOGS_DIR = LOGS_DIR / "sts_logs"
 GAME_JSON = STS_LOGS_DIR / "game.jsonl"
 SEARCH_JSON = STS_LOGS_DIR / "search.jsonl"
 TIMING_JSON = STS_LOGS_DIR / "timing.jsonl"
+ROOT_MOVES_JSON = STS_LOGS_DIR / "root_moves.jsonl"
 STS_JSON = STS_LOGS_DIR / "sts_suite.jsonl"
 
 # --------------------------
@@ -57,7 +58,8 @@ def upload_logs(args):
         {},
         timing_path = TIMING_JSON,
         sts_id = sts_id,
-        engine_id = engine_id
+        engine_id = engine_id,
+        root_moves_path = ROOT_MOVES_JSON
     )
 
     etl.update_experiment(

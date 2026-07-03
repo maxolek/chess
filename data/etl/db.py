@@ -6,6 +6,8 @@ import subprocess
 import platform
 import shutil
 import re
+import queue 
+import threading
 from .paths import RAW_DB
 
 
@@ -48,15 +50,9 @@ def get_engine_id(cnxn, version=None):
 
 
 def probe_engine_metadata(engine_path, timeout=10.0):
-    """
-    Query a chess engine via UCI and extract version info.
-    Handles Windows .exe extension automatically.
-    Forces kill if engine hangs.
-    """
     system = platform.system()
     engine_path = os.path.abspath(engine_path)
 
-    # Auto-append .exe on Windows if missing
     if system == "Windows" and not engine_path.lower().endswith(".exe"):
         if os.path.exists(engine_path + ".exe"):
             engine_path += ".exe"
@@ -74,6 +70,20 @@ def probe_engine_metadata(engine_path, timeout=10.0):
             bufsize=1
         )
 
+        q = queue.Queue()
+
+        def _reader():
+            try:
+                for line in p.stdout:
+                    q.put(line)
+            except Exception:
+                pass
+            finally:
+                q.put(None)  # sentinel: stdout closed
+
+        t = threading.Thread(target=_reader, daemon=True)
+        t.start()
+
         meta = {}
         options = {}
         start = time.time()
@@ -82,13 +92,17 @@ def probe_engine_metadata(engine_path, timeout=10.0):
             p.stdin.flush()
 
             while True:
-                if time.time() - start > timeout:
+                remaining = timeout - (time.time() - start)
+                if remaining <= 0:
                     raise RuntimeError(f"Timeout waiting for UCI response from {engine_path}")
 
-                line = p.stdout.readline()
-                if not line:
-                    time.sleep(0.01)
+                try:
+                    line = q.get(timeout=min(remaining, 0.5))
+                except queue.Empty:
                     continue
+
+                if line is None:
+                    raise RuntimeError(f"Engine closed stdout before uciok: {engine_path}")
 
                 line = line.strip()
                 if line.startswith("id name"):
@@ -98,10 +112,6 @@ def probe_engine_metadata(engine_path, timeout=10.0):
                 elif line.startswith("id author"):
                     meta["author"] = line[len("id author"):].strip()
                 elif line.startswith("option name "):
-                    # Robust parsing: capture name, type, optional default, min, max
-                    # Examples handled:
-                    # option name Foo type spin default 3 min 0 max 10
-                    # option name Bar type string default "C:/path/to/file"
                     m = re.match(r'^option name (.+?) type (\w+)(?: default (".*?"|[^ ]+))?(?: min ([^ ]+))?(?: max ([^ ]+))?', line)
                     if m:
                         opt_name = m.group(1).strip()
@@ -112,7 +122,6 @@ def probe_engine_metadata(engine_path, timeout=10.0):
 
                         if isinstance(default_val, str):
                             default_val = default_val.strip()
-                            # strip surrounding double-quotes if present
                             if default_val.startswith('"') and default_val.endswith('"'):
                                 default_val = default_val[1:-1]
 

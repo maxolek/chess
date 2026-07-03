@@ -24,6 +24,7 @@ SPRT_LOG_DIR = LOGS_DIR / "sprt_logs"
 GAME_JSON = SPRT_LOG_DIR / "game.jsonl"
 SEARCH_JSON = SPRT_LOG_DIR / "search.jsonl"
 TIMING_JSON = SPRT_LOG_DIR / "timing.jsonl"
+ROOT_MOVES_JSON = SPRT_LOG_DIR / "root_moves.jsonl"
 
 def _consolidate_instance_logs(logroot):
     logroot = Path(logroot)
@@ -154,13 +155,17 @@ def parse_cutechess_output(output, candidate_name="Candidate"):
 
 
 def upload_logs(args, cute_chess_stats, runtime=None):
+    print("[DATA] Preparing to upload logs to database...")
+
     if system == "Windows": cnxn = sqlite3.connect('F:/databases/chess.db')
     elif system == "Darwin": cnxn = sqlite3.connect(Path.home() / "Documents/databases/chess.db")
 
+    print("[DATA] Probing engine metadata...")
     candidate_engine_version = etl.probe_engine_metadata(args.engine_a)['version']
     baseline_engine_version = etl.probe_engine_metadata(args.engine_b)['version']
 
     # get engine_id by probing db.engines via version
+    print("[DATA] Retrieving engine ids...")
     candidate_engine_id = etl.get_engine_id(cnxn, version=candidate_engine_version)
     baseline_engine_id = etl.get_engine_id(cnxn, version=baseline_engine_version)
 
@@ -181,6 +186,7 @@ def upload_logs(args, cute_chess_stats, runtime=None):
     )
 
     # consolidate per-instance log files from concurrent engine processes
+    print("[DATA] Consolidating per-instance log files...")
     _consolidate_instance_logs(args.logroot)
 
     # map search --> game
@@ -197,16 +203,18 @@ def upload_logs(args, cute_chess_stats, runtime=None):
         SEARCH_JSON,
         game_map, 
         timing_path=TIMING_JSON,
-        engine_id=candidate_engine_id
+        engine_id=candidate_engine_id,
+        root_moves_path=ROOT_MOVES_JSON
     )
 
     # log sprt experiment details in db.sprt
+    args_dict = {k: (str(v) if isinstance(v, Path) else v) for k, v in vars(args).items()}
     etl.log_sprt(
         cnxn,
         sprt_id,  # experiment_id
         candidate_engine_id,
         baseline_engine_id,
-        **{**vars(args), **cute_chess_stats},
+        **{**args_dict, **cute_chess_stats},
         runtime=runtime
     )
     etl.update_experiment(
@@ -215,6 +223,7 @@ def upload_logs(args, cute_chess_stats, runtime=None):
         {"end_time_utc": datetime.now(timezone.utc).isoformat()}
     )
 
+    print("[DATA] Clearing log directory...")
     etl.clear_log_dir(args.logroot)
     print(f"[DATA] Logging completed for SPRT {sprt_id}.")
 
@@ -278,9 +287,12 @@ def main(args=None):
     if args.time is not None:
         fast_tc = args.time <= 0.25
     else:  # args.tc must exist
-        base_time = int(re.split(":", args.tc)[1][:2])
-        fast_tc = base_time <= 25
+        base_sec = 60*int(re.split(":", args.tc)[0]) + int(re.split(":", args.tc)[1][:2])
+        fast_tc = base_sec <= 30
     should_log = args.log and fast_tc
+
+    if (should_log):
+        print("[SPRT] Logging enabled for candidate engine (low time control ... logging can affect performance at these search speeds)")
 
     each_block = [
         "-each",
