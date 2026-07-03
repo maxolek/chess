@@ -2,9 +2,9 @@
 """Run the full ETL pipeline from the data package.
 
 Usage:
-  python3 -m data.run_analytics_pipeline
+  python3 -m data.databases.run_analytics_pipeline
   or
-  python3 data/run_analytics_pipeline.py
+  python3 data/databases/run_analytics_pipeline.py
 """
 import subprocess
 import sys
@@ -28,7 +28,7 @@ def run_module(module: str, extra_args: list = None) -> None:
         cmd.extend(extra_args)
     try:
         # run subprocess from repository root so package imports like 'data.*' resolve
-        repo_root = Path(__file__).resolve().parent.parent
+        repo_root = Path(__file__).resolve().parent.parent.parent
         subprocess.run(cmd, check=True, cwd=str(repo_root))
     except subprocess.CalledProcessError as e:
         print(f"Module {module} failed with exit code {e.returncode}")
@@ -36,7 +36,7 @@ def run_module(module: str, extra_args: list = None) -> None:
 
 
 def main():
-    cwd = Path(__file__).resolve().parent.parent
+    cwd = Path(__file__).resolve().parent.parent.parent
     parser = argparse.ArgumentParser(description="Run ETL pipeline modules")
     parser.add_argument('--skip-load', action='store_true', help='Skip data.load_analytics step')
     parser.add_argument('--full', action='store_true', help='Full refresh (drop + reload all tables)')

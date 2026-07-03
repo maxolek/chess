@@ -328,7 +328,7 @@ def init_raw_db(db_dir=None) -> None:
             candidate_black_draws           INTEGER,
         -- summaries
             games_played                    INTEGER,
-            run_time_s                      INTEGER,
+            run_time_s                      REAL,
 
             ingestion_timestamp_utc         DATETIME DEFAULT CURRENT_TIMESTAMP,
             
