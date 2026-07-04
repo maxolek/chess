@@ -585,7 +585,7 @@ def query_root_moves() -> pd.DataFrame:
     if df.empty or engines_df.empty or "search_id" not in df.columns: return df 
     try: 
         emap = safe_query(f"""
-                        SELECT id AS search_id, engine_id FROM {_SEARCH_TABLE} 
+                        SELECT search_id AS search_id, engine_id FROM {_SEARCH_TABLE} 
                         WHERE search_id IN (SELECT DISTINCT search_id FROM root_moves)
                 """)
         if not emap.empty:
@@ -603,7 +603,7 @@ def query_timing() -> pd.DataFrame:
         return df
     try:
         emap = safe_query(f"""
-            SELECT id AS search_id, engine_id FROM {_SEARCH_TABLE}
+            SELECT search_id AS search_id, engine_id FROM {_SEARCH_TABLE}
             WHERE search_id IN (SELECT DISTINCT search_id FROM search_timings)
         """)
         if not emap.empty:
