@@ -49,18 +49,23 @@ def upload_logs(args):
         engine_id
     )
 
-    etl.bulk_log_sts(cnxn, STS_JSON, sts_id, **vars(args))
+    try:
+        etl.bulk_log_sts(cnxn, STS_JSON, sts_id, **vars(args))
 
-    # no games to map search to, so no game_map like in SPRT
-    etl.bulk_log_search_and_timing(
-        cnxn,
-        SEARCH_JSON,
-        {},
-        timing_path = TIMING_JSON,
-        sts_id = sts_id,
-        engine_id = engine_id,
-        root_moves_path = ROOT_MOVES_JSON
-    )
+        # no games to map search to, so no game_map like in SPRT
+        etl.bulk_log_search_and_timing(
+            cnxn,
+            SEARCH_JSON,
+            {},
+            timing_path = TIMING_JSON,
+            sts_id = sts_id,
+            engine_id = engine_id,
+            root_moves_path = ROOT_MOVES_JSON
+        )
+        ingestion_ok = True
+    except Exception as e:
+        print(f"[DATA] STS ingestion failed: {e}")
+        ingestion_ok = False
 
     etl.update_experiment(
         cnxn, 
@@ -68,7 +73,11 @@ def upload_logs(args):
         {"end_time_utc": datetime.now(timezone.utc).isoformat()}
     )
 
-    etl.clear_log_dir(STS_LOGS_DIR)
+    # Only clear log directory if ingestion succeeded
+    if ingestion_ok:
+        etl.clear_log_dir(STS_LOGS_DIR)
+    else:
+        print("[DATA] Log files preserved due to ingestion failure.")
     print(f"[DATA] Logging completed for STS {sts_id}")
 
 # --------------------------

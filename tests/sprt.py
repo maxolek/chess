@@ -185,29 +185,39 @@ def upload_logs(args, cute_chess_stats, runtime=None):
         comparison_engine_id = baseline_engine_id
     )
 
-    # consolidate per-instance log files from concurrent engine processes
-    print("[DATA] Consolidating per-instance log files...")
-    _consolidate_instance_logs(args.logroot)
+    # Only consolidate and ingest JSONL data if logging was enabled
+    ingestion_ok = False
+    if args.log:
+        # consolidate per-instance log files from concurrent engine processes
+        print("[DATA] Consolidating per-instance log files...")
+        _consolidate_instance_logs(args.logroot)
 
-    # map search --> game
-    game_map = etl.bulk_log_game(
-        cnxn, 
-        GAME_JSON, 
-        sprt_id,
-        baseline_engine_id
-    )
+        try:
+            # map search --> game
+            game_map = etl.bulk_log_game(
+                cnxn, 
+                GAME_JSON, 
+                sprt_id,
+                baseline_engine_id
+            )
 
-    # log search+timing with game mapping
-    etl.bulk_log_search_and_timing(
-        cnxn, 
-        SEARCH_JSON,
-        game_map, 
-        timing_path=TIMING_JSON,
-        engine_id=candidate_engine_id,
-        root_moves_path=ROOT_MOVES_JSON
-    )
+            # log search+timing with game mapping
+            etl.bulk_log_search_and_timing(
+                cnxn, 
+                SEARCH_JSON,
+                game_map, 
+                timing_path=TIMING_JSON,
+                engine_id=candidate_engine_id,
+                root_moves_path=ROOT_MOVES_JSON
+            )
+            ingestion_ok = True
+        except Exception as e:
+            print(f"[DATA] JSONL ingestion failed: {e}")
+            print("[DATA] Log files preserved for retry.")
+    else:
+        print("[DATA] Logging was disabled, skipping JSONL ingestion.")
 
-    # log sprt experiment details in db.sprt
+    # log sprt experiment details in db.sprt (always, regardless of --log)
     args_dict = {k: (str(v) if isinstance(v, Path) else v) for k, v in vars(args).items()}
     etl.log_sprt(
         cnxn,
@@ -223,8 +233,10 @@ def upload_logs(args, cute_chess_stats, runtime=None):
         {"end_time_utc": datetime.now(timezone.utc).isoformat()}
     )
 
-    print("[DATA] Clearing log directory...")
-    etl.clear_log_dir(args.logroot)
+    # Only clear log directory if ingestion succeeded
+    if args.log and ingestion_ok:
+        print("[DATA] Clearing log directory...")
+        etl.clear_log_dir(args.logroot)
     print(f"[DATA] Logging completed for SPRT {sprt_id}.")
 
 
