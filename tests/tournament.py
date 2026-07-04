@@ -402,11 +402,15 @@ def run_tournament(args, cnxn, engine_id):
     games_per_pair = getattr(args, "tournament_games", 20)
     tc_categories = getattr(args, "tournament_tc", ["blitz"])
     n_engines = getattr(args, "tournament_engines", 3)
+    listed_opponents = getattr(args, "opps", [])
 
-    # Get all other engines from DB
-    all_engines = get_all_engines(cnxn, n_engines)
-    # Exclude the candidate itself
-    opponents = [e for e in all_engines if e["id"] != engine_id]
+    if len(listed_opponents) == 0:
+        # Get all other engines from DB
+        all_engines = get_all_engines(cnxn, n_engines)
+        # Exclude the candidate itself
+        opponents = [e for e in all_engines if e["id"] != engine_id]
+    else:
+        opponents = listed_opponents
 
     if not opponents:
         print("[TOURNAMENT] No opponents in database, skipping tournament.")
@@ -584,6 +588,7 @@ def run_tournament(args, cnxn, engine_id):
 def main():
     parser = argparse.ArgumentParser(description="Round-robin tournament runner")
     parser.add_argument("--engine", required=True, help="Candidate engine path")
+    parser.add_argument("--opps", default=[], help="Names of opponent .exe files")
     parser.add_argument("--n_engines", default=3, help="Number of last versions in tournament")
     parser.add_argument("--tc", nargs="+", default=["blitz"],
                         choices=["ultra_fast", "bullet", "blitz", "rapid", "classical"],
@@ -619,6 +624,7 @@ def main():
         tournament_games=args.games,
         tournament_tc=args.tc,
         tournament_engines=args.n_engines,
+        tournament_opponents=args.opponents,
     )
 
     run_tournament(ns, cnxn, engine_id)

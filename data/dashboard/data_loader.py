@@ -24,7 +24,7 @@ SAFETY_LIMIT = 10_000_000
 SCATTER_SAMPLE = 100_000
 
 # The primary search table — prefer `search_features` if it exists.
-_SEARCH_TABLE: str = "search_stats"
+_SEARCH_TABLE: str = "search_features"
 
 
 # ──────────────────────────────────────────────────────────────────────────────

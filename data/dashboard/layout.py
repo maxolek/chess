@@ -187,8 +187,16 @@ app.layout = html.Div([
                        "paddingLeft": "8px", "flexShrink": "0"},
             ),
             dcc.Store(id="main-tabs", data="tab-overview"),
-            html.Div(id="tab-content", className="tab-content",
-                     style={"padding": "20px 24px", "overflowY": "auto", "flex": "1"})
+            #html.Div(id="tab-content", className="tab-content",
+            #         style={"padding": "20px 24px", "overflowY": "auto", "flex": "1"})
+            dcc.Loading(
+                id="loading-tab-content",
+                type="dot",
+                color=ACCENT,
+                style={"flex": "1", "display": "flex", "felxDirection": "column"},
+                children=html.Div(id="tab-content", className="tab-content",
+                                style={"pladding": "20px 24px", "overflowY": "auto", "flex": "1"}),
+            ),
         ], style={"flex": "1", "display": "flex", "flexDirection": "column",
                    "overflow": "auto", "height": "100vh"}),
     ], style={"display": "flex", "flexDirection": "row", "height": "100vh"}),

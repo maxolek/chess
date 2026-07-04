@@ -45,6 +45,11 @@ app.index_string = """
         .tab-content { animation: fadeIn 0.18s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 
+        #loading-tab-content { position: relative; }
+        #loading-tab-content > .dash-spinner { position: absolute !important; top: 50%; left: 50%;  transform: translate(-50%, -50%); z-index: 10; }
+        #loading-tab-content .dash-spinner::before { content: 'Loading_'; display: block; text-align: center; coler: #8892a4; font-family: 'JetBrains Mono', monospace; font-size: 11px; margin-top: 12px; }
+        ._dash-loading { opacity: 0.3; pointer-events: none; transition: opacity 0.15s; }
+        
         .metric-card {
             background: linear-gradient(135deg, #141720 0%, #181d2a 100%);
             border: 1px solid #252a38;

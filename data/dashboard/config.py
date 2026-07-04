@@ -117,8 +117,9 @@ NUMERIC_EXCLUDE = {
 
 METRIC_LABELS: dict[str, str] = {
     # ── Core ──
-    "depth": "Depth",
-    "max_depth": "Max Depth",
+    #"depth": "Depth",
+    "completed_depth": "Completed Depth",
+    "max_depth": "Depth",
     "qdepth": "QSearch Depth",
     "max_qdepth": "Max QSearch Depth",
     "eval": "Eval (cp)",
@@ -270,7 +271,7 @@ METRIC_LABELS: dict[str, str] = {
 
 _METRIC_ORDER = [
     # Core
-    "depth", "max_depth", "qdepth", "max_qdepth", "eval", "final_eval",
+    "completed_depth", "depth", "max_depth", "qdepth", "max_qdepth", "eval", "final_eval",
     "sf_eval", "eval_diff", "engine_move_rank", "best_move_match", "ply",
     "time_ms", "total_time_ms", "running_time_ms", "total_search_time",
     # Nodes
