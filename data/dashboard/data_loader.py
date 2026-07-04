@@ -7,6 +7,7 @@ Design:
 - apply_filters() pushes WHERE clauses to DuckDB and returns all matching rows.
 - query_iter() / query_tree() fetch detail rows on demand for specific search_ids.
 """
+import hashlib
 import pandas as pd
 import numpy as np
 import duckdb
@@ -279,13 +280,12 @@ def enrich_searches(df: pd.DataFrame) -> pd.DataFrame:
             df = df.join(emap, on="engine_id")
 
     if "engine_name" in df.columns:
-        try:
-            df["engine_version"] = df.get("engine_version", "").fillna("")
-            df["engine_label"] = df["engine_name"].astype(str) + (
-                df["engine_version"].astype(str).apply(lambda v: f" ({v})" if v and v != 'None' else "")
-            )
-        except Exception:
-            df["engine_label"] = df["engine_name"].astype(str)
+        ver = df.get("engine_version", pd.Series("", index=df.index)).fillna("")
+        df['engine_label'] = df['engine_name'].astype(str) + np.where(
+            (ver != "") & (ver != "None"),
+            " (" + ver.astype(str) + ")",
+            ""
+        )
 
     # Join game info for side/result
     _gdf = query_games()
@@ -308,18 +308,19 @@ def enrich_searches(df: pd.DataFrame) -> pd.DataFrame:
         df["engine_side"] = "unknown"
 
     # Result label
-    def _result(r):
-        res = str(r.get("result", "")).strip()
-        side = r.get("engine_side", "unknown")
-        if res in ("1-0", "1", "white"):
-            return "Win" if side == "white" else "Loss"
-        if res in ("0-1", "2", "black"):
-            return "Win" if side == "black" else "Loss"
-        if res in ("1/2-1/2", "3", "\u00bd-\u00bd", "draw"):
-            return "Draw"
-        return None
-
-    df["result_label"] = df.apply(_result, axis=1)
+    if "result" in df.columns and "enngine_side" in df.columns:
+        res = df['result'].astype(str).str.strip()
+        side = df['engine_side']
+        is_white_win = res.isin(['1-0', '1','white'])
+        is_black_win = res.isin(['0-1', '2', 'black'])
+        is_draw = res.isin(['1/2-1/2', '3', '\u00bd-\u00bd', 'draw'])
+        df['result_label'] = np.where(
+            is_white_win, np.where(side== 'white', 'Win', 'Loss'),
+            np.where(is_black_win, np.where(side == 'black', 'Win', 'Loss'),
+                     np.where(is_draw, 'Draw', None))
+        )
+    else:
+        df['result_label'] = None
 
     # Normalize eval/depth column names
     if "final_eval" in df.columns and "eval" not in df.columns:
@@ -372,6 +373,12 @@ def _build_where_clauses(
 
     return clauses
 
+# simple cache for aplly filters: store last n results keyed by filter params
+_filter_cache: dict[str, tuple[pd.DataFrame, pd.DataFrame]] = {}
+_FILTER_CACHE_MAX = 8
+
+def _cache_key(*args) -> str:
+    return hashlib.md5(repr(args).encode()).hexdigest()
 
 def apply_filters(
     engine_ids: list | None,
@@ -388,6 +395,19 @@ def apply_filters(
     Games are filtered in memory (loaded on demand). Searches are queried in full
     since DuckDB handles millions of rows efficiently and callbacks aggregate.
     """
+    # check cache
+    key = _cache_key(
+        tuple(sorted(engine_ids)) if engine_ids else None,
+        tuple(sorted(result_vals)) if result_vals else None,
+        tuple(sorted(opening_vals)) if opening_vals else None,
+        tuple(sorted(side_vals)) if side_vals else None,
+        tuple(sorted(pos_type_vals)) if pos_type_vals else None,
+        tuple(sorted(game_phase_vals)) if game_phase_vals else None,
+        include_mates, mates_only,
+    )
+    if key in _filter_cache:
+        return _filter_cache[key]
+
     # ── Games filtering (loaded on demand, cached) ──
     gf = query_games().copy()
     if engine_ids:
@@ -427,6 +447,11 @@ def apply_filters(
     # If we had too many game_ids, post-filter now
     if opening_vals and "game_id" in sf.columns and "id" in gf.columns:
         sf = sf[sf["game_id"].isin(gf["id"].unique())]
+
+        # store in cache (evict oldest if full)
+        if len(_filter_cache) >= _FILTER_CACHE_MAX:
+            _filter_cache.pop(next(iter(_filter_cache)))
+        _filter_cache[key] = (gf, sf)
 
     return gf, sf
 
