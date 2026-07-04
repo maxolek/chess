@@ -553,11 +553,13 @@ def run_tournament(args, cnxn, engine_id):
     root_moves_json = TOURNAMENT_LOG_DIR / "root_moves.jsonl"
 
     game_map = {}
+    ingestion_ok = True
     if game_json.exists():
         try:
             game_map = etl.bulk_log_game(cnxn, game_json, experiment_id)
         except Exception as e:
             print(f"[DATA] bulk_log_game failed: {e}")
+            ingestion_ok = False
 
     if search_json.exists():
         try:
@@ -571,12 +573,17 @@ def run_tournament(args, cnxn, engine_id):
             )
         except Exception as e:
             print(f"[DATA] bulk_log_search_and_timing failed: {e}")
+            ingestion_ok = False
 
     # finalize experiment
     from datetime import datetime, timezone
     etl.update_experiment(cnxn, experiment_id, {"end_time_utc": datetime.now(timezone.utc).isoformat()})
 
-    etl.clear_log_dir(TOURNAMENT_LOG_DIR)
+    # Only clear log directory if ingestion succeeded
+    if ingestion_ok:
+        etl.clear_log_dir(TOURNAMENT_LOG_DIR)
+    else:
+        print("[DATA] Log files preserved due to ingestion failure.")
 
     # !!! outdated ... printing perf-rating not new-rating !!!
     #print(f"\n[TOURNAMENT] Ratings logged for new engine (id={engine_id}")
