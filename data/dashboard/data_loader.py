@@ -261,12 +261,22 @@ def enrich_searches(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return df
 
-    # Engine label
+   # Engine label
     if not engines_df.empty and "engine_id" in df.columns:
-        emap = engines_df.set_index("id")[["name", "version"]].rename(
-            columns={"name": "engine_name", "version": "engine_version"}
-        )
-        df = df.join(emap, on="engine_id")
+        missing = [
+            c for c in ("engine_name", "engine_version")
+            if c not in df.columns
+        ]
+
+        if missing:
+            emap = (
+                engines_df.set_index("id")[["name", "version"]]
+                .rename(columns={
+                    "name": "engine_name",
+                    "version": "engine_version"
+                })[missing]
+            )
+            df = df.join(emap, on="engine_id")
 
     if "engine_name" in df.columns:
         try:

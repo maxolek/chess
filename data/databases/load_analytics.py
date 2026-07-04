@@ -389,7 +389,8 @@ def load_incremental(cnxn):
                         CAST(NULL AS TEXT)      AS sf_best_move, 
                         CAST(NULL AS DOUBLE)    AS sf_time_ms, 
                         CAST(NULL AS TIMESTAMP) AS sf_computed_at, 
-                        CAST(NULL AS TEXT)      AS sf_pv 
+                        CAST(NULL AS TEXT)      AS sf_pv ,
+                        CAST(NULL AS INTEGER)   AS eval_diff,
                      FROM raw.searches 
                      WHERE id > {max_id}
         """)

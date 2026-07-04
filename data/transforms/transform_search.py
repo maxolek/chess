@@ -40,7 +40,7 @@ def build_search_iterations_features(cnxn):
             -- within iteration derived metrics
             total_nodes,
             total_nodes / (NULLIF(time_ms, 0) / 1000) AS nps,
-            qnodes / NULLIF(nodes, 0) AS qratio,
+            qnodes / NULLIF(total_nodes, 0) AS qratio,
             tt_hits / NULLIF(total_nodes, 0) AS tt_hit_ratio,
             tt_stores / NULLIF(total_nodes, 0) AS tt_store_ratio,
             fail_highs / NULLIF(total_nodes, 0) AS fail_high_ratio,
@@ -94,7 +94,7 @@ def build_search_tree_features(cnxn):
             nmp AS nmp, nmp_fail AS nmp_fail,
 
             nodes + qnodes AS total_nodes,
-            qnodes / NULLIF(nodes, 0) as qratio,
+            qnodes / NULLIF(nodes + qnodes, 0) as qratio,
             tt_hits / NULLIF(nodes + qnodes, 0) AS tt_hit_ratio,
             tt_stores / NULLIF(nodes + qnodes, 0) AS tt_store_ratio,
             fail_highs / NULLIF(nodes + qnodes, 0) AS fail_high_ratio,
@@ -126,59 +126,41 @@ def build_search_features(cnxn):
                 -- We define the total search time once here
                     MAX(CASE WHEN function = 'ROOT' THEN total_time_ms END) AS total_search_time,
 
-                -- MakeMove
-                MAX(CASE WHEN function = 'MakeMove' THEN total_time_ms END) AS make_move_total_ms,
-                MAX(CASE WHEN function = 'MakeMove' THEN total_time_ms / NULLIF(num_calls, 0) END) AS make_move_avg_ms,
-                MAX(CASE WHEN function = 'MakeMove' THEN total_time_ms END) / 
-                    NULLIF(MAX(CASE WHEN function = 'ROOT' THEN total_time_ms END), 0) AS make_move_perc_total_ms,
+                -- MAKEMOVE
+                MAX(CASE WHEN function = 'MAKEMOVE' THEN total_time_ms END) AS make_move_total_ms,
+                MAX(CASE WHEN function = 'MAKEMOVE' THEN total_time_ms / NULLIF(num_calls, 0) END) AS make_move_avg_ms,
 
                 -- UnMakeMove
-                MAX(CASE WHEN function = 'UnMakeMove' THEN total_time_ms END) AS unmake_move_total_ms,
-                MAX(CASE WHEN function = 'UnMakeMove' THEN total_time_ms / NULLIF(num_calls, 0) END) AS unmake_move_avg_ms,
-                MAX(CASE WHEN function = 'UnMakeMove' THEN total_time_ms END) / 
-                    NULLIF(MAX(CASE WHEN function = 'ROOT' THEN total_time_ms END), 0) AS unmake_move_perc_total_ms,
+                MAX(CASE WHEN function = 'UNMAKE_MOVE' THEN total_time_ms END) AS unmake_move_total_ms,
+                MAX(CASE WHEN function = 'UNMAKE_MOVE' THEN total_time_ms / NULLIF(num_calls, 0) END) AS unmake_move_avg_ms,
 
                 -- Movegen
-                MAX(CASE WHEN function = 'Movegen' THEN total_time_ms END) AS movegen_total_ms,
-                MAX(CASE WHEN function = 'Movegen' THEN total_time_ms / NULLIF(num_calls, 0) END) AS movegen_avg_ms,
-                MAX(CASE WHEN function = 'Movegen' THEN total_time_ms END) / 
-                    NULLIF(MAX(CASE WHEN function = 'ROOT' THEN total_time_ms END), 0) AS movegen_perc_total_ms,
+                MAX(CASE WHEN function = 'MOVEGEN' THEN total_time_ms END) AS movegen_total_ms,
+                MAX(CASE WHEN function = 'MOVEGEN' THEN total_time_ms / NULLIF(num_calls, 0) END) AS movegen_avg_ms,
 
-                    -- Score_Order (Move Order)
-                    MAX(CASE WHEN function = 'Score_Order' THEN total_time_ms END) AS move_order_total_ms,
-                    MAX(CASE WHEN function = 'Score_Order' THEN total_time_ms / NULLIF(num_calls, 0) END) AS move_order_avg_ms,
-                    MAX(CASE WHEN function = 'Score_Order' THEN total_time_ms END) / 
-                        NULLIF(MAX(CASE WHEN function = 'ROOT' THEN total_time_ms END), 0) AS move_order_perc_total_ms,
+                -- Score_Order (Move Order)
+                MAX(CASE WHEN function = 'SCORE_ORDER' THEN total_time_ms END) AS move_order_total_ms,
+                MAX(CASE WHEN function = 'SCORE_ORDER' THEN total_time_ms / NULLIF(num_calls, 0) END) AS move_order_avg_ms,
 
                 -- NNUE
                 MAX(CASE WHEN function = 'NNUE' THEN total_time_ms END) AS nnue_total_ms,
                 MAX(CASE WHEN function = 'NNUE' THEN total_time_ms / NULLIF(num_calls, 0) END) AS nnue_avg_ms,
-                MAX(CASE WHEN function = 'NNUE' THEN total_time_ms END) / 
-                    NULLIF(MAX(CASE WHEN function = 'ROOT' THEN total_time_ms END), 0) AS nnue_perc_total_ms,
 
                 -- Eval (Static)
-                MAX(CASE WHEN function = 'Eval' THEN total_time_ms END) AS static_eval_total_ms,
-                MAX(CASE WHEN function = 'Eval' THEN total_time_ms / NULLIF(num_calls, 0) END) AS static_eval_avg_ms,
-                MAX(CASE WHEN function = 'Eval' THEN total_time_ms END) / 
-                    NULLIF(MAX(CASE WHEN function = 'ROOT' THEN total_time_ms END), 0) AS static_eval_perc_total_ms,
+                MAX(CASE WHEN function = 'EVAL' THEN total_time_ms END) AS static_eval_total_ms,
+                MAX(CASE WHEN function = 'EVAL' THEN total_time_ms / NULLIF(num_calls, 0) END) AS static_eval_avg_ms,
 
                 -- SEE
                 MAX(CASE WHEN function = 'SEE' THEN total_time_ms END) AS see_total_ms,
                 MAX(CASE WHEN function = 'SEE' THEN total_time_ms / NULLIF(num_calls, 0) END) AS see_avg_ms,
-                MAX(CASE WHEN function = 'SEE' THEN total_time_ms END) / 
-                    NULLIF(MAX(CASE WHEN function = 'ROOT' THEN total_time_ms END), 0) AS see_perc_total_ms,
 
                 -- TT_PROBE
                 MAX(CASE WHEN function = 'TT_PROBE' THEN total_time_ms END) AS tt_probe_total_ms,
                 MAX(CASE WHEN function = 'TT_PROBE' THEN total_time_ms / NULLIF(num_calls, 0) END) AS tt_probe_avg_ms,
-                MAX(CASE WHEN function = 'TT_PROBE' THEN total_time_ms END) / 
-                    NULLIF(MAX(CASE WHEN function = 'ROOT' THEN total_time_ms END), 0) AS tt_probe_perc_total_ms,
 
                 -- TT_STORE
                 MAX(CASE WHEN function = 'TT_STORE' THEN total_time_ms END) AS tt_store_total_ms,
                 MAX(CASE WHEN function = 'TT_STORE' THEN total_time_ms / NULLIF(num_calls, 0) END) AS tt_store_avg_ms,
-                MAX(CASE WHEN function = 'TT_STORE' THEN total_time_ms END) / 
-                    NULLIF(MAX(CASE WHEN function = 'ROOT' THEN total_time_ms END), 0) AS tt_store_perc_total_ms
                     
             FROM search_timings
             GROUP BY search_id
@@ -251,17 +233,35 @@ def build_search_features(cnxn):
 
 
         SELECT
-            -- raw search stats
             s.id as search_id,
-            s.engine_id,
-            s.game_id,
-            s.sts_id,
             s.fen,
             s.ply,
+            --  engine info
+            s.engine_id,
+            e.name AS engine_name,
+            e.version AS engine_version,
+            /* BRING IN SEARCH PARAM INFO FOR EASIER ANALYSIS */
+            --  game info
+            s.game_id,
+            CASE
+                 WHEN (s.engine_id = g.white_engine_id) AND (g.result = 'white') THEN 1
+                 WHEN (s.engine_id = g.black_engine_id) AND (g.result = 'black') THEN 1
+                 WHEN g.result = 'draw' THEN 0
+                 ELSE -1
+            END AS game_score,
+            g.opening as game_opening,
+            g.opening_eco as game_eco,
+            --   sts info
+            s.sts_id,
+            sts.suite AS sts_suite,
+            sts.position_name AS sts_position_name,
+            sts.move_is_correct as sts_move_is_correct,
+            --   search results
             s.time_ms AS total_time_ms,
             s.eval AS final_eval,
             s.move AS best_move,
             s.principal_variation,
+            --   search stats
             s.depth AS max_depth,
             s.qdepth AS max_qdepth,
             s.nodes AS total_internal_nodes,
@@ -320,23 +320,23 @@ def build_search_features(cnxn):
 
             -- timing stats
             t.make_move_avg_ms AS make_move_avg_ms, 
-            t.make_move_perc_total_ms AS make_move_perc_total_time,
+            100 * t.make_move_total_ms / s.time_ms AS make_move_perc_total_time,
             t.unmake_move_avg_ms AS unmake_move_avg_ms, 
-            t.unmake_move_perc_total_ms AS unmake_move_perc_total_time,
+            100 * t.unmake_move_total_ms / s.time_ms AS unmake_move_perc_total_time,
             t.movegen_avg_ms AS movegen_avg_ms, 
-            t.movegen_perc_total_ms AS movegen_perc_total_time,
+            100 * t.movegen_total_ms / s.time_ms AS movegen_perc_total_time,
             t.move_order_avg_ms AS move_order_avg_ms, 
-            t.move_order_perc_total_ms AS move_order_perc_total_time,
+            100 * t.move_order_total_ms / s.time_ms AS move_order_perc_total_time,
             t.tt_probe_avg_ms AS tt_probe_avg_ms, 
-            t.tt_probe_perc_total_ms AS tt_probe_perc_total_time,
+            100 * t.tt_probe_total_ms / s.time_ms AS tt_probe_perc_total_time,
             t.tt_store_avg_ms AS tt_store_avg_ms, 
-            t.tt_store_perc_total_ms AS tt_store_perc_total_time,
+            100 * t.tt_store_total_ms / s.time_ms AS tt_store_perc_total_time,
             t.see_avg_ms AS see_avg_ms, 
-            t.see_perc_total_ms AS see_perc_total_time,
+            100 * t.see_total_ms / s.time_ms AS see_perc_total_time,
             t.nnue_avg_ms AS nnue_avg_ms, 
-            t.nnue_perc_total_ms AS nnue_perc_total_time,
+            100 * t.nnue_total_ms / s.time_ms AS nnue_perc_total_time,
             t.static_eval_avg_ms AS static_eval_avg_ms, 
-            t.static_eval_perc_total_ms AS static_eval_perc_total_time,
+            100 * t.static_eval_total_ms / s.time_ms AS static_eval_perc_total_time,
             
             -- position features
             pf.position_type AS pos_label,
@@ -371,12 +371,21 @@ def build_search_features(cnxn):
 
 
         FROM search_stats s
+        -- additional search stats
         LEFT JOIN iterative_depth itdeep
             ON s.id = itdeep.search_id
         LEFT JOIN times t 
             ON s.id = t.search_id
         LEFT JOIN position_features pf
             ON s.id = pf.search_id
+        -- search environment info
+        LEFT JOIN engines e
+            on s.engine_id = e.id
+        LEFT JOIN game_stats g
+            ON s.game_id = g.id
+        LEFT JOIN sts_runs sts
+            ON s.sts_id = sts.id
+        
     """)
 
 import duckdb

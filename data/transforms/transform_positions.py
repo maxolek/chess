@@ -563,7 +563,7 @@ def build_position_features(cnxn):
         if len(batch) >= BATCH_SIZE:
             _insert_batch(cnxn, batch)
             batch = []
-            if (i + 1) % 2000 == 0:
+            if (i + 1) % 5000 == 0:
                 print(f"    ...processed {i + 1}/{len(rows)}")
 
     # flush remaining
