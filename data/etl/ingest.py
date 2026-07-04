@@ -649,12 +649,12 @@ def bulk_log_search_and_timing(
     cursor.executemany(
         """
         INSERT INTO searches (
-            engine_id, game_id, sts_id, fen, ply, time_ms, eval, depth, qdepth, move,
+            engine_id, game_id, sts_id, fen, ply, time_ms, eval, completed_depth, depth, qdepth, move,
             principal_variation, nodes, qnodes, tt_stores, tt_hits, tt_fill,
             fail_highs, fail_lows, fail_high_first, fail_high_late, fail_high_researches, fail_low_researches,
             see_prunes, delta_prunes, nmp, nmp_fail, tt_overwritten
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         [row[:-1] for row in searches_rows]
     )

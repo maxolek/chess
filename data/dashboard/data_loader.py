@@ -297,10 +297,12 @@ def enrich_searches(df: pd.DataFrame) -> pd.DataFrame:
 
     # Side
     if "white_engine_id" in df.columns and "black_engine_id" in df.columns:
-        df["engine_side"] = df.apply(
-            lambda r: "white" if r.get("engine_id") == r.get("white_engine_id")
-            else ("black" if r.get("engine_id") == r.get("black_engine_id") else "unknown"),
-            axis=1
+        eid = df['engine_id'] 
+        wid = df['white_engine_id']
+        bid = df['black_engine_id']
+        df['engine_side'] = np.where(
+            eid.notna() & wid.notna() & (eid == wid), "white",
+            np.where(eid.notna() & bid.notna() & (eid == bid), "black", "unknown")
         )
     else:
         df["engine_side"] = "unknown"
@@ -473,7 +475,7 @@ def query_iter_agg(
         PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY i.{y_col}) AS p90,
         COUNT(*) AS n
     FROM {_ITER_TABLE} i
-    JOIN {_SEARCH_TABLE} s ON i.search_id = s.id
+    JOIN {_SEARCH_TABLE} s ON i.search_id = s.search_id
     LEFT JOIN engines e ON s.engine_id = e.id
     WHERE i.search_id IN ({filter_sub})
       AND i.{y_col} IS NOT NULL
@@ -510,7 +512,7 @@ def query_tree_agg(
         PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY t.{y_col}) AS p90,
         COUNT(*) AS n
     FROM {_TREE_TABLE} t
-    JOIN {_SEARCH_TABLE} s ON t.search_id = s.id
+    JOIN {_SEARCH_TABLE} s ON t.search_id = s.search_id
     LEFT JOIN engines e ON s.engine_id = e.id
     WHERE t.search_id IN ({filter_sub})
       AND t.{y_col} IS NOT NULL
@@ -559,7 +561,7 @@ def query_root_moves() -> pd.DataFrame:
     try: 
         emap = safe_query(f"""
                         SELECT id AS search_id, engine_id FROM {_SEARCH_TABLE} 
-                        WHERE id IN (SELECT DISTINCT search_id FROM root_moves)
+                        WHERE search_id IN (SELECT DISTINCT search_id FROM root_moves)
                 """)
         if not emap.empty:
             df = df.merge(emap, on="search_id", how="left")
@@ -577,7 +579,7 @@ def query_timing() -> pd.DataFrame:
     try:
         emap = safe_query(f"""
             SELECT id AS search_id, engine_id FROM {_SEARCH_TABLE}
-            WHERE id IN (SELECT DISTINCT search_id FROM search_timings)
+            WHERE search_id IN (SELECT DISTINCT search_id FROM search_timings)
         """)
         if not emap.empty:
             df = df.merge(emap, on='search_id', how='left')

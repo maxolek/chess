@@ -176,22 +176,20 @@ app.layout = html.Div([
     html.Div([
         make_sidebar(),
         html.Div([
-            dcc.Tabs(
-                id="main-tabs", value="tab-overview",
-                children=[
-                    dcc.Tab(label=lbl, value=val, style=TAB_STYLE, selected_style=TAB_SELECTED_STYLE)
-                    for val, lbl in TABS
-                ],
-                style={"borderBottom": f"1px solid {BORDER}", "backgroundColor": "#0b0d12",
-                       "paddingLeft": "8px"},
+            html.Div(
+                [html.Button(
+                    lbl, id={"type": "tab-btn", "index": val},
+                             n_clicks=0,
+                             style=TAB_STYLE,
+                ) for val, lbl in TABS],
+                style={"display": "flex", "flexWrap": "wrap", "gap": "0", 
+                       "borderBottom": f"1px solid {BORDER}", "backgroundColor": "#0b0d12",
+                       "paddingLeft": "8px", "flexShrink": "0"},
             ),
-            dcc.Loading(
-                id="loading-tab-content",
-                type="dot",
-                color=ACCENT,
-                children=html.Div(id="tab-content", className="tab-content",
-                                  style={"padding": "20px 24px", "overflowY": "auto", "flex": "1"}),
-            ),
-        ], style={"flex": "1", "display": "flex", "flexDirection": "column", "overflow": "hidden"}),
-    ], style={"display": "flex", "flexDirection": "row", "height": "100vh", "overflow": "hidden"}),
+            dcc.Store(id="main-tabs", data="tab-overview"),
+            html.Div(id="tab-content", className="tab-content",
+                     style={"padding": "20px 24px", "overflowY": "auto", "flex": "1"})
+        ], style={"flex": "1", "display": "flex", "flexDirection": "column",
+                   "overflow": "auto", "height": "100vh"}),
+    ], style={"display": "flex", "flexDirection": "row", "height": "100vh"}),
 ], style={"backgroundColor": DARK_BG, "minHeight": "100vh"})

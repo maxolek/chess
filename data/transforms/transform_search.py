@@ -262,6 +262,7 @@ def build_search_features(cnxn):
             s.move AS best_move,
             s.principal_variation,
             --   search stats
+            s.completed_depth  AS completed_depth,
             s.depth AS max_depth,
             s.qdepth AS max_qdepth,
             s.nodes AS total_internal_nodes,

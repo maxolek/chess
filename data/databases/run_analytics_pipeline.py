@@ -44,6 +44,7 @@ def main():
 
     print(f"Running pipeline from: {cwd}")
     modules_to_run = MODULES[1:] if args.skip_load else MODULES
+    #if args.full: modules_to_run.append("data.databases.migrate_schema")
     if args.skip_load:
         print("Skipping data.load_analytics (use --skip-load to enable)")
     for m in modules_to_run:

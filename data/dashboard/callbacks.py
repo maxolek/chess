@@ -6,13 +6,13 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from dash import Input, Output, State, ctx, html, dcc
+from dash import Input, Output, State, ctx, html, dcc, ALL
 
 from .app import app
 from .config import (
     ACCENT, ACCENT2, TEXT_PRI, TEXT_SEC, BORDER, _PALETTE,
     numeric_cols, metric_label, metric_options, engine_colour_map, hex_to_rgba,
-    SIDEBAR_LABEL, DROPDOWN_STYLE, EVAL_CLIP_CP,
+    SIDEBAR_LABEL, DROPDOWN_STYLE, EVAL_CLIP_CP, TAB_STYLE, TAB_SELECTED_STYLE,
 )
 from .components import apply_theme, empty_fig, section, panel, metric_card, graph, table
 from .data_loader import (
@@ -29,17 +29,43 @@ from .tabs import (
     tab_ratings, tab_sprt, tab_sts, tab_perft, tab_positions, tab_corr,
     _build_calibration_charts,
 )
+from .layout import TABS
 
 # Aliases
 _sidebar_label = SIDEBAR_LABEL
 _dropdown_style = DROPDOWN_STYLE
 
+# ──────────────────────────────────────────────────────────────────────────────
+# TAB SELECTION CALLBACK
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.callback(
+    Output("main-tabs", "data"),
+    Output({"type": "tab-btn", "index": ALL}, "style"),
+    Input({"type": "tab-btn", "index": ALL}, "n_clicks"),
+    State("main-tabs", "data"),
+    prevent_initial_call=True,
+)
+def select_tab(n_clicks_list, current_tab):
+    triggered = ctx.triggered_id
+    if triggered is None:
+        tab_val = current_tab or "tab-overview"
+    else:
+        tab_val = triggered['index']
+    # build styles: highligh selected tab
+    styles = [
+        TAB_SELECTED_STYLE if val == tab_val else TAB_STYLE
+        for val, _lbl in TABS
+    ]
+    return tab_val, styles
+
+# ──────────────────────────────────────────────────────────────────────────────
 # 10. MAIN TAB CALLBACK
 # ──────────────────────────────────────────────────────────────────────────────
 
 @app.callback(
     Output("tab-content", "children"),
-    Input("main-tabs",       "value"),
+    Input("main-tabs",       "data"),
     Input("filter-engine",   "value"),
     Input("filter-result",   "value"),
     Input("filter-opening",  "value"),

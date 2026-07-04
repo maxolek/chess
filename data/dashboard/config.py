@@ -2,10 +2,18 @@
 Configuration constants: colors, theme, DB path, metric labels, ordering.
 """
 from pathlib import Path
+import importlib.util
 
 import numpy as np
 
-from ..etl.paths import ANALYTICS_DB
+#from ..etl.paths import ANALYTICS_DB
+# import analytics_db directly from etl.paths.py without trigger  etl/__init__.py
+# (pulls in heavy deps like python-chess that the dashboard doesnt need)
+_paths_file = Path(__file__).parent.parent / "etl" / "paths.py"
+_spec = importlib.util.spec_from_file_location("etl.paths", _paths_file)
+_paths_module = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_paths_module)
+ANALYTICS_DB = _paths_module.ANALYTICS_DB
 
 # ──────────────────────────────────────────────────────────────────────────────
 # COLORS
