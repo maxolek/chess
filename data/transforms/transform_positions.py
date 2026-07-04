@@ -5,6 +5,8 @@ get characteristics of a position
 import chess
 from collections import Counter
 import pandas as pd
+import datetime
+import time
 
 # pawn value of pieces (approx)
 piece_values = {
@@ -544,6 +546,7 @@ def build_position_features(cnxn):
         # Mobility + space
         wm, bm = get_mobility_characteristics(fen)
 
+        # ---- batch insert ----
         batch.append((
             search_id, game_id, fen, game_phase, position_type,
             tactical_score, positional_score, endgame_score, balance,
@@ -600,6 +603,7 @@ from ..etl.paths import ANALYTICS_DB
 
 if __name__ == "__main__":
     DB = os.environ.get('CHESS_ANALYTICS_DB') or str(ANALYTICS_DB)
+    cwd_dir = Path(__file__).resolve().parent
 
     cnxn = duckdb.connect(DB)
 
@@ -627,7 +631,7 @@ if __name__ == "__main__":
                 return int(val) if val is not None else None
             except Exception:
                 return None
-
+    """
     def ensure_search_stats_columns(conn, N=3):
         cur = conn.execute("PRAGMA table_info('search_stats')").fetchall()
         cols = {r[1] for r in cur}
@@ -642,10 +646,10 @@ if __name__ == "__main__":
         if 'sf_pv' not in cols:
             conn.execute("ALTER TABLE search_stats ADD COLUMN sf_pv TEXT")
         # per-ply `sf_pv_#` columns deprecated: we only store full PV in `sf_pv` JSON
-
+    """
     def update_search_stats_with_stockfish(conn, engine_path=None, depth=12, mpv=3, limit=None, skip_existing=True):
         engine_path = find_engine(engine_path)
-        ensure_search_stats_columns(conn, mpv)
+        #ensure_search_stats_columns(conn, mpv)
         q = "SELECT id, fen FROM search_stats WHERE fen IS NOT NULL"
         if limit and limit > 0:
             q += f" LIMIT {limit}"
@@ -655,16 +659,21 @@ if __name__ == "__main__":
         import chess.engine
 
         engine = chess.engine.SimpleEngine.popen_uci(engine_path)
-        # request MultiPV from engine so `info` contains multiple principal variations
+        # request MultiPV from engine so `info` contains multiple principal variations 
+        #   which # of stockfish's favorite moves did we play?
         N = int(mpv or 1)
         try:
             engine.configure({"MultiPV": N})
         except Exception:
             # some engine builds may not expose configure or MultiPV; continue
             pass
+
         updates = []
+        cnt = 0
+        print(f"  ...processing {len(rows)} search_stats rows with Stockfish depth={depth}, MultiPV={N}...")
         try:
             for sid, fen in rows:
+                if (cnt > 0 and ((len(rows) < 10000 and cnt % 1000 == 0) or (len(rows) >= 10000 and cnt % 10000 == 0))): print(f"  ...processed {cnt}/{len(rows)} search_stats rows")
                 if skip_existing:
                     existing = conn.execute("SELECT sf_eval FROM search_stats WHERE id=? AND sf_eval IS NOT NULL LIMIT 1", (sid,)).fetchone()
                     if existing:
@@ -692,8 +701,9 @@ if __name__ == "__main__":
 
                 import json
                 # build tuple: sf_eval, sf_best, sf_time_ms, sf_computed_at, sf_pv(JSON), id
-                rowvals = [sf_eval, sf_best, sf_time_ms, datetime.datetime.utcnow(), json.dumps(pv_uci), sid]
+                rowvals = [sf_eval, sf_best, sf_time_ms, datetime.datetime.now(datetime.UTC), json.dumps(pv_uci), sid]
                 updates.append(tuple(rowvals))
+                cnt += 1
         finally:
             engine.quit()
 
@@ -706,7 +716,14 @@ if __name__ == "__main__":
             print("No updates performed")
 
     try:
-        update_search_stats_with_stockfish(cnxn, engine_path=None, depth=12, mpv=5, limit=None, skip_existing=True)
+        update_search_stats_with_stockfish(
+            cnxn, 
+            engine_path=cwd_dir.parent.parent / "engines" / "stockfish" / "stockfish-windows-x86-64-avx2.exe", 
+            depth=8, 
+            mpv=1, 
+            limit=None, 
+            skip_existing=True
+        )
     except Exception as e:
         print(f"[WARN] Ground-truth computation failed or skipped: {e}")
 

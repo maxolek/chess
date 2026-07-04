@@ -48,8 +48,11 @@ def _register_udfs(cnxn):
 # ─────────────────────────────────────────────────────────────────────────────
 def _table_exists(cnxn, table: str) -> bool:
     result = cnxn.execute(
-        "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = ?", [table]
-    ).fetchone()
+        """SELECT COUNT(*) 
+        FROM information_schema.tables 
+        WHERE table_catalog = current_database() -- prevent raw.db creating false positives
+            AND table_name = ?
+    """, [table]).fetchone()
     return result[0] > 0
 
 
@@ -125,7 +128,7 @@ def load_full(cnxn):
     cnxn.execute("""
         CREATE TABLE game_stats AS
         WITH openings AS (
-            SELECT *,
+            SELECT * EXCLUDE (opening),
                  get_opening_name(moves) as opening,
                  get_opening_code(moves) as opening_eco
             FROM raw.games
@@ -157,7 +160,16 @@ def load_full(cnxn):
 
     print("  [full] Loading search_stats...")
     cnxn.execute("DROP TABLE IF EXISTS search_stats")
-    cnxn.execute("CREATE TABLE search_stats AS SELECT * FROM raw.searches")
+    cnxn.execute("""
+                 CREATE TABLE search_stats AS 
+                 SELECT *,
+                    CAST(NULL AS INTEGER)  AS sf_eval,
+                    CAST(NULL AS TEXT)     AS sf_best_move,
+                    CAST(NULL AS DOUBLE)   AS sf_time_ms,
+                    CAST(NULL AS TIMESTAMP) AS sf_computed_at,
+                    CAST(NULL AS TEXT)     AS sf_pv
+                 FROM raw.searches
+    """)
 
     print("  [full] Loading iterative_deepening_stats...")
     cnxn.execute("DROP TABLE IF EXISTS iterative_deepening_stats")
@@ -297,7 +309,7 @@ def load_incremental(cnxn):
         cnxn.execute("""
             CREATE TABLE game_stats AS
             WITH openings AS (
-                SELECT *,
+                SELECT * EXCLUDE (opening),
                      get_opening_name(moves) as opening,
                      get_opening_code(moves) as opening_eco
                 FROM raw.games
@@ -327,7 +339,7 @@ def load_incremental(cnxn):
         cnxn.execute(f"""
             INSERT INTO game_stats
             WITH openings AS (
-                SELECT *,
+                SELECT * EXCLUDE (opening),
                      get_opening_name(moves) as opening,
                      get_opening_code(moves) as opening_eco
                 FROM raw.games WHERE id > {max_id}
@@ -356,13 +368,31 @@ def load_incremental(cnxn):
     # ── search_stats ──
     print("  [incr] Syncing search_stats...")
     if not _table_exists(cnxn, 'search_stats'):
-        cnxn.execute("CREATE TABLE search_stats AS SELECT * FROM raw.searches")
+        cnxn.execute("""CREATE TABLE search_stats AS 
+                 SELECT *,
+                    CAST(NULL AS INTEGER)  AS sf_eval,
+                    CAST(NULL AS TEXT)     AS sf_best_move,
+                    CAST(NULL AS DOUBLE)   AS sf_time_ms,
+                    CAST(NULL AS TIMESTAMP) AS sf_computed_at,
+                    CAST(NULL AS TEXT)     AS sf_pv
+                 FROM raw.searches
+        """)
         totals['search_stats'] = cnxn.execute("SELECT COUNT(*) FROM search_stats").fetchone()[0]
     else:
         max_id = _max_id(cnxn, 'search_stats')
         before = cnxn.execute("SELECT COUNT(*) FROM search_stats").fetchone()[0]
         cnxn.execute("BEGIN TRANSACTION")
-        cnxn.execute(f"INSERT INTO search_stats SELECT * FROM raw.searches WHERE id > {max_id}")
+        cnxn.execute(f"""
+                     INSERT INTO search_stats 
+                     SELECT *, 
+                        CAST(NULL AS INTEGER)   AS sf_eval, 
+                        CAST(NULL AS TEXT)      AS sf_best_move, 
+                        CAST(NULL AS DOUBLE)    AS sf_time_ms, 
+                        CAST(NULL AS TIMESTAMP) AS sf_computed_at, 
+                        CAST(NULL AS TEXT)      AS sf_pv 
+                     FROM raw.searches 
+                     WHERE id > {max_id}
+        """)
         cnxn.execute("COMMIT")
         after = cnxn.execute("SELECT COUNT(*) FROM search_stats").fetchone()[0]
         totals['search_stats'] = after - before
@@ -373,10 +403,10 @@ def load_incremental(cnxn):
         cnxn.execute("CREATE TABLE iterative_deepening_stats AS SELECT * FROM raw.searches_by_iteration")
         totals['iterative_deepening_stats'] = cnxn.execute("SELECT COUNT(*) FROM iterative_deepening_stats").fetchone()[0]
     else:
-        max_id = _max_id(cnxn, 'iterative_deepening_stats')
+        max_id = _max_id(cnxn, 'iterative_deepening_stats', id_col='search_id')
         before = cnxn.execute("SELECT COUNT(*) FROM iterative_deepening_stats").fetchone()[0]
         cnxn.execute("BEGIN TRANSACTION")
-        cnxn.execute(f"INSERT INTO iterative_deepening_stats SELECT * FROM raw.searches_by_iteration WHERE id > {max_id}")
+        cnxn.execute(f"INSERT INTO iterative_deepening_stats SELECT * FROM raw.searches_by_iteration WHERE search_id > {max_id}")
         cnxn.execute("COMMIT")
         after = cnxn.execute("SELECT COUNT(*) FROM iterative_deepening_stats").fetchone()[0]
         totals['iterative_deepening_stats'] = after - before
@@ -387,10 +417,10 @@ def load_incremental(cnxn):
         cnxn.execute("CREATE TABLE search_tree_stats AS SELECT * FROM raw.searches_by_tree_depth")
         totals['search_tree_stats'] = cnxn.execute("SELECT COUNT(*) FROM search_tree_stats").fetchone()[0]
     else:
-        max_id = _max_id(cnxn, 'search_tree_stats')
+        max_id = _max_id(cnxn, 'search_tree_stats', id_col='search_id')
         before = cnxn.execute("SELECT COUNT(*) FROM search_tree_stats").fetchone()[0]
         cnxn.execute("BEGIN TRANSACTION")
-        cnxn.execute(f"INSERT INTO search_tree_stats SELECT * FROM raw.searches_by_tree_depth WHERE id > {max_id}")
+        cnxn.execute(f"INSERT INTO search_tree_stats SELECT * FROM raw.searches_by_tree_depth WHERE search_id > {max_id}")
         cnxn.execute("COMMIT")
         after = cnxn.execute("SELECT COUNT(*) FROM search_tree_stats").fetchone()[0]
         totals['search_tree_stats'] = after - before
@@ -401,10 +431,10 @@ def load_incremental(cnxn):
         cnxn.execute("CREATE TABLE search_timings AS SELECT * FROM raw.timing")
         totals['search_timings'] = cnxn.execute("SELECT COUNT(*) FROM search_timings").fetchone()[0]
     else:
-        max_id = _max_id(cnxn, 'search_timings')
+        max_id = _max_id(cnxn, 'search_timings', id_col='search_id')
         before = cnxn.execute("SELECT COUNT(*) FROM search_timings").fetchone()[0]
         cnxn.execute("BEGIN TRANSACTION")
-        cnxn.execute(f"INSERT INTO search_timings SELECT * FROM raw.timing WHERE id > {max_id}")
+        cnxn.execute(f"INSERT INTO search_timings SELECT * FROM raw.timing WHERE search_id > {max_id}")
         cnxn.execute("COMMIT")
         after = cnxn.execute("SELECT COUNT(*) FROM search_timings").fetchone()[0]
         totals['search_timings'] = after - before
