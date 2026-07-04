@@ -592,37 +592,67 @@ def bulk_log_search_and_timing(
     root_moves_path=None,
     sts_id=None
 ):
-    """Bulk-load searches, per-depth iterations, tree stats, and timing from JSONL."""
+    """Bulk-load searches, per-depth iterations, tree stats, and timing from JSONL.
+
+    Supports search logs that mix multiple engines: each record's engine is
+    resolved individually via its own `engine_version` field (cached so we
+    don't re-query the DB per row). Pass `engine_id` explicitly to force a
+    single engine for every record (old single-engine behavior).
+    """
     cursor = cnxn.cursor()
 
     searches_rows = []
     uuid_map = {}  # search_uuid -> search_id
     game_id = None
+    skipped_uuids = set() # search_uuids dropped due to unresolved engine
 
-    if engine_id is None:
-        engine_version = extract_engine_id_from_search(search_path)
+    # engine_version -> engine_id, avoids re-querying the DB for every row
+    engine_id_cache = {}
+
+    def resolve_engine_id(data):
+        """Return (engine_id, engine_version) for a single record."""
+        if engine_id is not None:
+            # Caller forced a single engine for the whole file.
+            return engine_id
+
+        engine_version = data.get("engine_version")
         if engine_version is None:
-            raise RuntimeError("engine_version not provided and not found in search log")
+            # Fall back to file-level detection, for logs that don't
+            # stamp engine_version on every record.
+            engine_version = extract_engine_id_from_search(search_path)
+            if engine_version is None:
+                return None
 
-        engine_id = get_engine_id(cnxn, engine_version)
-        if engine_id is None:
-            raise RuntimeError("engine_id not provided and not found in database")
+        if engine_version in engine_id_cache:
+            return engine_id_cache[engine_version], engine_version
+
+        resolved = get_engine_id(cnxn, engine_version)
+        engine_id_cache[engine_version] = resolved 
+        return resolved 
 
     # ── SEARCHES ──
     for data in _iter_json_objects_from_path(search_path):
+
+        row_engine_id = resolve_engine_id(data) 
+        if row_engine_id is None: 
+            skipped_uuids.add(data.get('search_uuid'))
+            continue # unresolved / dev / test
 
         if not sts_id or game_map == {}:
             game_uuid = data["game_uuid"]
             game_id = game_map.get(game_uuid)
 
+        row_engine_id, engine_version = resolve_engine_id(data)
+
         searches_rows.append((
-            engine_id,
+            row_engine_id,
             game_id,
             sts_id,
             data.get("fen"),
             data.get("ply"),
             data.get("time_ms"),
             data.get("root_eval"),
+            data.get("completed_depth"),
             data.get("max_depth"),
             data.get("max_qdepth"),
             data.get("best_move"),
@@ -643,8 +673,15 @@ def bulk_log_search_and_timing(
             data.get("nmp"),
             data.get("nmp_fail"),
             data.get("tt_overwritten"),
-            data["search_uuid"],  # temp key for uuid mapping
+            data["search_uuid"],   # temp key: uuid mapping
+            engine_version,        # temp key: dev/test filtering
         ))
+
+    # engines that never get logged — filtered by version string, not id
+    searches_rows = [
+        row for row in searches_rows
+        if row[-1] not in ('dev', 'test')
+    ]
 
     cursor.executemany(
         """
@@ -656,7 +693,7 @@ def bulk_log_search_and_timing(
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        [row[:-1] for row in searches_rows]
+        [row[:-2] for row in searches_rows]  # drop search_uuid + engine_version temp keys
     )
 
     # Recover search IDs
@@ -667,12 +704,13 @@ def bulk_log_search_and_timing(
     search_ids = [r[0] for r in cursor.fetchall()][::-1]
 
     for row, sid in zip(searches_rows, search_ids):
-        uuid_map[row[-1]] = sid
+        uuid_map[row[-2]] = sid  # search_uuid is now second-to-last element
 
     # ── PER-ITERATION DEPTH ──
     depth_rows = []
     for data in _iter_json_objects_from_path(search_path):
-        search_id = uuid_map[data["search_uuid"]]
+        search_id = uuid_map.get(data['search_uuid'])
+        if search_id is None: continue
 
         n = len(data.get("itdepth_nodes", []))
         for d in range(n):
@@ -718,7 +756,8 @@ def bulk_log_search_and_timing(
     # ── PER-TREE DEPTH ──
     ply_rows = []
     for data in _iter_json_objects_from_path(search_path):
-        search_id = uuid_map[data["search_uuid"]]
+        search_id = uuid_map.get(data['search_uuid'])
+        if search_id is None: continue
 
         n = len(data.get("treedepth_nodes", []))
         for d in range(n):
@@ -819,4 +858,5 @@ def bulk_log_search_and_timing(
         f"{len(depth_rows), len(ply_rows)} depth rows, "
         f"{len(timing_rows)} timing rows, "
         f"{len(root_moves_rows)} root move rows."
+        f"Skipped {len(skipped_uuids)} records with unresolved/dev/test engines."
     )
