@@ -491,7 +491,7 @@ def main():
     args = parser.parse_args()
 
     print(f"RAW_DB:       {RAW_DB}")
-    print(f"ANALYTICS_DB: {ANALYTICS_DB}")
+    print(f"ANALYTICS_DB: {ANALYTICS_DB}\n")
 
     cnxn = duckdb.connect(str(ANALYTICS_DB))
     cnxn.execute(f"ATTACH '{RAW_DB}' AS raw (TYPE SQLITE)")

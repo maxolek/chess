@@ -86,7 +86,7 @@ def clear_all_tables(db_path, exclude_engines=False) -> None:
             "root_moves",
             "dim_positions",
             "game_stats",
-            "sprt_runs",
+            "sprt_runs", 
             "sts_runs",
             "perft",
             "experiments",

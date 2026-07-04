@@ -9,6 +9,7 @@ single wide fact table for dashboarding and analysis:
 ASPIRATION_START_DEPTH = 6
 
 def build_search_iterations_features(cnxn):
+    print("  [BUILD] Creating search iteration features...")
     rolling_window = 5
     window_spec = "(PARTITION BY search_id ORDER BY depth ASC)"
     rolling_window_spec = f"(PARTITION BY search_id ORDER BY depth ASC ROWS BETWEEN {rolling_window} PRECEDING AND CURRENT ROW)"
@@ -74,6 +75,7 @@ def build_search_iterations_features(cnxn):
     """)
 
 def build_search_tree_features(cnxn):
+    print("  [BUILD] Creating search tree features...")
     window_spec = "(PARTITION BY search_id ORDER BY depth asc)"
     # Cast numeric-like columns to DOUBLE in a temporary view to avoid
     # arithmetic errors when source columns are stored as VARCHAR (from
@@ -112,6 +114,7 @@ def build_search_tree_features(cnxn):
     """)
     
 def build_search_features(cnxn):
+    print("  [BUILD] Creating search features...")
     # Ensure numeric search-level columns for arithmetic
     # Use search tables' original numeric columns directly
     cnxn.execute(f"""
@@ -391,6 +394,7 @@ if __name__ == "__main__":
 
     # Persist eval_diff into `search_stats` so downstream tools (dashboard, queries)
     # can read it directly from the table instead of recomputing client-side.
+    print("  [BUILD] Executing...")
     try:
         cur = cnxn.execute("PRAGMA table_info('search_stats')").fetchall()
         cols = {r[1] for r in cur}
@@ -398,7 +402,9 @@ if __name__ == "__main__":
             cnxn.execute("ALTER TABLE search_stats ADD COLUMN eval_diff DOUBLE")
         # populate eval_diff from existing eval and sf_eval values
         cnxn.execute("UPDATE search_stats SET eval_diff = CASE WHEN eval IS NOT NULL AND sf_eval IS NOT NULL THEN eval - sf_eval ELSE NULL END")
+        print("  [BUILD] Completed building (wide) feature tables.")
     except Exception:
+        print("  [BUILD] Failed to build tables !!!!!!")
         # non-fatal: leave as-is if ALTER/UPDATE unsupported for some DB backends
         pass
 

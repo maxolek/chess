@@ -519,7 +519,7 @@ def build_position_features(cnxn):
 
     print(f"  position_features: processing {len(rows)} new positions...")
 
-    BATCH_SIZE = 500
+    BATCH_SIZE = 1000
     batch = []
 
     for i, row in enumerate(rows):

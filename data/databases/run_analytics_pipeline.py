@@ -16,13 +16,13 @@ MODULES = [
     "data.databases.load_analytics",
     "data.transforms.transform_positions",
     "data.transforms.transform_search",
-    "data.transforms.normalize_metadata",
+    #"data.transforms.normalize_metadata",
 ]
 
 
 
 def run_module(module: str, extra_args: list = None) -> None:
-    print(f"\n=== Running module: {module} ===")
+    print(f"\n=== Running module: {module} ===\n")
     cmd = [sys.executable, "-m", module]
     if extra_args:
         cmd.extend(extra_args)
