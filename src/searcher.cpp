@@ -29,7 +29,7 @@ bool Searcher::shouldPrune(Move& move, int standPat, int alpha, int search_depth
     ) {
         // see pruning (bad captures ... excl promo and checks)
         int seeGain = eval.SEE(board, move);
-        if (seeGain < -50) {
+        if (seeGain < params.SEE_PRUNE_THRESHOLD) {
             STATS_SEE_PRUNE(search_depth, ply);
             return true;
         }
@@ -142,7 +142,7 @@ int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int 
     if (limits.out_of_time()) return alpha;
 
     // draw detection
-    if (board.isThreefold() || board.currentGameState.fiftyMoveCounter >= 50) {
+    if (board.isThreefold() || board.currentGameState.fiftyMoveCounter >= 100) {
         //engine.tt.store(board.zobrist_hash, depth, ply, 0, EXACT, Move::NullMove());
         return params.DRAW_EVAL;
     }
@@ -153,9 +153,11 @@ int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int 
     TTEntry* ttEntry = engine.tt.probe(board.zobrist_hash);
     if (ttEntry && ttEntry->key == board.zobrist_hash) {
         STATS_TT_HIT(search_depth, ply);
+        int ttScore = ttEntry->eval;
+
         if (ttEntry->flag == EXACT) return ttEntry->eval;
-        else if (ttEntry->flag == UPPERBOUND && ttEntry->eval <= alpha) return alpha;
-        else if (ttEntry->flag == LOWERBOUND && ttEntry->eval >= beta)  return beta;
+        else if (ttEntry->flag == UPPERBOUND && ttEntry->eval <= alpha) return ttScore;
+        else if (ttEntry->flag == LOWERBOUND && ttEntry->eval >= beta)  return ttScore;
 
         //if (alpha >= beta) return ttEntry->eval;
     }
@@ -164,7 +166,7 @@ int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int 
     // Use incremental NNUE output (accumulators must be kept in sync)
     //boardallGameMoves.back().PrintMove();
     int standPat = nnue.evaluate(board.is_white_move); //eval.taperedEval(board);
-    if (standPat >= beta) return beta;
+    if (standPat >= beta) return standPat;
     if (standPat > alpha) alpha = standPat;
 
     //return standPat;
@@ -204,7 +206,7 @@ int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int 
             if (i == 0) STATS_FAILHIGH(search_depth, ply, "first");
             else if (i >= count / 2) STATS_FAILHIGH(search_depth, ply, 0);
             else STATS_FAILHIGH(search_depth, ply, 0); 
-            return beta; 
+            return score; 
         }
         if (score > bestEval) {
             bestEval = score;
@@ -233,7 +235,7 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
 
     // --- end of search conditions ---
 
-    if (board.isThreefold() || board.currentGameState.fiftyMoveCounter >= 50) {
+    if (board.isThreefold() || board.currentGameState.fiftyMoveCounter >= 100) {
         //engine.tt.store(board.zobrist_hash, depth, ply, 0, EXACT, Move::NullMove());
         return params.DRAW_EVAL;
     }
@@ -252,8 +254,8 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
         int ttScore = ttEntry->eval;
 
         if (ttEntry->flag == EXACT) return ttScore;
-        else if (ttEntry->flag == UPPERBOUND && ttScore <= alpha) return alpha;
-        else if (ttEntry->flag == LOWERBOUND && ttScore >= beta)  return beta;
+        else if (ttEntry->flag == UPPERBOUND && ttScore <= alpha) return ttScore;
+        else if (ttEntry->flag == LOWERBOUND && ttScore >= beta)  return ttScore;
 
         //if (alpha >= beta) return ttScore;
     }
@@ -400,10 +402,7 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
     if (bestEval <= alphaOrig) { flag = UPPERBOUND; STATS_FAILLOW(depth+ply, ply); }
     else if (bestEval >= beta) { flag = LOWERBOUND; }
 
-    if (flag == LOWERBOUND)
-        engine.tt.store(board.zobrist_hash, depth, ply, beta, LOWERBOUND, Move::NullMove());
-    else
-        engine.tt.store(board.zobrist_hash, depth, ply, bestEval, flag, bestMove);
+    engine.tt.store(board.zobrist_hash, depth, ply, bestEval, flag, bestMove);
     //STATS_TT_STORE(depth+ply, ply);
 
     return bestEval;
@@ -474,7 +473,7 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
                 iter_result.eval = eval;
                 iter_result.bestMove = m;
                 iter_result.best_line.set(m, childPV); // propagate raised alpha across root moves (in non-aspiration search)
-                //alpha = std::max(alpha, eval); 
+                //if (depth < params.ASPIRATION_START_DEPTH) alpha = std::max(alpha, eval); 
             }
         }
 
