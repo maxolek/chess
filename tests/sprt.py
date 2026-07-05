@@ -194,20 +194,20 @@ def upload_logs(args, cute_chess_stats, runtime=None):
 
         try:
             # map search --> game
+            print("[DATA] Building game map ...")
             game_map = etl.bulk_log_game(
                 cnxn, 
                 GAME_JSON, 
                 sprt_id,
-                baseline_engine_id
             )
 
             # log search+timing with game mapping
+            print("[DATA] Logging all search data ...")
             etl.bulk_log_search_and_timing(
                 cnxn, 
                 SEARCH_JSON,
                 game_map, 
                 timing_path=TIMING_JSON,
-                engine_id=candidate_engine_id,
                 root_moves_path=ROOT_MOVES_JSON
             )
             ingestion_ok = True
@@ -319,6 +319,7 @@ def main(args=None):
         f"option.uci_logging=true",
     ]
     log_b_block = [
+        f"option.log_dir={args.logroot}",
         f"option.timer_logging={"true" if should_log else "false"}",
         f"option.stats_logging={"true" if should_log else "false"}",
         f"option.game_logging={"true" if should_log else "false"}",

@@ -20,7 +20,7 @@ from .config import DB_PATH, EVAL_CLIP_CP, NUMERIC_EXCLUDE, numeric_cols
 
 # Max rows pulled into pandas for any single query — safety cap to prevent OOM.
 # Normal usage (1000 games × 50 searches × 4 engines × 15 depths ≈ 3M) is well under this.
-SAFETY_LIMIT = 10_000_000
+SAFETY_LIMIT = 2_000_000
 
 SCATTER_SAMPLE = 100_000
 
@@ -308,7 +308,7 @@ def enrich_searches(df: pd.DataFrame) -> pd.DataFrame:
         df["engine_side"] = "unknown"
 
     # Result label
-    if "result" in df.columns and "enngine_side" in df.columns:
+    if "result" in df.columns and "engine_side" in df.columns:
         res = df['result'].astype(str).str.strip()
         side = df['engine_side']
         is_white_win = res.isin(['1-0', '1','white'])
@@ -429,10 +429,21 @@ def apply_filters(
 
     where_sql = (" WHERE " + " AND ".join(where)) if where else ""
 
-    sql = f"SELECT * FROM {_SEARCH_TABLE}{where_sql}"
+    # push engine name + game info joins into duckdb for speed
+    join_clauses = ""
+    extra_cols = ""
+    if "engines" in _tables and "engine_id" in _SEARCH_COLUMNS:
+        join_clauses += f" LEFT JOIN engines e ON s.engine_id = e.id"
+        extra_cols += ", e.name as engine_name, e.version as engine_version"
+    if "game_stats" in _tables and "game_id" in _SEARCH_COLUMNS:
+        join_clauses += f" LEFT JOIN game_stats g ON s.game_id = g.id"
+        extra_cols += ", g.white_engine_id, g.black_engine_id, g.result, g.opening"
+
+    sql = f"SELECT s.*{extra_cols} FROM {_SEARCH_TABLE} s{join_clauses}{where_sql}"
     try:
         sf = _safe_limited_query(sql)
-    except Exception:
+    except Exception as e:
+        print(f"[WARN] Search query failed: {e}")
         sf = pd.DataFrame(columns=_SEARCH_COLUMNS)
 
     # Enrich with engine names, side, result
@@ -448,10 +459,10 @@ def apply_filters(
     if opening_vals and "game_id" in sf.columns and "id" in gf.columns:
         sf = sf[sf["game_id"].isin(gf["id"].unique())]
 
-        # store in cache (evict oldest if full)
-        if len(_filter_cache) >= _FILTER_CACHE_MAX:
-            _filter_cache.pop(next(iter(_filter_cache)))
-        _filter_cache[key] = (gf, sf)
+    # store in cache (evict oldest if full)
+    if len(_filter_cache) >= _FILTER_CACHE_MAX:
+        _filter_cache.pop(next(iter(_filter_cache)))
+    _filter_cache[key] = (gf, sf)
 
     return gf, sf
 

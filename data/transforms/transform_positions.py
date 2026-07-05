@@ -651,6 +651,8 @@ if __name__ == "__main__":
         engine_path = find_engine(engine_path)
         #ensure_search_stats_columns(conn, mpv)
         q = "SELECT id, fen FROM search_stats WHERE fen IS NOT NULL"
+        if skip_existing:
+            q += " AND sf_eval IS NULL"
         if limit and limit > 0:
             q += f" LIMIT {limit}"
         rows = conn.execute(q).fetchall()
@@ -674,12 +676,10 @@ if __name__ == "__main__":
         try:
             for sid, fen in rows:
                 if (cnt > 0 and ((len(rows) < 10000 and cnt % 1000 == 0) or (len(rows) >= 10000 and cnt % 10000 == 0))): print(f"  ...processed {cnt}/{len(rows)} search_stats rows")
-                if skip_existing:
-                    existing = conn.execute("SELECT sf_eval FROM search_stats WHERE id=? AND sf_eval IS NOT NULL LIMIT 1", (sid,)).fetchone()
-                    if existing:
-                        continue
+
                 board = chess.Board(fen)
                 t0 = time.time()
+                
                 try:
                     info = engine.analyse(board, chess.engine.Limit(depth=depth))
                     t1 = time.time()

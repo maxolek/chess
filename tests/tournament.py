@@ -569,7 +569,6 @@ def run_tournament(args, cnxn, engine_id):
                 game_map,
                 timing_path=timing_json if timing_json.exists() else None,
                 root_moves_path=root_moves_json if root_moves_json.exists() else None,
-                engine_id=engine_id,
             )
         except Exception as e:
             print(f"[DATA] bulk_log_search_and_timing failed: {e}")

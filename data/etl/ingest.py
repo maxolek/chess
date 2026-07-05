@@ -211,6 +211,7 @@ def register_engine(cnxn, engine):
     """Register an engine and return its row ID.
     
     If an engine with the same version is already registered, returns its ID instead.
+    Prompts the user for a description if one is not provided
     """
     # First, extract version to check for duplicates
     if engine.get("engine_path"):
@@ -221,7 +222,16 @@ def register_engine(cnxn, engine):
         print(f"[ETL] Probed option keys: {list(options.keys())}")
         version = engine.get("version") or engine_meta.get("version")
         name = engine.get("name") or Path(engine_path).stem
-        description = engine.get("description") or f"Auto-registered from {engine_path}"
+        #description = engine.get("description") or f"Auto-registered from {engine_path}"
+
+        # prompt user for description instead of auto-filling
+        if engine.get("description"): 
+            description = engine['description']
+        else:
+            print(f"\n[ETL] Registerinng new engine: {name} ({version})")
+            description = input("  Enter a description for this engine version (or press Enter to skip): ").strip()
+            if not description: 
+                description = f"Auto-registered from {engine_path}"
 
         move_overhead_ms = _int_option(options, "Move Overhead")
         max_threads = _int_option(options, "Threads")
@@ -520,42 +530,69 @@ def bulk_log_sts(cnxn, path, sts_id, **kwargs):
 
 
 def bulk_log_game(cnxn, path, experiment_id=None, second_engine_id=None):
-    """Bulk-load games from a JSONL file. Returns {game_uuid: game_id} mapping."""
+    """
+    Bulk-load games from a JSONL file. Returns {game_uuid: game_id} mapping.
+    
+    Handles multi-engine JSONL files: if multiple records share the same game_uuid
+    (from different engines), both engine IDs are resolved from the records themselves.
+    Falls back to second_engine_id for the opponent when only one engine logged.
+    """
     cursor = cnxn.cursor()
+
+    # first pass: collect all records grouped by game_uuid
+    game_records = {} # game_uuid -> list of record dicts
+    game_order = [] # preserve insertion order of first-seen game_uuids
+
+    for data in _iter_json_objects_from_path(path):
+        uuid = data['game_uuid']
+        if uuid not in game_records:
+            game_records[uuid] = []
+            game_order.append(uuid)
+        game_records[uuid].append(data)
 
     rows = []
     game_uuids = []
 
-    white_engine_id = None
-    black_engine_id = None
+    for uuid in game_order:
+        records = game_records[uuid]
+        white_engine_id = None
+        black_engine_id = None
 
-    for data in _iter_json_objects_from_path(path):
-        game_uuids.append(data["game_uuid"])
-        if data.get('side') == "white":
-            white_engine_id = get_engine_id(cnxn, data.get('engine_id'))
-            black_engine_id = second_engine_id
-        else:
+        # use the first record as the primary source for the game metadata
+        primary = records[0]
+
+        # resolve engine  IDs from all records 
+        for rec in records:
+            rec_engine_id = get_engine_id(cnxn, rec.get('engine_id'))
+            if rec.get('side') == 'white':
+                white_engine_id = rec_engine_id
+            else:
+                black_engine_id = get_engine_id(cnxn, data.get('engine_id'))
+
+        # fall back to second_engine_id for the missing side
+        if white_engine_id is None:
             white_engine_id = second_engine_id
-            black_engine_id = get_engine_id(cnxn, data.get('engine_id'))
+        if black_engine_id is None:
+            black_engine_id = second_engine_id
 
         rows.append((
             experiment_id,
             white_engine_id,
             black_engine_id,
-            data.get("wtime"),
-            data.get("btime"),
-            data.get("winc"),
-            data.get("binc"),
-            data.get("movestogo"),
-            data.get("depth"),
-            data.get("nodes"),
-            data.get("movetime"),
-            data.get("result"),
-            data.get("reason"),
-            data.get("opening"),
-            data.get("start_fen"),
-            json.dumps(data.get("moves")),
-            data.get("time_s")
+            primary.get("wtime"),
+            primary.get("btime"),
+            primary.get("winc"),
+            primary.get("binc"),
+            primary.get("movestogo"),
+            primary.get("depth"),
+            primary.get("nodes"),
+            primary.get("movetime"),
+            primary.get("result"),
+            primary.get("reason"),
+            primary.get("opening"),
+            primary.get("start_fen"),
+            json.dumps(primary.get("moves")),
+            primary.get("time_s")
         ))
 
     cursor.executemany(
@@ -613,7 +650,7 @@ def bulk_log_search_and_timing(
         """Return (engine_id, engine_version) for a single record."""
         if engine_id is not None:
             # Caller forced a single engine for the whole file.
-            return engine_id
+            return engine_id, data.get("engine_version")
 
         engine_version = data.get("engine_version")
         if engine_version is None:
@@ -621,19 +658,19 @@ def bulk_log_search_and_timing(
             # stamp engine_version on every record.
             engine_version = extract_engine_id_from_search(search_path)
             if engine_version is None:
-                return None
+                return None, None
 
         if engine_version in engine_id_cache:
             return engine_id_cache[engine_version], engine_version
 
         resolved = get_engine_id(cnxn, engine_version)
         engine_id_cache[engine_version] = resolved 
-        return resolved 
+        return resolved, engine_version
 
     # ── SEARCHES ──
     for data in _iter_json_objects_from_path(search_path):
 
-        row_engine_id = resolve_engine_id(data) 
+        row_engine_id, engine_version = resolve_engine_id(data) 
         if row_engine_id is None: 
             skipped_uuids.add(data.get('search_uuid'))
             continue # unresolved / dev / test
@@ -641,8 +678,6 @@ def bulk_log_search_and_timing(
         if not sts_id or game_map == {}:
             game_uuid = data["game_uuid"]
             game_id = game_map.get(game_uuid)
-
-        row_engine_id, engine_version = resolve_engine_id(data)
 
         searches_rows.append((
             row_engine_id,
@@ -857,6 +892,6 @@ def bulk_log_search_and_timing(
         f"[INFO] Inserted {len(searches_rows)} searches, "
         f"{len(depth_rows), len(ply_rows)} depth rows, "
         f"{len(timing_rows)} timing rows, "
-        f"{len(root_moves_rows)} root move rows."
-        f"Skipped {len(skipped_uuids)} records with unresolved/dev/test engines."
+        f"{len(root_moves_rows)} root move rows. "
+        f"Skipped {len(skipped_uuids)} records with unresolved/dev/test engines. "
     )
