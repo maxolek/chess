@@ -551,7 +551,7 @@ def bulk_log_game(cnxn, path, experiment_id=None, second_engine_id=None):
         game_records[uuid].append(data)
 
     rows = []
-    game_uuids = []
+    #game_uuids = []
 
     for uuid in game_order:
         records = game_records[uuid]
@@ -567,7 +567,7 @@ def bulk_log_game(cnxn, path, experiment_id=None, second_engine_id=None):
             if rec.get('side') == 'white':
                 white_engine_id = rec_engine_id
             else:
-                black_engine_id = get_engine_id(cnxn, data.get('engine_id'))
+                black_engine_id = rec_engine_id
 
         # fall back to second_engine_id for the missing side
         if white_engine_id is None:
@@ -617,7 +617,7 @@ def bulk_log_game(cnxn, path, experiment_id=None, second_engine_id=None):
     game_ids = [r[0] for r in cursor.fetchall()][::-1]
 
     cnxn.commit()
-    return dict(zip(game_uuids, game_ids))
+    return dict(zip(game_order, game_ids))
 
 
 def bulk_log_search_and_timing(
@@ -643,34 +643,34 @@ def bulk_log_search_and_timing(
     game_id = None
     skipped_uuids = set() # search_uuids dropped due to unresolved engine
 
-    # engine_version -> engine_id, avoids re-querying the DB for every row
+    # version_string -> db_engine_id, avoids re-querying the DB for every row
     engine_id_cache = {}
 
     def resolve_engine_id(data):
-        """Return (engine_id, engine_version) for a single record."""
+        """Return the DB engine_id (int) for a single record (or None if unresolved)."""
         if engine_id is not None:
             # Caller forced a single engine for the whole file.
-            return engine_id, data.get("engine_version")
+            return engine_id
 
-        engine_version = data.get("engine_version")
-        if engine_version is None:
+        version = data.get("engine_id")
+        if version is None:
             # Fall back to file-level detection, for logs that don't
-            # stamp engine_version on every record.
-            engine_version = extract_engine_id_from_search(search_path)
-            if engine_version is None:
-                return None, None
+            # stamp engine_id on every record.
+            version = extract_engine_id_from_search(search_path)
+            if version is None:
+                return None
 
-        if engine_version in engine_id_cache:
-            return engine_id_cache[engine_version], engine_version
+        if version in engine_id_cache:
+            return engine_id_cache[version]
 
-        resolved = get_engine_id(cnxn, engine_version)
-        engine_id_cache[engine_version] = resolved 
-        return resolved, engine_version
+        resolved = get_engine_id(cnxn, version)
+        engine_id_cache[version] = resolved 
+        return resolved, version
 
     # ── SEARCHES ──
     for data in _iter_json_objects_from_path(search_path):
 
-        row_engine_id, engine_version = resolve_engine_id(data) 
+        row_engine_id = resolve_engine_id(data) 
         if row_engine_id is None: 
             skipped_uuids.add(data.get('search_uuid'))
             continue # unresolved / dev / test
@@ -709,14 +709,14 @@ def bulk_log_search_and_timing(
             data.get("nmp_fail"),
             data.get("tt_overwritten"),
             data["search_uuid"],   # temp key: uuid mapping
-            engine_version,        # temp key: dev/test filtering
+            #engine_version,        # temp key: dev/test filtering
         ))
 
     # engines that never get logged — filtered by version string, not id
-    searches_rows = [
-        row for row in searches_rows
-        if row[-1] not in ('dev', 'test')
-    ]
+    #searches_rows = [
+    #    row for row in searches_rows
+    #    if row[-1] not in ('dev', 'test')
+    #]
 
     cursor.executemany(
         """
@@ -728,7 +728,7 @@ def bulk_log_search_and_timing(
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        [row[:-2] for row in searches_rows]  # drop search_uuid + engine_version temp keys
+        [row[:-1] for row in searches_rows]  # drop search_uuid temp keys
     )
 
     # Recover search IDs
@@ -739,7 +739,7 @@ def bulk_log_search_and_timing(
     search_ids = [r[0] for r in cursor.fetchall()][::-1]
 
     for row, sid in zip(searches_rows, search_ids):
-        uuid_map[row[-2]] = sid  # search_uuid is now second-to-last element
+        uuid_map[row[-1]] = sid  # search_uuid is now last element
 
     # ── PER-ITERATION DEPTH ──
     depth_rows = []
