@@ -665,7 +665,7 @@ def bulk_log_search_and_timing(
 
         resolved = get_engine_id(cnxn, version)
         engine_id_cache[version] = resolved 
-        return resolved, version
+        return resolved
 
     # ── SEARCHES ──
     for data in _iter_json_objects_from_path(search_path):
