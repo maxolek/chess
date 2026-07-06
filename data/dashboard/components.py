@@ -103,12 +103,12 @@ def table(df: pd.DataFrame, page_size=15, max_rows=MAX_TABLE_ROWS) -> dash_table
 
     for c in disp.columns:
         try:
-            disp = disp.map(_coerce_cell)
+            disp[c] = disp[c].map(_coerce_cell)
         except Exception:
             try:
-                disp = disp.map(lambda v: None if v is None else str(v))
+                disp[c] = disp[c].map(lambda v: None if v is None else str(v))
             except Exception:
-                disp = disp.astype(str)
+                disp[c] = disp[c].astype(str)
 
     tooltip_data = None
     if "search_id" in disp.columns:
