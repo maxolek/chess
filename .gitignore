@@ -15,6 +15,7 @@ libs/
 
 # data
 logs/
+data/dashboard_dash/
 
 # ignore engines
 engines/
