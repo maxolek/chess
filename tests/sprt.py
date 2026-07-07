@@ -7,7 +7,6 @@ from datetime import datetime
 import sqlite3
 from data import etl
 import re
-import shutil
 from pathlib import Path
 import time
 from datetime import datetime, timezone
@@ -25,19 +24,6 @@ GAME_JSON = SPRT_LOG_DIR / "game.jsonl"
 SEARCH_JSON = SPRT_LOG_DIR / "search.jsonl"
 TIMING_JSON = SPRT_LOG_DIR / "timing.jsonl"
 ROOT_MOVES_JSON = SPRT_LOG_DIR / "root_moves.jsonl"
-
-def _consolidate_instance_logs(logroot):
-    logroot = Path(logroot)
-    for basename in ("game", "search", "timing", "root_moves"):
-        parts = sorted(logroot.glob(f"{basename}_*.jsonl"))
-        if not parts:
-            continue
-
-        output_path = logroot / f"{basename}.jsonl"
-        with open(output_path, "w", encoding="utf-8") as out_f:
-            for part in parts:
-                with open(part, "r", encoding="utf-8") as in_f:
-                    shutil.copyfileobj(in_f, out_f)
 
 
 def parse_cutechess_output(output, candidate_name="Candidate"):
@@ -190,7 +176,7 @@ def upload_logs(args, cute_chess_stats, runtime=None):
     if args.log:
         # consolidate per-instance log files from concurrent engine processes
         print("[DATA] Consolidating per-instance log files...")
-        _consolidate_instance_logs(args.logroot)
+        etl.consolidate_instance_logs(args.logroot)
 
         try:
             # map search --> game
@@ -297,7 +283,7 @@ def main(args=None):
     engine_b = os.path.abspath(args.engine_b)
 
     if args.time is not None:
-        fast_tc = args.time <= 0.25
+        fast_tc = args.time <= 0.5
     else:  # args.tc must exist
         base_sec = 60*int(re.split(":", args.tc)[0]) + int(re.split(":", args.tc)[1][:2])
         fast_tc = base_sec <= 30

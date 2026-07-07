@@ -1,6 +1,7 @@
 """Small helper utilities."""
 import json
-
+import shutil
+from pathlib import Path
 
 def safe_val(val):
     """Convert lists/dicts to JSON strings for DB insertion."""
@@ -15,7 +16,7 @@ def safe(arr, i):
 
 # convert search_{pid}.jsonl to search.jsonl, game_{pid}.jsonl to game.jsonl, etc.
 # search_{pid} is the process specific file, search is the expected readable file
-def _consolidate_instance_logs(logroot):
+def consolidate_instance_logs(logroot):
     logroot = Path(logroot)
     for basename in ("game", "search", "timing", "root_moves"):
         parts = sorted(logroot.glob(f"{basename}_*.jsonl"))

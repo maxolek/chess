@@ -114,7 +114,7 @@ def get_engines_by_names(cnxn, names):
         if not exe_path.exists():
             exe_path = ENGINES_DIR / version
             if not exe_path.exists():
-                print(f"[TOURNAMENT] WARNING: exe not found for engine version={version}, skipping")
+                print(f"[TOURNAMENT] WARNING: exe not found for engine version={version}")
                 continue
         engines.append({"id": engine_id, "version": version, "path": str(exe_path)})
     return engines

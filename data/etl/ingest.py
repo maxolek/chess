@@ -1,5 +1,6 @@
 """Bulk ingestion functions: games, searches, timing, STS, SPRT."""
 import json
+import shutil
 from pathlib import Path
 
 from .paths import GAME_JSON, SEARCH_JSON, TIMING_JSON, ROOT_MOVES_JSON, GAMES_LOG_DIR, LOG_DIRS, get_jsonl_paths
@@ -16,6 +17,8 @@ def _iter_json_objects_from_path(path):
                 data = json.loads(text)
             except json.JSONDecodeError:
                 print(f"[WARN] skipping malformed JSON line {line_no} in {path}")
+                print("\n\n\n")
+                print(text)
                 continue
 
             if not isinstance(data, dict):
@@ -55,7 +58,8 @@ def ingest_log_dir(cnxn, log_dir, clear=True):
     else:
         print(f"[INFO] No search log found: {paths['search']}")
 
-    if clear:
+    # clear only if searches+games
+    if clear and paths["search"].is_file() and paths["game"].is_file():
         clear_log_dir(log_dir)
 
 
@@ -700,10 +704,15 @@ def bulk_log_search_and_timing(
             data.get("tt_fill"),
             data.get("fail_highs"),
             data.get("fail_lows"),
-            data.get("fail_high_first"),
-            data.get("fail_high_late"),
             data.get("aspiration_fail_high_researches"),
             data.get("aspiration_fail_low_researches"),
+            # fail-high move index histogram buckets
+            safe(data.get("fail_high_index", []), 0),
+            safe(data.get("fail_high_index", []), 1),
+            safe(data.get("fail_high_index", []), 2),
+            safe(data.get("fail_high_index", []), 3),
+            safe(data.get("fail_high_index", []), 4),
+            safe(data.get("fail_high_index", []), 5),
             data.get("see_prunes"),
             data.get("delta_prunes"),
             data.get("nmp"),
@@ -724,10 +733,11 @@ def bulk_log_search_and_timing(
         INSERT INTO searches (
             engine_id, game_id, sts_id, fen, ply, time_ms, eval, completed_depth, depth, qdepth, move,
             principal_variation, nodes, qnodes, tt_stores, tt_hits, tt_fill,
-            fail_highs, fail_lows, fail_high_first, fail_high_late, fail_high_researches, fail_low_researches,
+            fail_highs, fail_lows, fail_high_researches, fail_low_researches,
+            fh_index_0, fh_index_1, fh_index_2, fh_index_3, fh_index_4to7, fh_index_8plus,
             see_prunes, delta_prunes, nmp, nmp_fail, tt_overwritten
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         [row[:-1] for row in searches_rows]  # drop search_uuid temp keys
     )
@@ -749,7 +759,10 @@ def bulk_log_search_and_timing(
         if search_id is None: continue
 
         n = len(data.get("itdepth_nodes", []))
+        fh_index_data = data.get("itdepth_fh_index", [])
         for d in range(n):
+            # Extract per-depth fh_index bucket (array of 6 values)
+            fh_buckets = safe(fh_index_data, d) if d < len(fh_index_data) else None
             depth_rows.append((
                 search_id,
                 d + 1,
@@ -764,10 +777,15 @@ def bulk_log_search_and_timing(
                 safe(data.get("itdepth_ttfill", []), d),
                 safe(data.get("itdepth_fail_highs", []), d),
                 safe(data.get("itdepth_fail_lows", []), d),
-                safe(data.get("itdepth_fail_high_firsts", []), d),
-                safe(data.get("itdepth_fail_high_lates", []), d),
                 safe(data.get("itdepth_aspiration_failhigh_researches", []), d),
                 safe(data.get("itdepth_aspiration_faillow_researches", []), d),
+                # fail-high index histogram per iteration depth
+                fh_buckets[0] if isinstance(fh_buckets, list) and len(fh_buckets) > 0 else None,
+                fh_buckets[1] if isinstance(fh_buckets, list) and len(fh_buckets) > 1 else None,
+                fh_buckets[2] if isinstance(fh_buckets, list) and len(fh_buckets) > 2 else None,
+                fh_buckets[3] if isinstance(fh_buckets, list) and len(fh_buckets) > 3 else None,
+                fh_buckets[4] if isinstance(fh_buckets, list) and len(fh_buckets) > 4 else None,
+                fh_buckets[5] if isinstance(fh_buckets, list) and len(fh_buckets) > 5 else None,
                 safe(data.get("itdepth_see_prunes", []), d),
                 safe(data.get("itdepth_delta_prunes", []), d),
                 safe(data.get("itdepth_pvs_researches", []), d),
@@ -780,11 +798,13 @@ def bulk_log_search_and_timing(
         INSERT INTO searches_by_iteration (
             search_id, depth, time_ms, eval, move, qdepth,
             nodes, qnodes, tt_stores, tt_hits, tt_fill,
-            fail_highs, fail_lows, fail_high_first, fail_high_late,
-            fail_high_researches, fail_low_researches, see_prunes, delta_prunes,
+            fail_highs, fail_lows,
+            fail_high_researches, fail_low_researches,
+            fh_index_0, fh_index_1, fh_index_2, fh_index_3, fh_index_4to7, fh_index_8plus,
+            see_prunes, delta_prunes,
             pvs_researches, nmp, nmp_fail
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         depth_rows
     )
@@ -796,7 +816,9 @@ def bulk_log_search_and_timing(
         if search_id is None: continue
 
         n = len(data.get("treedepth_nodes", []))
+        fh_index_tree = data.get("treedepth_fh_index", [])
         for d in range(n):
+            fh_buckets = safe(fh_index_tree, d) if d < len(fh_index_tree) else None
             ply_rows.append((
                 search_id,
                 d + 1,
@@ -806,8 +828,13 @@ def bulk_log_search_and_timing(
                 safe(data.get("treedepth_tt_hits", []), d),
                 safe(data.get("treedepth_fail_highs", []), d),
                 safe(data.get("treedepth_fail_lows", []), d),
-                safe(data.get("treedepth_fail_high_firsts", []), d),
-                safe(data.get("treedepth_fail_high_lates", []), d),
+                # fail-high index histogram per tree depth
+                fh_buckets[0] if isinstance(fh_buckets, list) and len(fh_buckets) > 0 else None,
+                fh_buckets[1] if isinstance(fh_buckets, list) and len(fh_buckets) > 1 else None,
+                fh_buckets[2] if isinstance(fh_buckets, list) and len(fh_buckets) > 2 else None,
+                fh_buckets[3] if isinstance(fh_buckets, list) and len(fh_buckets) > 3 else None,
+                fh_buckets[4] if isinstance(fh_buckets, list) and len(fh_buckets) > 4 else None,
+                fh_buckets[5] if isinstance(fh_buckets, list) and len(fh_buckets) > 5 else None,
                 safe(data.get("treedepth_see_prunes", []), d),
                 safe(data.get("treedepth_delta_prunes", []), d),
                 safe(data.get("treedepth_pvs_researches", []), d),
@@ -820,10 +847,11 @@ def bulk_log_search_and_timing(
         INSERT INTO searches_by_tree_depth (
             search_id, depth,
             nodes, qnodes, tt_stores, tt_hits, fail_highs, fail_lows,
-            fail_high_first, fail_high_late, see_prunes, delta_prunes,
+            fh_index_0, fh_index_1, fh_index_2, fh_index_3, fh_index_4to7, fh_index_8plus,
+            see_prunes, delta_prunes,
             pvs_researches, nmp, nmp_fail
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         ply_rows
     )

@@ -203,9 +203,7 @@ int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int 
         board.UnmakeMove(m);
 
         if (score >= beta) { 
-            if (i == 0) STATS_FAILHIGH(search_depth, ply, "first");
-            else if (i >= count / 2) STATS_FAILHIGH(search_depth, ply, 0);
-            else STATS_FAILHIGH(search_depth, ply, 0); 
+            STATS_FAILHIGH(search_depth, ply, i);
             return score; 
         }
         if (score > bestEval) {
@@ -383,9 +381,7 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
         alpha = std::max(alpha, bestEval);
         if (alpha >= beta) {
             
-            if (i == 0) STATS_FAILHIGH(depth+ply, ply, "first");
-            else if (i >= count / 2) STATS_FAILHIGH(depth+ply, ply, 0);
-            else STATS_FAILHIGH(depth+ply, ply, 0);
+            STATS_FAILHIGH(depth+ply, ply, i);
 
             if (!Move::SameMove(killerMoves[depth][0], m) && !m.IsPromotion() &&
                 !(1ULL << m.TargetSquare() & board.colorBitboards[1 - board.move_color])) {

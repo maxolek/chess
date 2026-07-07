@@ -15,7 +15,7 @@ npm run dev
 
 Then open `http://localhost:3000?db=path/to/chess_analytics.duckdb`
 
-Or open the dashboard and use the file picker to load your `.duckdb` file.
+Or open the dashboard and use the file picker to load `.duckdb` file.
 
 ## Architecture
 
@@ -23,7 +23,7 @@ Or open the dashboard and use the file picker to load your `.duckdb` file.
 - **Mosaic**: Cross-filtering framework — brush one chart, all linked charts update instantly
 - **Vite**: Dev server and bundler (fast HMR in development, optimized static build)
 
-All queries run in-browser against your analytics file. No data leaves your machine.
+All queries run in-browser against the analytics file. No data leaves the machine.
 
 ## Building for deployment
 
@@ -31,7 +31,7 @@ All queries run in-browser against your analytics file. No data leaves your mach
 npm run build
 ```
 
-Produces a `dist/` folder you can host anywhere (GitHub Pages, Vercel, Netlify, etc).
+Produces a `dist/` folder that can be hosted anywhere (GitHub Pages, Vercel, Netlify, etc).
 
 ## Tabs
 
@@ -55,7 +55,7 @@ Produces a `dist/` folder you can host anywhere (GitHub Pages, Vercel, Netlify, 
 
 ## Data requirements
 
-Expects a DuckDB file with these tables (from your analytics pipeline):
+Expects a DuckDB file with these tables (from analytics pipeline):
 - `engines`, `experiments`, `game_stats`
 - `search_stats` or `search_features`
 - `iterative_deepening_stats` or `search_iteration_features`

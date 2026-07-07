@@ -16,7 +16,8 @@ MODULES = [
     "data.databases.load_analytics",
     "data.transforms.transform_positions",
     "data.transforms.transform_search",
-    #"data.transforms.normalize_metadata",
+    "data.transforms.validate",
+    "data.databases.test_schema",
 ]
 
 
@@ -48,8 +49,8 @@ def main():
     if args.skip_load:
         print("Skipping data.load_analytics (use --skip-load to enable)")
     for m in modules_to_run:
-        # Pass --full to load_analytics if requested
-        extra = ['--full'] if args.full and m == 'data.load_analytics' else None
+        # Pass --full to load_analytics and transform_search if requested
+        extra = ['--full'] if args.full and m in ('data.databases.load_analytics', 'data.transforms.transform_search') else None
         run_module(m, extra_args=extra)
     print("\nPipeline completed successfully.")
 
