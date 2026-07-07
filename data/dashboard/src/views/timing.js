@@ -19,7 +19,7 @@ export async function renderTiming() {
       function,
       SUM(total_time_ms) as total_ms,
       SUM(num_calls) as total_calls,
-      AVG(total_time_ms) as avg_ms_per_search
+      total_ms/NULLIF(total_calls, 0)  as avg_ms_per_search
     FROM search_timings
     GROUP BY function
     ORDER BY total_ms DESC
@@ -27,11 +27,11 @@ export async function renderTiming() {
   `);
 
   // Top functions bar chart
-  await coordinator().exec(`CREATE OR REPLACE TEMP VIEW timing_by_func AS SELECT "function", SUM(total_time_ms) as total_ms FROM search_timings GROUP BY "function" ORDER BY total_ms DESC LIMIT 15`);
+  await coordinator().exec(`CREATE OR REPLACE TEMP VIEW timing_by_func AS SELECT "function", SUM(total_time_ms)/NULLIF(SUM(num_calls), 0) as avg_ms_per_search FROM search_timings WHERE "function" <> 'ROOT' GROUP BY "function" ORDER BY avg_ms_per_search DESC LIMIT 15`);
   const funcBar = vg.plot(
     vg.barX(
       vg.from('timing_by_func'),
-      { x: 'total_ms', y: 'function', fill: 'steelblue', sort: { y: '-x' } }
+      { x: 'avg_ms_per_search', y: 'function', fill: 'steelblue', sort: { y: '-x' } }
     ),
     vg.width(700),
     vg.height(400),

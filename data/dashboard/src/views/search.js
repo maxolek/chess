@@ -71,7 +71,7 @@ export async function renderSearch() {
   // Nodes histogram
   const nodesHist = vg.plot(
     vg.rectY(vg.from(searchTable, { filterBy: $filter }), {
-      x: vg.bin('nodes'),
+      x: vg.bin('total_nodes'),
       y: vg.count(),
       fill: 'steelblue',
     }),
@@ -86,7 +86,7 @@ export async function renderSearch() {
   // Time histogram
   const timeHist = vg.plot(
     vg.rectY(vg.from(searchTable, { filterBy: $filter }), {
-      x: vg.bin('time_ms'),
+      x: vg.bin('total_time_ms'),
       y: vg.count(),
       fill: 'steelblue',
     }),

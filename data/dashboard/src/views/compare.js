@@ -30,9 +30,9 @@ export async function renderCompare() {
 
   // Box plots comparing engines
   const depthBox = vg.plot(
-    vg.boxY(vg.from(searchTable, { filterBy: $filter }), {
+    vg.rectY(vg.from(searchTable, { filterBy: $filter }), {
       x: 'engine_id',
-      y: 'depth',
+      y: 'completed_depth',
     }),
     vg.width(700),
     vg.height(300),
@@ -44,9 +44,9 @@ export async function renderCompare() {
 
   // Nodes box plot
   const nodesBox = vg.plot(
-    vg.boxY(vg.from(searchTable, { filterBy: $filter }), {
+    vg.rectY(vg.from(searchTable, { filterBy: $filter }), {
       x: 'engine_id',
-      y: 'nodes',
+      y: 'total_nodes',
     }),
     vg.width(700),
     vg.height(300),
@@ -58,9 +58,9 @@ export async function renderCompare() {
 
   // Time comparison
   const timeBox = vg.plot(
-    vg.boxY(vg.from(searchTable, { filterBy: $filter }), {
+    vg.rectY(vg.from(searchTable, { filterBy: $filter }), {
       x: 'engine_id',
-      y: 'time_ms',
+      y: 'total_time_ms',
     }),
     vg.width(700),
     vg.height(300),
@@ -73,8 +73,8 @@ export async function renderCompare() {
   // TT efficiency: hits / stores ratio
   const ttPlot = vg.plot(
     vg.dot(vg.from(searchTable, { filterBy: $filter }), {
-      x: 'tt_stores',
-      y: 'tt_hits',
+      x: 'total_tt_stores',
+      y: 'total_tt_hits',
       fill: 'engine_id',
       opacity: 0.3,
       r: 2,

@@ -237,7 +237,7 @@ def upload_logs(args, cute_chess_stats, runtime=None):
     if args.log and ingestion_ok:
         print("[DATA] Clearing log directory...")
         etl.clear_log_dir(args.logroot)
-    print(f"[DATA] Logging completed for SPRT {sprt_id}.")
+        print(f"[DATA] Logging completed for SPRT {sprt_id}.")
 
 
 def parse_args():

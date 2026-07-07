@@ -43,12 +43,12 @@ export async function renderTrends() {
     SELECT 
       e.name || ' (' || e.version || ')' as engine_label,
       e.id as engine_order,
-      AVG(s.depth) as avg_depth,
-      AVG(s.nodes) as avg_nodes,
-      AVG(s.time_ms) as avg_time_ms,
-      AVG(s.tt_hits) as avg_tt_hits,
-      AVG(s.fail_highs) as avg_fail_highs,
-      AVG(s.nmp) as avg_nmp,
+      AVG(s.completed_depth) as avg_depth,
+      AVG(s.total_nodes) as avg_nodes,
+      AVG(s.total_time_ms) as avg_time_ms,
+      AVG(s.total_tt_hits) as avg_tt_hits,
+      AVG(s.total_fail_highs) as avg_fail_highs,
+      AVG(s.total_nmp) as avg_nmp,
       COUNT(*) as n_searches
     FROM ${searchTable} s
     JOIN engines e ON s.engine_id = e.id

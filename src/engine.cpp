@@ -458,7 +458,7 @@ void Engine::ponderHit() {
 // ------ principle move ordering
 
 void Engine::iterativeDeepening() {
-    ScopedTimer timer(T_ROOT);
+    //ScopedTimer timer(T_ROOT);
     auto start_time = std::chrono::steady_clock::now();
     g_run_context.search_uuid = generate_uuid();
 

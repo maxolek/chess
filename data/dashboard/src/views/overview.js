@@ -61,7 +61,7 @@ export async function renderOverview() {
   container.appendChild(plotPanel('Eval Distribution (±1500cp)', evalPlot));
 
   // Nodes distribution (log scale)
-  await coordinator().exec(`CREATE OR REPLACE TEMP VIEW nodes_filtered AS SELECT * FROM ${searchTable} WHERE nodes > 0`);
+  await coordinator().exec(`CREATE OR REPLACE TEMP VIEW total_nodes_filtered AS SELECT * FROM ${searchTable} WHERE total_nodes > 0`);
   const nodesPlot = vg.plot(
     vg.rectY(vg.from('nodes_filtered'), {
       x: vg.bin('nodes'),
