@@ -46,6 +46,11 @@ The engines essential information, e.g. neural network weights, test positions, 
 
 ## Data Framework
 
-OLTP-OLAP stored in sqlite & duckdb. Raw logging is stored in .jsonl files that are connected via UUIDs based on .exe process IDs. Raw logs are stored in SQLite database that feeds into DuckDB database with rich position and search information for deep analysis and engine comparison.
+OLTP-OLAP stored in SQLite & DuckDB. Raw logging is stored in .jsonl files that are connected via UUIDs based on .exe process IDs. Raw logs are stored in SQLite database that feeds into DuckDB database with rich position and search information for deep analysis and engine comparison.
 
 Typical search, game, and function call time information is collected for basic engine performance analysis, but in the ETL during OLTP -> OLAP pipelines additional metrics on search information is calculated, games are better summarized, broad position information is generated, and stockfish eval/move comparisons are computed.
+
+
+<br> 
+
+##### See /docs/ for more information
