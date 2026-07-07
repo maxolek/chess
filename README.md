@@ -1,74 +1,56 @@
-# Tomahawk Chess Engine
+<div align="center">
 
-Tomahawk is a NNUE chess engine written in C++ with a Python testing framework. It utilizes the UCI protocal.
+<img src="bin/logos/logo.png" width="200">
 
-Play at https://lichess.org/@/tomahawkBOT
+# Tomahawk 
 
-## Features
+### A NNUE chess engine written in C++
 
-### Engine Core
-- **Iterative Deepening**: Depth-limited search with progressive deepening for accurate time management.
-- **Negamax Search**: Efficient minimax implementation for zero-sum game evaluation.
-- **Alpha-Beta Pruning**: Cuts off unnecessary branches to improve search speed.
-- **Quiescence Search**: Extends search at tactical positions to avoid horizon effect.
-- **Aspiration Windows**: Dyanmic alpha-beta values based on previous iteration, with dynamic scaling.
-- **Move Ordering Heuristics**: Includes TT move, SEE, MVA-LVA, killer moves, history heuristics, and PV moves.
-- **Evaluation Function**:
-  768-128x2 NNUE
-  - incremental dual-perspective accumulators
-  - trained on T60T70wIsRightFarseer
-  - dynamic lr, wdl+eval based target function
-  - quantization for faster forward pass
-  - **Tapered Evaluation**: training of larger nets and the use of different evaluations based on game phase in progress
-- **Magic Bitboards**: Fast sliding piece move generation.
-- **Transposition Table (TT)**: Caches evaluated positions for faster search.
+[![UCI](https://img.shields.io/badge/protocol-UCI-green.svg)]()
 
-### Testing & Analysis
-- Python-based **testing framework** for SPRT, Elo estimation, and statistical analysis.
-- Data collection for move performance, NPS, evaluation breakdowns, and tournament-style testing.
-- **Game Visualization** using Tkinter and PNG piece sets.
+[![C++](https://img.shields.io/badge/C++-20-blue.svg)]()
+[![Python](https://img.shields.io/badge/Python-3-blue.svg)]()
 
-## Project Structure
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey.svg)]()
 
-/tomahawk       --> engine + make file
-/tests          --> testing + visual games
-  ./pgo_profile --> profile build components
-/visual_assets  --> .svg/.png for visuals
-/bin            --> opening book, PST tables
+<br>
+Play against Tomahawk!
+
+https://lichess.org/@/tomahawkBOT
+
+</div>
+
+---
+
+## Overview
+
+Tomahawk is a UCI chess engine written in C++ focused on search optimization, neural network evaluation, and data-driven improvement.
+
+##### /src/ + /include/
+
+The engine combines traditional alpha-beta search techniques with NNUE evaluation and an extensive testing framework for measuring strength improvements through automated analysis and SPRT testing.
+
+##### /data/
+
+A large emphasis has been placed on a (python) data collection pipeline with integration into a Node.js dashboard. This data has been used to drive improvements, make programming decisions, and perform automated tuning.
+
+##### /tests/
+
+An even more important aspect of engine development lies in testing. This python based testing schema includes move generation testing, speed testing, and game/position testing. The engine includes further testing possibilities via the UCI commands (e.g. see, dumpzobrist)
+
+##### /bin/
+
+The engines essential information, e.g. neural network weights, test positions, etc.
+
+---
+
+## Data Framework
+
+OLTP-OLAP stored in SQLite & DuckDB. Raw logging is stored in .jsonl files that are connected via UUIDs based on .exe process IDs. Raw logs are stored in SQLite database that feeds into DuckDB database with rich position and search information for deep analysis and engine comparison.
+
+Typical search, game, and function call time information is collected for basic engine performance analysis, but in the ETL during OLTP -> OLAP pipelines additional metrics on search information is calculated, games are better summarized, broad position information is generated, and stockfish eval/move comparisons are computed.
 
 
-## Usage
+<br> 
 
-Compile is optimized for the following CPU with the compile flag -march=native
-
-Name                                      NumberOfCores  NumberOfLogicalProcessors
-Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz  4              8
-
-Full compile flags: -pthread -O3 -ffast-math -march=native -flto
-
-### Compile Engine
-
-bash
-
-cd tomahawk
-
-make -f makefile.mak
-
-### Play Game
-
-bash
-
-cd tomahawk
-
-tomahawk
-
-position startpos
-
-go movetime [time in ms]
-
-### Run Game Tests
-bash
-
-cd tests
-
-py sprt.py
+##### See /docs/ for more information

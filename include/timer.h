@@ -18,21 +18,23 @@
 // Timer IDs
 enum TimerID {
     T_MOVEGEN, T_MAKEMOVE, T_UNMAKE_MOVE,
-    T_ROOT, T_SEARCH, T_QSEARCH,  
-    T_SCORE_ORDER, T_TT_PROBE, T_TT_STORE, 
+    T_SEARCH, T_PVS_SEARCH, T_PVS_RESEARCH, T_NMP_SEARCH,
+    T_SCORE_ORDER,
+    T_TT_PROBE, T_TT_STORE, 
     T_EVAL, T_NNUE, 
-    T_SEE, T_PERFT,
+    T_SEE,
     T_BOOK_PROBE, 
     T_COUNT
 };
 
-// C++17 inline variable avoids multiple definitions
+// inline variable avoids multiple definitions
 inline const char* TimerNames[T_COUNT] = {
     "MOVEGEN", "MAKEMOVE", "UNMAKE_MOVE",
-    "ROOT", "SEARCH", "QSEARCH",
-    "SCORE_ORDER", "TT_PROBE", "TT_STORE",
+    "SEARCH", "PVS_SEARCH", "PVS_RESEARCH", "NMP_SEARCH",
+    "SCORE_ORDER",
+    "TT_PROBE", "TT_STORE",
     "EVAL", "NNUE",
-    "SEE", "PERFT",
+    "SEE",
     "BOOK_PROBE"
 };
 
@@ -76,11 +78,11 @@ struct ScopedTimer {
 
 // Header-only logging
 inline void logTimingStats(const std::string& fen = "") {
-    static std::ofstream out(Logging::log_dir / "timing.jsonl", std::ios::app);
+    static std::ofstream out(Logging::log_file_name("timing.jsonl"), std::ios::app);
     if (!out.is_open()) return;
 
-    const auto& root = g_timing.stats[T_ROOT];
-    double total_ms = double(root.cycles) / Timer::freq() * 1000.0;
+    //const auto& root = g_timing.stats[T_ROOT];
+    //double total_ms = double(root.cycles) / Timer::freq() * 1000.0;
 
     out << "{";
     out << "\"engine_id\":\"" << ENGINE_ID << "\","; 
@@ -89,20 +91,20 @@ inline void logTimingStats(const std::string& fen = "") {
     out << "\"session\":" << currentSession() << ",";
     out << "\"game_uuid\":\"" << g_run_context.game_uuid << "\",";
     out << "\"search_uuid\":\"" << g_run_context.search_uuid << "\",";
-    out << "\"fen\":\"" << fen << "\",";
-    out << "\"total_search_time_ms\":" << total_ms;
+    out << "\"fen\":\"" << fen;
+    //out << "\"total_search_time_ms\":" << total_ms;
 
     for (int i = 0; i < T_COUNT; ++i) {
         const auto& ts = g_timing.stats[i];
         double ms = double(ts.cycles) / Timer::freq() * 1000.0;
-        double pct = total_ms > 0 ? 100.0 * ms / total_ms : 0.0;
+        //double pct = total_ms > 0 ? 100.0 * ms / total_ms : 0.0;
         double avg_ms = ts.calls ? ms / ts.calls : 0.0;
 
         out << ",\"" << TimerNames[i] << "\":{"
             << "\"total_ms\":" << ms << ","
             << "\"calls\":" << ts.calls << ","
-            << "\"avg_ms\":" << avg_ms << ","
-            << "\"pct_of_root_ms\":" << pct
+            << "\"avg_ms\":" << avg_ms 
+            //<< "\"pct_of_root_ms\":" << pct
             << "}";
     }
 

@@ -55,7 +55,7 @@ inline GameLog g_gamelog;
 inline void logGameLog() {
     if (!Logging::track_game_log) return;
 
-    static std::ofstream out(Logging::log_dir / "game.jsonl", std::ios::app);
+    static std::ofstream out(Logging::log_file_name("game.jsonl"), std::ios::app);
     if (!out.is_open()) return;
 
     out << "{"

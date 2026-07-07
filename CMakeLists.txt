@@ -5,7 +5,7 @@ project(tomahawk LANGUAGES CXX)
 # Version
 # -------------------
 # Usage:
-#   cmake -S . -B build -G "MinGW Makefiles" -DCMAKE_C_COMPILER=g++ -DCMAKE_CXX_COMPILER=g++ -DVERSION=1.2.3
+#   cmake -S . -B build -G "MinGW Makefiles" -DCMAKE_C_COMPILER=g++ -DCMAKE_CXX_COMPILER=g++ -DCMAKE_BUILD_TYPE=Release -DVERSION=1.2.3
 #   cmake --build build
 #
 if (NOT DEFINED VERSION)
@@ -90,6 +90,30 @@ elseif (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
     target_compile_options(tomahawk PRIVATE
         -O1
         -g
+    )
+
+# ASAN
+elseif (CMAKE_BUILD_TYPE STREQUAL "Asan")
+    target_compile_options(tomahawk PRIVATE 
+        -O1
+        -g
+        -fsanitize=address,undefined
+        -fno-omit-frame-pointer
+    )
+    target_link_options(tomahawk PRIVATE
+        -fsanitize=address,undefined
+    )
+    target_compile_definitions(tomahawk PRIVATE DEBUG)
+
+# profile with full optimization
+elseif (CMAKE_BUILD_TYPE STREQUAL "Profile")
+    target_compile_options(tomahawk PRIVATE
+        -O3
+        -ffast-math
+        -march=native
+        -flto
+        -g
+        -fno-omit-frame-pointer
     )
 
 # RELEASE

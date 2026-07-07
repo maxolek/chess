@@ -5,6 +5,14 @@
 
 #include "helpers.h"
 
+// struct for sliding piece rays
+// (classic sliding move generation ... non-magics)
+struct SMasks {
+    U64 lower; // from lower idx square -> piece
+    U64 upper; // from piece -> upper idx square
+    U64 lineEx; // lower | upper
+};
+
 class Bits {
 private:
 public:

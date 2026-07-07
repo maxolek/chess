@@ -2,7 +2,9 @@
 #include <vector>
 #include <cstdint>
 #include <string>
+#ifndef NDEBUG
 #include <unordered_set>
+#endif
 #include "board.h"
 #include "move.h"
 #include "stats.h"
@@ -26,28 +28,28 @@ constexpr int SCALE = 400;
 
 struct Accumulator {
     int32_t vals[HIDDEN_SIZE];   // pre-activation
-    std::unordered_set<int> active_features;
+    //std::unordered_set<int> active_features;
 
     void init_bias(const int16_t* bias) {
         for (int i = 0; i < HIDDEN_SIZE; i++)
             vals[i] = bias[i];
-        active_features.clear();
+        //active_features.clear();
     }
 
     inline void add_feature(int feature_idx, int16_t (*W)[HIDDEN_SIZE]) {
         const int16_t* col = W[feature_idx];
         for (int i = 0; i < HIDDEN_SIZE; i++)
             vals[i] += col[i];
-        active_features.insert(feature_idx);
+        //active_features.insert(feature_idx);
     }
 
     inline void remove_feature(int feature_idx, int16_t (*W)[HIDDEN_SIZE]) {
         const int16_t* col = W[feature_idx];
         for (int i = 0; i < HIDDEN_SIZE; i++)
             vals[i] -= col[i];
-        active_features.erase(feature_idx);
+        //active_features.erase(feature_idx);
     }
-
+    /*
     void dump_active_features(const char* name) const {
         std::cout << "[ACTIVE FEATURES] " << name << " count=" << active_features.size() << "\n";
         int count = 0;
@@ -57,6 +59,7 @@ struct Accumulator {
         }
         std::cout << "\n";
     }
+    */
 };
 
 // ============================================================
@@ -122,12 +125,13 @@ public:
     void debug_expected_changes(const Board &before,
                             const Move &m,
                             const Board &after);
+/*
     bool check_active_features_consistency(const Accumulator& incr,
                                               const Accumulator& full,
                                               const char* name,
                                               bool abort_on_mismatch = true);
     void debug_check_features_after_move(const Board& b);
-
+*/
     // Build full accumulators from board
     void build_accumulators(const Board& b);
 };

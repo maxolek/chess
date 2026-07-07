@@ -4,8 +4,9 @@ get characteristics of a position
 
 import chess
 from collections import Counter
-from pathlib import Path
 import pandas as pd
+import datetime
+import time
 
 # pawn value of pieces (approx)
 piece_values = {
@@ -434,8 +435,9 @@ def get_mobility_characteristics(fen):
     mobility = {}
     
     for color in [chess.WHITE, chess.BLACK]:
+        if board.turn != color:
+            board.push(chess.Move.null())  # switch turn to color for legal moves
         legal_moves = list(board.legal_moves)
-        if board.turn != color: legal_moves = []
         capture_moves = sum(board.is_capture(m) for m in legal_moves)
         check_moves = sum(board.gives_check(m) for m in legal_moves)
 
@@ -466,9 +468,9 @@ def get_mobility_characteristics(fen):
     return mobility[chess.WHITE], mobility[chess.BLACK]
 
 def build_position_features(cnxn):
-    # Drop and recreate table (DuckDB syntax)
+    # Create table if it doesn't exist
     cnxn.execute("""
-        CREATE OR REPLACE TABLE position_features (
+        CREATE TABLE IF NOT EXISTS position_features (
             search_id   INTEGER,
             game_id     INTEGER,
             fen         TEXT,
@@ -503,10 +505,24 @@ def build_position_features(cnxn):
         )
     """)
 
-    # Fetch all positions (from your intermediate table)
-    rows = cnxn.execute("SELECT search_id, fen, game_id, sts_id FROM dim_positions").fetchall()
+    # Only fetch positions not already processed (incremental)
+    rows = cnxn.execute("""
+        SELECT d.search_id, d.fen, d.game_id, d.sts_id
+        FROM dim_positions d
+        LEFT JOIN position_features pf ON d.search_id = pf.search_id
+        WHERE pf.search_id IS NULL AND d.fen IS NOT NULL
+    """).fetchall()
 
-    for row in rows:
+    if not rows:
+        print(f"  position_features: 0 new positions to process")
+        return
+
+    print(f"  position_features: processing {len(rows)} new positions...")
+
+    BATCH_SIZE = 1000
+    batch = []
+
+    for i, row in enumerate(rows):
         search_id, fen, game_id, sts_id = row
 
         # Extract features
@@ -530,63 +546,64 @@ def build_position_features(cnxn):
         # Mobility + space
         wm, bm = get_mobility_characteristics(fen)
 
-        # Flatten into a dict
-        features = {
-            'search_id': search_id,
-            'game_id': game_id,
-            'fen': fen,
-            'game_phase': game_phase,
-            'position_type': position_type,
-            'pos_tactical': tactical_score,
-            'pos_positional': positional_score,
-            'pos_endgame': endgame_score,
-            'balance': balance,
-            'white_backwards': w_backward,
-            'white_doubled': w_doubled,
-            'white_passed': w_passed,
-            'black_backwards': b_backward,
-            'black_doubled': b_doubled,
-            'black_passed': b_passed,
-            'white_shield_pawns': ws['shield_pawns'],
-            'white_open_files': ws['open_files'],
-            'white_tropism': ws['tropism'],
-            'black_shield_pawns': bs['shield_pawns'],
-            'black_open_files': bs['open_files'],
-            'black_tropism': bs['tropism'],
-            'white_num_moves': wm['num_moves'],
-            'white_capture_ratio': wm['capture_ratio'],
-            'white_check_ratio': wm['check_ratio'],
-            'white_legal_enemy': wm['legal_enemy'],
-            'white_controlled_enemy': wm['controlled_enemy'],
-            'black_num_moves': bm['num_moves'],
-            'black_capture_ratio': bm['capture_ratio'],
-            'black_check_ratio': bm['check_ratio'],
-            'black_legal_enemy': bm['legal_enemy'],
-            'black_controlled_enemy': bm['controlled_enemy'],
-        }
+        # ---- batch insert ----
+        batch.append((
+            search_id, game_id, fen, game_phase, position_type,
+            tactical_score, positional_score, endgame_score, balance,
+            w_backward, w_doubled, w_passed,
+            b_backward, b_doubled, b_passed,
+            ws['shield_pawns'], ws['open_files'], ws['tropism'],
+            bs['shield_pawns'], bs['open_files'], bs['tropism'],
+            wm['num_moves'], wm['capture_ratio'], wm['check_ratio'],
+            wm['legal_enemy'], wm['controlled_enemy'],
+            bm['num_moves'], bm['capture_ratio'], bm['check_ratio'],
+            bm['legal_enemy'], bm['controlled_enemy'],
+        ))
 
-        cols = ','.join(features.keys())
-        placeholders = ','.join('?' for _ in features)
+        if len(batch) >= BATCH_SIZE:
+            _insert_batch(cnxn, batch)
+            batch = []
+            if (i + 1) % 5000 == 0:
+                print(f"    ...processed {i + 1}/{len(rows)}")
 
-        cnxn.execute(
-            f"INSERT INTO position_features ({cols}) VALUES ({placeholders})",
-            list(features.values())
+    # flush remaining
+    if batch:
+        _insert_batch(cnxn, batch)
+
+    print(f"  position_features: done ({len(rows)} rows inserted)")
+
+
+def _insert_batch(cnxn, batch):
+    """Insert a batch of position feature tuples."""
+    cnxn.executemany(
+        """
+        INSERT INTO position_features (
+            search_id, game_id, fen, game_phase, position_type,
+            pos_tactical, pos_positional, pos_endgame, balance,
+            white_backwards, white_doubled, white_passed,
+            black_backwards, black_doubled, black_passed,
+            white_shield_pawns, white_open_files, white_tropism,
+            black_shield_pawns, black_open_files, black_tropism,
+            white_num_moves, white_capture_ratio, white_check_ratio,
+            white_legal_enemy, white_controlled_enemy,
+            black_num_moves, black_capture_ratio, black_check_ratio,
+            black_legal_enemy, black_controlled_enemy
         )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        batch
+    )
 
 
 import duckdb
-import platform
 import shutil
-import time
-import datetime
+import os
 from pathlib import Path
-system = platform.system()
+from ..etl.paths import ANALYTICS_DB
 
 if __name__ == "__main__":
-    if system == "Windows":
-        DB = "F:/databases/chess_analytics.duckdb"
-    elif system == "Darwin":
-        DB = Path.home() / "Documents/databases/chess_analytics.duckdb"
+    DB = os.environ.get('CHESS_ANALYTICS_DB') or str(ANALYTICS_DB)
+    cwd_dir = Path(__file__).resolve().parent
 
     cnxn = duckdb.connect(DB)
 
@@ -614,7 +631,7 @@ if __name__ == "__main__":
                 return int(val) if val is not None else None
             except Exception:
                 return None
-
+    """
     def ensure_search_stats_columns(conn, N=3):
         cur = conn.execute("PRAGMA table_info('search_stats')").fetchall()
         cols = {r[1] for r in cur}
@@ -629,11 +646,13 @@ if __name__ == "__main__":
         if 'sf_pv' not in cols:
             conn.execute("ALTER TABLE search_stats ADD COLUMN sf_pv TEXT")
         # per-ply `sf_pv_#` columns deprecated: we only store full PV in `sf_pv` JSON
-
+    """
     def update_search_stats_with_stockfish(conn, engine_path=None, depth=12, mpv=3, limit=None, skip_existing=True):
         engine_path = find_engine(engine_path)
-        ensure_search_stats_columns(conn, mpv)
+        #ensure_search_stats_columns(conn, mpv)
         q = "SELECT id, fen FROM search_stats WHERE fen IS NOT NULL"
+        if skip_existing:
+            q += " AND sf_eval IS NULL"
         if limit and limit > 0:
             q += f" LIMIT {limit}"
         rows = conn.execute(q).fetchall()
@@ -642,22 +661,25 @@ if __name__ == "__main__":
         import chess.engine
 
         engine = chess.engine.SimpleEngine.popen_uci(engine_path)
-        # request MultiPV from engine so `info` contains multiple principal variations
+        # request MultiPV from engine so `info` contains multiple principal variations 
+        #   which # of stockfish's favorite moves did we play?
         N = int(mpv or 1)
         try:
             engine.configure({"MultiPV": N})
         except Exception:
             # some engine builds may not expose configure or MultiPV; continue
             pass
+
         updates = []
+        cnt = 0
+        print(f"  ...processing {len(rows)} search_stats rows with Stockfish depth={depth}, MultiPV={N}...")
         try:
             for sid, fen in rows:
-                if skip_existing:
-                    existing = conn.execute("SELECT sf_eval FROM search_stats WHERE id=? AND sf_eval IS NOT NULL LIMIT 1", (sid,)).fetchone()
-                    if existing:
-                        continue
+                if (cnt > 0 and ((len(rows) < 10000 and cnt % 1000 == 0) or (len(rows) >= 10000 and cnt % 10000 == 0))): print(f"  ...processed {cnt}/{len(rows)} search_stats rows")
+
                 board = chess.Board(fen)
                 t0 = time.time()
+                
                 try:
                     info = engine.analyse(board, chess.engine.Limit(depth=depth))
                     t1 = time.time()
@@ -679,8 +701,9 @@ if __name__ == "__main__":
 
                 import json
                 # build tuple: sf_eval, sf_best, sf_time_ms, sf_computed_at, sf_pv(JSON), id
-                rowvals = [sf_eval, sf_best, sf_time_ms, datetime.datetime.utcnow(), json.dumps(pv_uci), sid]
+                rowvals = [sf_eval, sf_best, sf_time_ms, datetime.datetime.now(datetime.UTC), json.dumps(pv_uci), sid]
                 updates.append(tuple(rowvals))
+                cnt += 1
         finally:
             engine.quit()
 
@@ -693,7 +716,14 @@ if __name__ == "__main__":
             print("No updates performed")
 
     try:
-        update_search_stats_with_stockfish(cnxn, engine_path=None, depth=12, mpv=5, limit=None, skip_existing=True)
+        update_search_stats_with_stockfish(
+            cnxn, 
+            engine_path=cwd_dir.parent.parent / "engines" / "stockfish" / "stockfish-windows-x86-64-avx2.exe", 
+            depth=8, 
+            mpv=1, 
+            limit=None, 
+            skip_existing=True
+        )
     except Exception as e:
         print(f"[WARN] Ground-truth computation failed or skipped: {e}")
 

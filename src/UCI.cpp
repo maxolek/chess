@@ -2,6 +2,10 @@
 #include <vector>
 #include <string>
 #include <iostream>
+#include <stats.h>
+
+
+namespace fs = std::filesystem;
 
 UCI::UCI(Engine& eng) {
     engine=&eng;
@@ -31,41 +35,55 @@ void UCI::handleCommand(const std::string& line) {
     Logging::logUCIin(line); // cmd -> engine
 
     // standard commands
-    if (token == "uci") {
+    if ((token == "uci") || (token == "uci_dev")) {
             std::cout << "id name tomahawk\n";
             std::cout << "id version " << ENGINE_ID << "\n";
             std::cout << "id author max oleksa\n";
 
             // engine options
-            std::cout << "option name Move Overhead type spin default " << engine->options.moveOverhead << " min 0 max 1000\n";
-            std::cout << "option name Threads type spin default " << engine->options.threads << " min 1 max 1\n";
-            std::cout << "option name Hash type spin default " << engine->options.hashSize << " min 1 max 1024\n";
-            std::cout << "option name Ponder type check default " << engine->options.ponder << "\n";
+            std::cout << "option name Move Overhead type spin default " << engine->engine_options.MOVE_OVERHEAD_MS << " min 0 max 1000\n";
+            std::cout << "option name Threads type spin default " << engine->engine_options.MAX_THREADS<< " min 1 max 1\n";
+            std::cout << "option name Hash type spin default " << engine->engine_options.HASH_SIZE_MB<< " min 1 max 1024\n";
+            std::cout << "option name Ponder type check default " << engine->engine_options.PONDERING << "\n";
+            if (token == "uci_dev") {std::cout << std::endl;} // line break
             // stats tracking
-            std::cout << "option name ShowStats type check default " << engine->options.showStats << "\n";
+            std::cout << "option name ShowStats type check default " << Logging::track_search_stats << "\n";
             // Required for lichess
-            std::cout << "option name UCI_ShowWDL type check default " << engine->options.uciShowWDL << "\n";
-            // -------- customization --------
-            std::cout << "option name MagicBitboards type check default " << engine->options.magics << "\n";
-            std::cout << "option name NNUE type check default " << engine->options.nnue << "\n";
-            // search
-            std::cout << "option name quiescence type check default " << engine->options.quiescence << "\n";
-            std::cout << "option name aspiration type check default " << engine->options.aspiration << "\n";
-            // move ordering
-            std::cout << "option name moveordering type check default " << engine->options.moveordering << "\n";
-            std::cout << "option name mvvlva_ordering type check default " << engine->options.mvvlva << "\n";
-            std::cout << "option name see_ordering type check default " << engine->options.see << "\n";
-            // pruning
-            std::cout << "option name delta_pruning type check default " << engine->options.delta_pruning << "\n";
-            std::cout << "option name see_pruning type check default " << engine->options.see_pruning << "\n";
-            // books
-            std::cout << "option name nnue_weight_file type string default " << engine->options.nnue_weight_path << "\n";
-            std::cout << "option name opening_book type string default " << engine->options.opening_book_path << "\n";
-            std::cout << "option name syzygy type string default " << engine->options.syzygyPath << "\n";
+            std::cout << "option name UCI_ShowWDL type check default " << engine->engine_options.UCI_SHOW_WDL << "\n";
+            
+            if (token == "uci_dev") {
+                std::cout << std::endl; // line break
+                // books
+                std::cout << "option name nnue_weight_file type string default " << engine->engine_options.nnue_weight_path << "\n";
+                std::cout << "option name opening_book type string default " << engine->engine_options.opening_book_path << "\n";
+                std::cout << "option name syzygy type string default " << engine->engine_options.syzygy_path << "\n\n";
+                // search params
+                std::cout << "option name delta_prune_threshold type spin default " << engine->searcher->params.DELTA_PRUNE_THRESHOLD << " min 0 max 10000\n";
+                std::cout << "option name see_prune_threshold type spin default " << engine->searcher->params.SEE_PRUNE_THRESHOLD << " min -1000 max 1000\n";
+                //      aspiration
+                std::cout << "option name aspiration_start_depth type spin default " << engine->searcher->params.ASPIRATION_START_DEPTH << " min 1 max 32\n";
+                std::cout << "option name aspiration_window type spin default " << engine->searcher->params.ASPIRATION_WINDOW << " min 1 max 1000\n";
+                std::cout << "option name aspiration_depth_scale type spin default " << engine->searcher->params.ASPIRATION_DEPTH_SCALE << " min 0 max 100\n";
+                std::cout << "option name aspiration_research_scale type spin default " << engine->searcher->params.ASPIRATION_RESEARCH_SCALE << " min 0 max 1000\n";
+                //       draw/contempt
+                std::cout << "option name draw_eval type spin default " << engine->searcher->params.DRAW_EVAL << " min 0 max 1000\n";
+                std::cout << "option name contempt type spin default " << engine->searcher->params.CONTEMPT << " min 0 max 10\n";
+                //      reductions
+                std::cout << "option name r_nmp type spin default " << engine->searcher->params.R_NMP << " min 0 max 32\n";
+                //          lmr
+                std::cout << "option name lmr_move_order_threshold type spin default " << engine->searcher->params.LMR_MOVE_ORDER_THRESHOLD << " min 0 max 256\n";
+                std::cout << "option name lmr_depth_threshold type spin default " << engine->searcher->params.LMR_DEPTH_THRESHOLD << " min 0 max 32\n";
+                std::cout << "option name r_lmr_const type spin default " << static_cast<int>(100*engine->searcher->params.R_LMR_CONST) << " min 0 max 200\n";
+                std::cout << "option name r_lmr_denom type spin default " << static_cast<int>(100*engine->searcher->params.R_LMR_DENOM) << " min 100 max 500\n";
+                // line break
+                std::cout << std::endl; 
+            }
+
             // logging
             std::cout << "option name log_dir type string default " << Logging::log_dir << "\n";
             std::cout << "option name uci_logging type check default " << Logging::track_uci << "\n";
             std::cout << "option name timer_logging type check default " << Logging::track_timers << "\n";
+            std::cout << "option name root_moves_logging type check default " << Logging::track_root_moves << "\n";
             std::cout << "option name stats_logging type check default " << Logging::track_search_stats << "\n";
             std::cout << "option name stats_nodes_only type check default " << Logging::track_search_nodes << "\n";
             std::cout << "option name game_logging type check default " << Logging::track_game_log << "\n";
@@ -94,6 +112,66 @@ void UCI::handleCommand(const std::string& line) {
     }
     else if (token == "quit") {
         engine->stopSearch();
+    }
+    else if (token == "config") { // see config options and apply
+        fs::path dir = fs::path(PROJECT_ROOT) / "bin/configs";
+
+        // print config options
+        std::cout << "Available config files:\n\n";
+
+        int idx = 1;
+        std::vector<fs::path> configs;
+
+        for (const auto& entry : fs::directory_iterator(dir)) {
+            if (!entry.is_regular_file()) continue;
+            if (entry.path().extension() != ".ini") continue;
+
+            configs.push_back(entry.path());
+
+            std::cout << "  [" << idx++ << "] "
+                    << entry.path().stem().string()
+                    << "\n";
+        }
+
+        if (configs.empty()) {
+            std::cout << "  (no config files found)\n";
+            return;
+        }
+
+        // user select config file
+        std::cout << "\nSelect config number: ";
+
+        int choice;
+        std::cin >> choice;
+
+        if (choice < 1 || choice > (int)configs.size()) {
+            std::cout << "Invalid selection.\n";
+            return;
+        }
+
+        // apply config
+        engine->apply_config_file(configs[choice - 1]);
+
+        // apply specifics (e.g. tt.resize)
+        engine->tt.resize(engine->engine_options.HASH_SIZE_MB);
+    }
+    else if (token == "apply_config") { // apply config option (without seeing options)
+        std::string name; 
+        iss >> name;
+
+        fs::path path = fs::path(PROJECT_ROOT) / "bin/configs" / name;
+        if (path.extension() != ".ini") path += ".ini";
+        
+        engine->apply_config_file(path);
+
+        // apply specifics (e.g. tt.resize)
+        engine->tt.resize(engine->engine_options.HASH_SIZE_MB);
+    }
+    else if (token == "save_config") { // save current config
+        std::string name;
+        iss >> name;
+
+        engine->create_config_file(name);
     }
     else if (token == "ponderhit") {
         //
@@ -145,7 +223,12 @@ void UCI::handleCommand(const std::string& line) {
         std::cout << "\n(Full game)   Fill %:     " << round_to_n_decimals(100*engine->tt.fillRatio(),2) << " %" << std::endl;
     }
     else if (token == "dumpstats") {
-        //engine->dumpStats(); // print collected stats to console for last search
+        dumpSearchStats(); // print collected stats to console for last search
+    }
+    else if (token == "clear_tt") {
+        std::cout << "Clearing ... " << engine->tt.filledCount << " / " << engine->tt.entriesCount << std::endl;
+        engine->tt.clear();
+        std::cout << "Cleared!" << std::endl;
     }
     else if (token == "bench") {
         //engine->bench(depth);  // implement bench mode

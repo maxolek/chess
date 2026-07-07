@@ -8,50 +8,54 @@
 #include "timer.h"
 #include "NNUE.h"
 
+
 class Engine;
 class Evaluator;
 class NNUE;
 
-struct RootMove {
-    Move move;
-    int eval;
+// ---- search constants ----
+struct SearchParams {
+    // delta / SEE
+    int   DELTA_PRUNE_THRESHOLD  = 1'000;
+    int   SEE_PRUNE_THRESHOLD    = -50;
+    // aspiration windows
+    int   ASPIRATION_WINDOW      = 50;
+    int   ASPIRATION_START_DEPTH = 6;
+    int   ASPIRATION_DEPTH_SCALE = 10;
+    float ASPIRATION_RESEARCH_SCALE = 2.0f;
+    // positional
+    int   DRAW_EVAL              = 0;
+    int   CONTEMPT               = 0;
+    // reductions
+    int   R_NMP                  = 3;      // null-move pruning
+    float R_LMR_CONST            = 0.99f;  // late move reductions 
+    float R_LMR_DENOM            = 3.14f;  //   = const + [log(depth) * log(move_order)] / denom
+    int   LMR_MOVE_ORDER_THRESHOLD = 3; // minimum move order # to start using LMR
+    int   LMR_DEPTH_THRESHOLD    = 2; // max search depth where LMR doesnt trigger
 };
 
-struct PV {
-    std::vector<Move> line;
-    void clear() { line.clear(); }
-    inline void set(Move first, const PV& child) {
-        line.clear();
-        line.reserve(1 + child.line.size());
-        line.push_back(first);
-        line.insert(line.end(), child.line.begin(), child.line.end());
-    }
-};
-
-struct SearchResult {
-    Move bestMove = Move::NullMove();
-    int eval = -MATE_SCORE;
-    //TaperedEvalReport eval_report;
-    PV best_line;
-    
-    RootMove root_moves[MAX_MOVES];
-    int root_count = 0;
-
-    inline void setPV(Move first, const PV& child) {
-        best_line.set(first, child);
-    }
+// ---- move ordering priorities ----
+struct MoveScores {
+    int TT_BASE       =  10'000'000;
+    int PV_BASE       =   9'000'000;
+    int PROMO_BASE    =   8'500'000;
+    int GOOD_CAP_BASE =   8'000'000;
+    int KILLER_BASE   =   7'000'000;
+    int QUIET_BASE    =           0;
+    int BAD_CAP_BASE  =  -1'000'000;
 };
 
 class Searcher {
 public:
-    static constexpr int KILL_SEARCH_RETURN = -5 * MATE_SCORE;
-    static constexpr int MAX_DELTA = 1000;
 
     // Object-owned state
     Engine& engine;
     Board& board; //= engine.search_board;
     Evaluator& eval; // = engine.evaluator;
-    NNUE& nnue; // = engine.evaluator.nnue;
+    NNUE& nnue; // = engine.nnue;
+
+    SearchParams params;
+    MoveScores move_scores;
 
     bool stop = false;
 
@@ -73,16 +77,8 @@ public:
         int move_count,
         int depth,
         SearchLimits& limits,
-        std::vector<Move>& previousPV
-    );
-
-    SearchResult searchAspiration(
-        Move potential_moves[MAX_MOVES],
-        int move_count,
-        int depth,
-        SearchLimits& limits,
         std::vector<Move>& previousPV,
-        int alpha, int beta
+        int previousEval
     );
 
     // --------------------------- Negamax & Quiescence --------------------------
@@ -93,8 +89,7 @@ public:
         PV& pv,
         std::vector<Move>& previousPV,
         SearchLimits& limits,
-        int ply,
-        bool inQSearch
+        int ply
     );
 
     int quiescence(
@@ -137,12 +132,16 @@ public:
         Move& move,
         int standPat,
         int alpha,
+        int search_depth,
         int ply
     );
 
-    // ------------------------------- Make/unmake w/ NNUE -------------------------------
-    void do_move(const Move& move);
-    void undo_move(const Move& move, const Board& before);
+    // -------------------------------- Search Reduction Parameters ----------------------------
+    int R_lmr(
+        int depth, 
+        int move_order
+    );
+
 };
 
 #endif // SEARCHER_H

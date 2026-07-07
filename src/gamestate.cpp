@@ -17,6 +17,7 @@ GameState::GameState() {
     enPassantFile = -1;
     castlingRights = 0b1111;
     fiftyMoveCounter = 0;
+    //was_in_check = false;
 }
 
 GameState::GameState(int capture_piece, int en_passant_file, int castling_rights, int fifty_move_count) {
@@ -24,6 +25,7 @@ GameState::GameState(int capture_piece, int en_passant_file, int castling_rights
     enPassantFile = en_passant_file;
     castlingRights = castling_rights;
     fiftyMoveCounter = fifty_move_count;
+    //was_in_check = false;
 }
 
 bool GameState::HasKingsideCastleRight(bool white) const {

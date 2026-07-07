@@ -88,6 +88,7 @@ int NNUE::evaluate(bool is_white_move) {
     Accumulator* us = is_white_move ? &acc_stm : &acc_ntm;
     Accumulator* them = is_white_move ? &acc_ntm : &acc_stm;
 
+    // activate, then multiple by weight and add to output (node)
     for (int i = 0; i < HIDDEN_SIZE; ++i)
         out64 += (int64_t)screlu(us->vals[i]) * (int32_t)l1w[i];
     for (int i = 0; i < HIDDEN_SIZE; ++i)
@@ -498,7 +499,7 @@ void NNUE::debug_replay_feature_changes(const Board& before,
               << feature_index_ntm(to, moved_piece, stm_after) << "\n";
 }
 
-
+/*
 bool NNUE::check_active_features_consistency(const Accumulator& incr,
                                              const Accumulator& full,
                                              const char* name,
@@ -595,3 +596,4 @@ void NNUE::debug_check_features_after_move(const Board& b) {
         abort();
     }
 }
+*/

@@ -1,5 +1,4 @@
-// Engine.cpp
-#include <engine.h>
+// engine_options.cpp
 #include <searcher.h>
 #include <iostream>
 #include <thread>
@@ -16,23 +15,21 @@ EngineMode mode = EngineMode::ANALYSIS;
 EngineSide side = EngineSide::UNKNOWN;
 GameTracker tracker;
 
-Engine::Engine()
-{
+Engine::Engine() {
     game_board = Board();
     search_board = game_board; //Board(game_board);
 
     movegen = std::make_unique<MoveGenerator>(search_board);
 
-    evaluator.nnue.load(options.nnue_weight_path);
-    evaluator.loadOpeningPST(options.opening_pst_path);
-    evaluator.loadEndgamePST(options.endgame_pst_path);
+    nnue.load(engine_options.nnue_weight_path);
+    evaluator.loadOpeningPST(engine_options.opening_pst_path);
+    evaluator.loadEndgamePST(engine_options.endgame_pst_path);
 
-    searcher = std::make_unique<Searcher>(*this, search_board, evaluator, evaluator.nnue);
+    searcher = std::make_unique<Searcher>(*this, search_board, evaluator, nnue);
     tt.clear();
 
-    book.load(options.opening_book_path);
+    book.load(engine_options.opening_book_path);
 
-    Logging::track_search_stats = options.showStats;
     g_stats = SearchStats();
 }
 
@@ -64,127 +61,128 @@ void Engine::setOption(const std::string& name, const std::string& value) {
         return val == "true" || val == "True" || val == "1";
     };
 
+    // --------- engine options ---------
     if (name == "Move Overhead") {
         limits.stopped = false;
-        options.moveOverhead = std::stoi(value);
-        std::cout << "info string set Move Overhead = " << options.moveOverhead << std::endl;
+        engine_options.MOVE_OVERHEAD_MS = std::stoi(value);
+        std::cout << "info string set Move Overhead = " << engine_options.MOVE_OVERHEAD_MS << std::endl;
     } 
     else if (name == "Hash") {
-        options.hashSize = std::stoi(value);
-        tt.resize(options.hashSize);
-        std::cout << "info string set Hash = " << options.hashSize << std::endl;
+        engine_options.HASH_SIZE_MB = std::stoi(value);
+        tt.resize(engine_options.HASH_SIZE_MB);
+        std::cout << "info string set Hash = " << engine_options.HASH_SIZE_MB << std::endl;
     } 
     else if (name == "Threads") {
-        options.threads = std::stoi(value);
+        engine_options.MAX_THREADS = std::stoi(value);
         // Apply threads to searcher
-        std::cout << "info string set Threads = " << options.threads << std::endl;
+        std::cout << "info string set Threads = " << engine_options.MAX_THREADS << std::endl;
     } 
     else if (name == "Ponder") {
-        options.ponder = boolFromString(value);
-        std::cout << "info string set Ponder = " << (options.ponder ? "true" : "false") << std::endl;
+        engine_options.PONDERING = boolFromString(value);
+        std::cout << "info string set Ponder = " << (engine_options.PONDERING ? "true" : "false") << std::endl;
     } 
     else if (name == "UCI_ShowWDL") {
-        options.uciShowWDL = boolFromString(value);
-        std::cout << "info string set UCI_ShowWDL = " << (options.uciShowWDL ? "true" : "false") << std::endl;
+        engine_options.UCI_SHOW_WDL = boolFromString(value);
+        std::cout << "info string set UCI_ShowWDL = " << (engine_options.UCI_SHOW_WDL ? "true" : "false") << std::endl;
     } 
     else if (name == "ShowStats") {
-        options.showStats = boolFromString(value);
-        Logging::track_search_stats = options.showStats;
-        std::cout << "info string set ShowStats = " << (options.showStats ? "true" : "false") << std::endl;
+        Logging::track_search_stats = boolFromString(value);
+        std::cout << "info string set ShowStats = " << (Logging::track_search_stats ? "true" : "false") << std::endl;
     }
 
-    // -------- customization --------
-    else if (name == "MagicBitboards") {
-        options.magics = boolFromString(value);
-        std::cout << "info string set MagicBitboards = " << (options.magics ? "true" : "false") << std::endl;
+    // -------- search params --------
+    else if (name == "delta_prune_threshold") {
+        searcher->params.DELTA_PRUNE_THRESHOLD = std::stoi(value);
+        std::cout << "info string set delta_prune_threshold = " << searcher->params.DELTA_PRUNE_THRESHOLD << std::endl;
     }
-    else if (name == "NNUE") {
-        options.nnue = boolFromString(value);
-        if (options.nnue) {
-            evaluator.nnue.load(options.nnue_weight_path); // load NNUE if path is set
-        }
-        std::cout << "info string set NNUE = " << (options.nnue ? "true" : "false") << std::endl;
+    else if (name == "see_prune_threshold") {
+        searcher->params.SEE_PRUNE_THRESHOLD = std::stoi(value);
+        std::cout << "info string set see_prune_threshold = " << searcher->params.SEE_PRUNE_THRESHOLD << std::endl;
     }
-
-    // -------- search --------
-    else if (name == "quiescence") {
-        options.quiescence = boolFromString(value);
-        std::cout << "info string set quiescence = " << (options.quiescence ? "true" : "false") << std::endl;
+    else if (name == "aspiration_start_depth") {
+        searcher->params.ASPIRATION_START_DEPTH = std::stoi(value);
+        std::cout << "info string set aspiration_start_depth = " << searcher->params.ASPIRATION_START_DEPTH << std::endl;
     }
-    else if (name == "aspiration") {
-        options.aspiration = boolFromString(value);
-        std::cout << "info string set aspiration = " << (options.aspiration ? "true" : "false") << std::endl;
+    else if (name == "aspiration_window") {
+        searcher->params.ASPIRATION_WINDOW = std::stoi(value);
+        std::cout << "info string set aspiration_window = " << searcher->params.ASPIRATION_WINDOW << std::endl;
     }
-    else if (name == "scorched_earth") {
-        options.scorched_earth = std::stoi(value);
-        std::cout << "info string set contempt " << options.scorched_earth << std::endl;
+    else if (name == "aspiration_start_depth") {
+        searcher->params.ASPIRATION_START_DEPTH = std::stoi(value);
+        std::cout << "info string set aspiration_start_depth = " << searcher->params.ASPIRATION_START_DEPTH << std::endl;
     }
-
-    // -------- move ordering --------
-    else if (name == "moveordering") {
-        options.moveordering = boolFromString(value);
-        std::cout << "info string set moveordering = " << (options.moveordering ? "true" : "false") << std::endl;
+    else if (name == "aspiration_research_scale") {
+        searcher->params.ASPIRATION_RESEARCH_SCALE = std::stoi(value);
+        std::cout << "info string set aspiration_research_scale = " << searcher->params.ASPIRATION_RESEARCH_SCALE << std::endl;
     }
-    else if (name == "mvvlva_ordering") {
-        options.mvvlva = boolFromString(value);
-        std::cout << "info string set mvvlva_ordering = " << (options.mvvlva ? "true" : "false") << std::endl;
+    else if (name == "draw_eval") {
+        searcher->params.DRAW_EVAL = std::stoi(value);
+        std::cout << "info string set draw_eval = " << searcher->params.DRAW_EVAL << std::endl;
     }
-    else if (name == "see_ordering") {
-        options.see = boolFromString(value);
-        std::cout << "info string set see_ordering = " << (options.see ? "true" : "false") << std::endl;
+    else if (name == "contempt") {
+        searcher->params.CONTEMPT = std::stoi(value);
+        std::cout << "info string set contempt = " << searcher->params.CONTEMPT << std::endl;
     }
-
-    // -------- pruning --------
-    else if (name == "delta_pruning") {
-        options.delta_pruning = boolFromString(value);
-        std::cout << "info string set delta_pruning = " << (options.delta_pruning ? "true" : "false") << std::endl;
+    else if (name == "r_nmp") {
+        searcher->params.R_NMP = std::stoi(value);
+        std::cout << "info string set r_nmp = " << searcher->params.R_NMP << std::endl;
     }
-    else if (name == "see_pruning") {
-        options.see_pruning = boolFromString(value);
-        std::cout << "info string set see_pruning = " << (options.see_pruning ? "true" : "false") << std::endl;
+    else if (name == "lmr_move_order_threshold") {
+        searcher->params.LMR_MOVE_ORDER_THRESHOLD = std::stoi(value);
+        std::cout << "info string set lmr_move_order_threshold = " << searcher->params.LMR_MOVE_ORDER_THRESHOLD << std::endl;
+    }
+    else if (name == "lmr_depth_threshold") {
+        searcher->params.LMR_DEPTH_THRESHOLD = std::stoi(value);
+        std::cout << "info string set lmr_depth_threshold = " << searcher->params.LMR_DEPTH_THRESHOLD << std::endl;
+    }
+    else if (name == "r_lmr_const") {
+        searcher->params.R_LMR_CONST = std::stoi(value);
+        std::cout << "info string set r_lmr_const = " << searcher->params.R_LMR_CONST << std::endl;
+    }
+    else if (name == "r_lmr_denom") {
+        searcher->params.R_LMR_DENOM = std::stoi(value);
+        std::cout << "info string set r_lmr_denom = " << searcher->params.R_LMR_DENOM << std::endl;
     }
 
     // -------- books / paths --------
     else if (name == "opening_pst_file") {
-        options.opening_pst_path = PROJECT_ROOT / fs::path("bin") / fs::path(value + ".txt");
-        if(evaluator.loadEndgamePST(options.opening_pst_path)) {
-            std::cout << "info string OpeningPST loaded successfully: " << options.opening_pst_path << std::endl;
+        engine_options.opening_pst_path = PROJECT_ROOT / fs::path("bin") / fs::path(value + ".txt");
+        if(evaluator.loadEndgamePST(engine_options.opening_pst_path)) {
+            std::cout << "info string OpeningPST loaded successfully: " << engine_options.opening_pst_path << std::endl;
         } else {
-            std::cout << "info string Failed to load OpeningPST: " << options.opening_pst_path << std::endl;
+            std::cout << "info string Failed to load OpeningPST: " << engine_options.opening_pst_path << std::endl;
         }
     }
     else if (name == "endgame_pst_file") {
-        options.endgame_pst_path = PROJECT_ROOT / fs::path("bin") / fs::path(value + ".txt");
-        if(evaluator.loadEndgamePST(options.endgame_pst_path)) {
-            std::cout << "info string EndgamePST loaded successfully: " << options.endgame_pst_path << std::endl;
+        engine_options.endgame_pst_path = PROJECT_ROOT / fs::path("bin") / fs::path(value + ".txt");
+        if(evaluator.loadEndgamePST(engine_options.endgame_pst_path)) {
+            std::cout << "info string EndgamePST loaded successfully: " << engine_options.endgame_pst_path << std::endl;
         } else {
-            std::cout << "info string Failed to load EndgamePST: " << options.endgame_pst_path << std::endl;
+            std::cout << "info string Failed to load EndgamePST: " << engine_options.endgame_pst_path << std::endl;
         }
     }
     else if (name == "nnue_weight_file") {
-        options.nnue_weight_path = PROJECT_ROOT / fs::path("bin/nnue_wgts") / fs::path(value + ".bin");
-        if (options.nnue) {
-            if(evaluator.nnue.load(options.nnue_weight_path)) {
-                std::cout << "info string NNUE loaded successfully: " << options.nnue_weight_path << std::endl;
-            } else {
-                std::cout << "info string Failed to load NNUE: " << options.nnue_weight_path << std::endl;
-            }
+        engine_options.nnue_weight_path = PROJECT_ROOT / fs::path("bin/nnue_wgts") / fs::path(value + ".bin");
+        if(nnue.load(engine_options.nnue_weight_path)) {
+            std::cout << "info string NNUE loaded successfully: " << engine_options.nnue_weight_path << std::endl;
+        } else {
+            std::cout << "info string Failed to load NNUE: " << engine_options.nnue_weight_path << std::endl;
         }
     }
     else if (name == "opening_book") {
-        options.opening_book_path = PROJECT_ROOT / fs::path("bin") / fs::path(value + ".bin"); // auto-construct full path
+        engine_options.opening_book_path = PROJECT_ROOT / fs::path("bin") / fs::path(value + ".bin"); // auto-construct full path
 
         if (!value.empty()) {
-            if (book.load(options.opening_book_path))
-                std::cout << "info string Book loaded successfully: " << options.opening_book_path << std::endl;
+            if (book.load(engine_options.opening_book_path))
+                std::cout << "info string Book loaded successfully: " << engine_options.opening_book_path << std::endl;
             else
-                std::cout << "info string Failed to load book: " << options.opening_book_path << std::endl;
+                std::cout << "info string Failed to load book: " << engine_options.opening_book_path << std::endl;
         }
     }
     else if (name == "SyzygyPath") {
-        options.syzygyPath = value;
+        engine_options.syzygy_path = value;
         //tablebases.load(value);
-        std::cout << "info string set SyzygyPath = " << options.syzygyPath << std::endl;
+        std::cout << "info string set SyzygyPath = " << engine_options.syzygy_path << std::endl;
     }
 
     // -------- logging --------
@@ -194,6 +192,9 @@ void Engine::setOption(const std::string& name, const std::string& value) {
     }
     else if (name == "timer_logging") {
         if (Logging::track_timers != boolFromString(value)) {Logging::setTrackTimers(boolFromString(value));}
+    }
+    else if (name == "root_moves_logging") {
+        if (Logging::track_root_moves != boolFromString(value)) {Logging::setTrackRootMoves(boolFromString(value));}
     }
     else if (name == "stats_logging") {
         if (Logging::track_search_stats != boolFromString(value)) {Logging::setTrackSearchStats(boolFromString(value));}
@@ -217,45 +218,34 @@ void Engine::setOption(const std::string& name, const std::string& value) {
 
 
 void Engine::print_info() {
+    // UCI options
     std::cout << "option name Hash type spin value "
-              << options.hashSize << " min 1 max 8192\n";
+              << engine_options.HASH_SIZE_MB << " min 1 max 8192\n";
     std::cout << "option name Threads type spin value "
-              << options.threads << " min 1 max 64\n";
+              << engine_options.MAX_THREADS << " min 1 max 64\n";
     std::cout << "option name Move Overhead type spin value "
-              << options.moveOverhead << " min 0 max 5000\n";
+              << engine_options.MOVE_OVERHEAD_MS << " min 0 max 5000\n";
     std::cout << "option name Ponder type check value "
-              << (options.ponder ? "true" : "false") << "\n";
+              << (engine_options.PONDERING ? "true" : "false") << "\n";
     std::cout << "option name UCI_ShowWDL type check value "
-              << (options.uciShowWDL ? "true" : "false") << "\n";
+              << (engine_options.UCI_SHOW_WDL ? "true" : "false") << "\n";
     std::cout << "option name ShowStats type check value "
-              << (options.showStats ? "true" : "false") << "\n";
-    // feature toggles
-    std::cout << "option name Magics type check value "
-              << (options.magics ? "true" : "false") << "\n";
-
-    std::cout << "option name NNUE type check value "
-              << (options.nnue ? "true" : "false") << "\n";
-
-    std::cout << "option name Quiescence type check value "
-              << (options.quiescence ? "true" : "false") << "\n";
-
-    std::cout << "option name Aspiration type check value "
-              << (options.aspiration ? "true" : "false") << "\n";
+              << (Logging::track_search_stats ? "true" : "false") << "\n";
     // paths
     std::cout << "option name OpeningPST type string value "
-              << options.opening_pst_path << "\n";
+              << engine_options.opening_pst_path << "\n";
 
     std::cout << "option name EndgamePST type string value "
-              << options.endgame_pst_path << "\n";
+              << engine_options.endgame_pst_path << "\n";
 
     std::cout << "option name NNUEWeights type string value "
-              << options.nnue_weight_path << "\n";
+              << engine_options.nnue_weight_path << "\n";
 
     std::cout << "option name OpeningBook type string value "
-              << options.opening_book_path << "\n";
+              << engine_options.opening_book_path << "\n";
 
     std::cout << "option name SyzygyPath type string value "
-              << options.syzygyPath << "\n";
+              << engine_options.syzygy_path << "\n";
 
     std::cout << "option name LogsDir type string value "
               << Logging::log_dir << "\n";
@@ -379,7 +369,7 @@ void Engine::computeSearchTime(const SearchSettings& settings) {
     // hard coded time/depth
     if (settings.movetime > 0 || settings.depth > 0) {
         limits = SearchLimits(
-            settings.movetime - options.moveOverhead,
+            settings.movetime - engine_options.MOVE_OVERHEAD_MS,
             settings.depth
         );
         return;
@@ -397,17 +387,17 @@ void Engine::computeSearchTime(const SearchSettings& settings) {
         * aggressiveness
     );
 
-    timeBudget = std::max(10, timeBudget - options.moveOverhead);
+    timeBudget = std::max(10, timeBudget - engine_options.MOVE_OVERHEAD_MS);
 
     limits = SearchLimits(timeBudget);
 }
 
 
 void Engine::startSearch() {
-    evaluator.nnue.build_accumulators(search_board);
+    nnue.build_accumulators(search_board);
 
     // book probe
-    if (!options.opening_book_path.empty()) {
+    if (!engine_options.opening_book_path.empty()) {
         uint64_t key = search_board.zobrist_hash;
         auto bookMoves = book.get_moves(key);
 
@@ -444,7 +434,6 @@ void Engine::startSearch() {
 
     computeSearchTime(settings);
     iterativeDeepening();
-
     sendBestMove(bestMove);
 }
 
@@ -469,16 +458,13 @@ void Engine::ponderHit() {
 // ------ principle move ordering
 
 void Engine::iterativeDeepening() {
-    ScopedTimer engineTimer(T_SEARCH); // top-level engine timer
+    //ScopedTimer timer(T_ROOT);
     auto start_time = std::chrono::steady_clock::now();
-    //limits.start_time = start_time;
-    //limits.max_depth = (limits.max_depth < 0) ? 30 : std::min(limits.max_depth, 30);
-    //limits.stopped = false;
     g_run_context.search_uuid = generate_uuid();
 
     // reset global stats
     if (Logging::track_search_stats) {
-        g_stats = SearchStats{};           // global-level
+        resetSearchStats();           // global-level
     }
 
     SearchResult last_result;
@@ -489,63 +475,33 @@ void Engine::iterativeDeepening() {
     int count = movegen->generateMoves(game_board, false);
     std::copy_n(movegen->moves, count, first_moves);
 
-    int aspiration_start_depth = 6;
-    int delta = 50;
-    int alpha = -MATE_SCORE;
-    int beta = MATE_SCORE;
-
     std::fill(std::begin(last_eval_table), std::end(last_eval_table), INVALID);
 
     int depth = 1;
     Move prevBest = Move::NullMove();
 
+    // --- iterative deepening loop ---
     while (!limits.should_stop(depth)) {
-        ScopedTimer timer(T_ROOT);
         auto depth_start = std::chrono::steady_clock::now();
         g_stats.max_depth = depth;
 
         // --- move ordering ---
-        if (depth > 1) {
+        if (depth > 1) { // sort by prev iteration elos
             std::sort(first_moves, first_moves + count,
                       [&](Move a, Move b) { return get_prev_eval(a) > get_prev_eval(b); });
-
-            if (depth >= aspiration_start_depth) {
-                delta = std::max(delta, 50 + depth * 10);
-                alpha = last_result.eval - delta;
-                beta  = last_result.eval + delta;
-            }
-        } else {
+        } else { // first search: order like typical mid-tree ordering
             searcher->orderedMoves(first_moves, count, game_board, 0, {});
         }
 
         // --- search ---
-        if (depth < aspiration_start_depth) {
-            result = searcher->search(first_moves, count, depth, limits,
-                                     last_result.best_line.line);
-        } else {
-            while (true) {
-                result = searcher->searchAspiration(first_moves, count, depth, limits,
-                                                   last_result.best_line.line,
-                                                   alpha, beta);
+        result = searcher->search(first_moves, count, depth, limits,
+                                     last_result.best_line.line, last_result.eval);
 
-                if (Logging::track_search_stats) {
-                    if (result.eval <= alpha) STATS_ASPIRATION_FAILLOW(depth);
-                    else if (result.eval >= beta) STATS_ASPIRATION_FAILHIGH(depth);
-                }
-
-                if (result.eval <= alpha) alpha -= delta;
-                else if (result.eval >= beta) beta += delta;
-                else break;
-
-                delta *= 2;
-            }
-        }
 
         // --- store results ---
         if (!Move::SameMove(result.bestMove, Move::NullMove())) {
             last_result = result;
             store_last_result(result);
-            g_stats.max_completed_depth = depth;
         }
 
         // --- determine best move and eval ---
@@ -560,6 +516,7 @@ void Engine::iterativeDeepening() {
         // --- update per-depth stats ---
         auto depth_end = std::chrono::steady_clock::now();
 
+        // --- logging --- 
         if (Logging::track_search_stats) {
             //g_stats.max_completed_depth = depth;
             g_stats.it_depth_eval[depth] = result.eval;
@@ -567,10 +524,19 @@ void Engine::iterativeDeepening() {
             g_stats.it_depth_time_ms[depth] = std::chrono::duration<double, std::milli>(depth_end - depth_start).count();
             //if (Move::SameMove(bestMove, prevBest)) g_stats.bestmoveStable++;
         }
+        // log per-root-move timing data
+        if (Logging::track_timers && result.root_count > 0) {
+            logRootMoves(result, depth);
+        }
 
         prevBest = bestMove;
         if (std::abs(result.eval) >= MATE_SCORE - 10) break;
         depth++;
+        // if only 1 legal move, perform depth 2 search then play move
+        // depth 2 to get fair eval with recaptures, etc. (very fast)
+        // but quit early since we know what were going to play anyway
+        // still want fair eval for continuation metrics, etc.
+        if ((count == 1) && (depth == 3)) break;
     }
 
     // --- finalize cumulative stats ---
@@ -593,7 +559,6 @@ void Engine::iterativeDeepening() {
         logSearchStats(game_board.getBoardFEN());  // JSON written once at end
     }
     if (Logging::track_timers) {logTimingStats(game_board.getBoardFEN());}
-
 }
 
 
@@ -688,7 +653,7 @@ bool Engine::checkGameEnd() {
     g_game_end_time = std::chrono::steady_clock::now();
     g_gamelog.totalTimeSeconds = std::chrono::duration<double>(g_game_end_time - g_game_start_time).count();
     g_gamelog.moves = game_board.allGameMoves;
-    g_gamelog.finalEval = evaluator.nnue.full_eval(game_board);
+    g_gamelog.finalEval = nnue.full_eval(game_board);
     logGameLog();
     g_gamelog.finalized = true;
 
@@ -720,14 +685,106 @@ void Engine::trackGame() {
 }
 
 void Engine::finalizeGameLog() {
-    g_gamelog.finalEval = evaluator.nnue.full_eval(game_board);
+    g_gamelog.finalEval = nnue.full_eval(game_board);
     logGameLog();
+}
+
+// CONFIG
+
+void Engine::apply_config_file(const fs::path& path) {
+    auto kv = parse_kv(path);
+    auto get = [&](const std::string& k) -> const std::string* {
+        auto it = kv.find(k); return it != kv.end() ? &it->second : nullptr;
+    };
+    auto b = [](const std::string& v) { return v == "true" || v == "1"; };
+
+    // SearchParams
+    if (auto* v = get("delta_prune_threshold"))    searcher->params.DELTA_PRUNE_THRESHOLD               = std::stoi(*v);
+    if (auto* v = get("see_prune_threshold"))      searcher->params.SEE_PRUNE_THRESHOLD      = std::stoi(*v);
+    if (auto* v = get("aspiration_window"))        searcher->params.ASPIRATION_WINDOW        = std::stoi(*v);
+    if (auto* v = get("aspiration_start_depth"))   searcher->params.ASPIRATION_START_DEPTH   = std::stoi(*v);
+    if (auto* v = get("aspiration_depth_scale"))   searcher->params.ASPIRATION_DEPTH_SCALE  = std::stoi(*v);
+    if (auto* v = get("aspiration_research_scale"))searcher->params.ASPIRATION_RESEARCH_SCALE = std::stof(*v);
+    if (auto* v = get("draw_eval"))                searcher->params.DRAW_EVAL                = std::stoi(*v);
+    if (auto* v = get("contempt"))                 searcher->params.CONTEMPT                 = std::stoi(*v);
+    if (auto* v = get("r_nmp"))                    searcher->params.R_NMP                    = std::stoi(*v);
+    if (auto* v = get("r_lmr_const"))              searcher->params.R_LMR_CONST              = std::stof(*v);
+    if (auto* v = get("r_lmr_denom"))              searcher->params.R_LMR_DENOM              = std::stof(*v);
+    if (auto* v = get("lmr_move_order_threshold")) searcher->params.LMR_MOVE_ORDER_THRESHOLD              = std::stof(*v);
+    if (auto* v = get("lmr_depth_threshold"))      searcher->params.LMR_DEPTH_THRESHOLD              = std::stof(*v);
+
+    // EngineOptions
+    if (auto* v = get("move_overhead_ms")) engine_options.MOVE_OVERHEAD_MS= std::stoi(*v);
+    if (auto* v = get("hash_size_mb"))     engine_options.HASH_SIZE_MB     = std::stoi(*v);
+    if (auto* v = get("max_threads"))     engine_options.MAX_THREADS     = std::stoi(*v);
+    if (auto* v = get("pondering"))        engine_options.PONDERING         = b(*v);
+    if (auto* v = get("nnue_weight_path"))  engine_options.nnue_weight_path  = Logging::project_root / *v;
+    if (auto* v = get("opening_book_path")) engine_options.opening_book_path = Logging::project_root / *v;
+    if (auto* v = get("syzygy_path"))       engine_options.syzygy_path       = Logging::project_root / *v;  
+}
+
+void Engine::create_config_file(std::string config_name) {
+    // ensure .ini extension
+    if (config_name.size() < 4 || config_name.substr(config_name.size() - 4) != ".ini")
+        config_name += ".ini";
+
+    fs::path dir = fs::path(PROJECT_ROOT) / "bin/configs";
+    fs::create_directories(dir);  // ensure directory exists
+    fs::path out_path = dir / config_name;
+
+    std::ofstream f(out_path);
+    if (!f) {
+        std::cerr << "Error: could not open " << out_path << " for writing.\n";
+        return;
+    }
+
+    auto b = [](bool v) -> std::string { return v ? "true" : "false"; };
+
+    // helper: write a relative path (strip PROJECT_ROOT prefix if present)
+    auto rel = [](const fs::path& p) -> std::string {
+        const fs::path root = fs::path(PROJECT_ROOT);
+        std::error_code ec;
+        fs::path r = fs::relative(p, root, ec);
+        return (!ec && !r.empty()) ? r.generic_string() : p.generic_string();
+    };
+
+    f << "# =========================================================\n"
+      << "# " << fs::path(config_name).stem().string() << " Engine Configuration\n"
+      << "# =========================================================\n\n";
+
+    // ── [search] ─────────────────────────────────────────────────────────────
+    f << "[search]\n"
+      << "delta_prune_threshold      = " << searcher->params.DELTA_PRUNE_THRESHOLD      << "\n"
+      << "see_prune_threshold        = " << searcher->params.SEE_PRUNE_THRESHOLD        << "\n\n"
+      << "aspiration_window          = " << searcher->params.ASPIRATION_WINDOW          << "\n"
+      << "aspiration_start_depth     = " << searcher->params.ASPIRATION_START_DEPTH     << "\n"
+      << "aspiration_depth_scale     = " << searcher->params.ASPIRATION_DEPTH_SCALE     << "\n"
+      << "aspiration_research_scale  = " << searcher->params.ASPIRATION_RESEARCH_SCALE  << "\n\n"
+      << "draw_eval                  = " << searcher->params.DRAW_EVAL                  << "\n"
+      << "contempt                   = " << searcher->params.CONTEMPT                   << "\n\n"
+      << "r_nmp                      = " << searcher->params.R_NMP                      << "\n"
+      << "r_lmr_const                = " << searcher->params.R_LMR_CONST                << "\n"
+      << "r_lmr_denom                = " << searcher->params.R_LMR_DENOM                << "\n\n"
+      << "lmr_move_order_threshold   = " << searcher->params.LMR_MOVE_ORDER_THRESHOLD   << "\n"
+      << "lmr_depth_threshold        = " << searcher->params.LMR_DEPTH_THRESHOLD        << "\n\n\n";
+
+    // ── [engine] ──────────────────────────────────────────────────────────────
+    f << "[engine]\n"
+      << "move_overhead_ms  = " << engine_options.MOVE_OVERHEAD_MS   << "\n"
+      << "max_threads       = " << engine_options.MAX_THREADS        << "\n"
+      << "hash_size_mb      = " << engine_options.HASH_SIZE_MB       << "\n"
+      << "pondering         = " << b(engine_options.PONDERING)       << "\n\n"
+      << "nnue_weight_path  = " << fs::relative(engine_options.nnue_weight_path,  Logging::project_root).generic_string() << "\n"
+      << "opening_book_path = " << fs::relative(engine_options.opening_book_path, Logging::project_root).generic_string() << "\n"
+      << "syzygy_path       = " << fs::relative(engine_options.syzygy_path,       Logging::project_root).generic_string() << "\n";
+
+    std::cout << "Config written to " << out_path << "\n";
 }
 
 // TESTING
 
 uint64_t Engine::perft(int depth) {
-    ScopedTimer timer(T_PERFT);
+    //ScopedTimer timer(T_PERFT);
     if (depth == 0) {return 1;}
 
     uint64_t nodes = 0;
@@ -822,8 +879,8 @@ void Engine::staticEvalTest() {
 
 
 void Engine::nnueEvalTest() {
-    evaluator.nnue.build_accumulators(search_board);
-    int eval = evaluator.nnue.evaluate(search_board.is_white_move);
+    nnue.build_accumulators(search_board);
+    int eval = nnue.evaluate(search_board.is_white_move);
 
     if (!search_board.is_white_move) eval = -eval;
 

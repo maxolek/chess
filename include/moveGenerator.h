@@ -11,6 +11,7 @@
 #include "move.h"
 #include "board.h"
 
+
 class MoveGenerator {
 public:
     // ------------------------
@@ -27,7 +28,6 @@ public:
     // Storage Type
     // -----------------------
     bool quiescence = false;
-    
 
     // ------------------------
     // Constructor
@@ -42,11 +42,13 @@ public:
     // quiescence limited generation (check-evasions, captures, promotions, limited quiet moves)
     // Check if side has any legal moves (accelerated generation)
     bool hasLegalMoves(const Board& _board);
+    // classic move generation method
+    //U64 odiff(U64 occ, SMasks pMask);
 
     // ------------------------
     // Individual Piece Move Generators
     // ------------------------
-    void generateSlidingMoves(bool ours);
+    void generateSlidingMoves(bool ours); // magic bitboards
     void generateKnightMoves(bool ours);
     void generatePawnPushes(bool ours);
     void generatePawnAttacks(bool ours);

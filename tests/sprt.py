@@ -6,7 +6,8 @@ import sys
 from datetime import datetime
 import sqlite3
 from data import etl
-import re 
+import re
+import shutil
 from pathlib import Path
 import time
 from datetime import datetime, timezone
@@ -23,6 +24,21 @@ SPRT_LOG_DIR = LOGS_DIR / "sprt_logs"
 GAME_JSON = SPRT_LOG_DIR / "game.jsonl"
 SEARCH_JSON = SPRT_LOG_DIR / "search.jsonl"
 TIMING_JSON = SPRT_LOG_DIR / "timing.jsonl"
+ROOT_MOVES_JSON = SPRT_LOG_DIR / "root_moves.jsonl"
+
+def _consolidate_instance_logs(logroot):
+    logroot = Path(logroot)
+    for basename in ("game", "search", "timing", "root_moves"):
+        parts = sorted(logroot.glob(f"{basename}_*.jsonl"))
+        if not parts:
+            continue
+
+        output_path = logroot / f"{basename}.jsonl"
+        with open(output_path, "w", encoding="utf-8") as out_f:
+            for part in parts:
+                with open(part, "r", encoding="utf-8") as in_f:
+                    shutil.copyfileobj(in_f, out_f)
+
 
 def parse_cutechess_output(output, candidate_name="Candidate"):
 
@@ -139,15 +155,27 @@ def parse_cutechess_output(output, candidate_name="Candidate"):
 
 
 def upload_logs(args, cute_chess_stats, runtime=None):
+    print("[DATA] Preparing to upload logs to database...")
+
     if system == "Windows": cnxn = sqlite3.connect('F:/databases/chess.db')
     elif system == "Darwin": cnxn = sqlite3.connect(Path.home() / "Documents/databases/chess.db")
 
+    print("[DATA] Probing engine metadata...")
     candidate_engine_version = etl.probe_engine_metadata(args.engine_a)['version']
     baseline_engine_version = etl.probe_engine_metadata(args.engine_b)['version']
 
     # get engine_id by probing db.engines via version
+    print("[DATA] Retrieving engine ids...")
     candidate_engine_id = etl.get_engine_id(cnxn, version=candidate_engine_version)
     baseline_engine_id = etl.get_engine_id(cnxn, version=baseline_engine_version)
+
+    # auto-register if not found
+    if candidate_engine_id is None:
+        print(f"[SPRT] Candidate engine {candidate_engine_version} not registered, registering now...")
+        candidate_engine_id = etl.register_engine(cnxn, {"engine_path": args.engine_a})
+    if baseline_engine_id is None:
+        print(f"[SPRT] Baseline engine {baseline_engine_version} not registered, registering now...")
+        baseline_engine_id = etl.register_engine(cnxn, {"engine_path": args.engine_b})
 
     # log sprt experiment
     sprt_id = etl.start_experiment(
@@ -157,31 +185,46 @@ def upload_logs(args, cute_chess_stats, runtime=None):
         comparison_engine_id = baseline_engine_id
     )
 
+    # Only consolidate and ingest JSONL data if logging was enabled
+    ingestion_ok = False
+    if args.log:
+        # consolidate per-instance log files from concurrent engine processes
+        print("[DATA] Consolidating per-instance log files...")
+        _consolidate_instance_logs(args.logroot)
 
-    # map search --> game
-    game_map = etl.bulk_log_game(
-        cnxn, 
-        GAME_JSON, 
-        sprt_id,
-        baseline_engine_id
-    )
+        try:
+            # map search --> game
+            print("[DATA] Building game map ...")
+            game_map = etl.bulk_log_game(
+                cnxn, 
+                GAME_JSON, 
+                sprt_id,
+            )
 
-    # log search+timing with game mapping
-    etl.bulk_log_search_and_timing(
-        cnxn, 
-        SEARCH_JSON,
-        game_map, 
-        timing_path=TIMING_JSON,
-        engine_id=candidate_engine_id
-    )
+            # log search+timing with game mapping
+            print("[DATA] Logging all search data ...")
+            etl.bulk_log_search_and_timing(
+                cnxn, 
+                SEARCH_JSON,
+                game_map, 
+                timing_path=TIMING_JSON,
+                root_moves_path=ROOT_MOVES_JSON
+            )
+            ingestion_ok = True
+        except Exception as e:
+            print(f"[DATA] JSONL ingestion failed: {e}")
+            print("[DATA] Log files preserved for retry.")
+    else:
+        print("[DATA] Logging was disabled, skipping JSONL ingestion.")
 
-    # log sprt experiment details in db.sprt
+    # log sprt experiment details in db.sprt (always, regardless of --log)
+    args_dict = {k: (str(v) if isinstance(v, Path) else v) for k, v in vars(args).items()}
     etl.log_sprt(
         cnxn,
         sprt_id,  # experiment_id
         candidate_engine_id,
         baseline_engine_id,
-        **{**vars(args), **cute_chess_stats},
+        **{**args_dict, **cute_chess_stats},
         runtime=runtime
     )
     etl.update_experiment(
@@ -190,8 +233,11 @@ def upload_logs(args, cute_chess_stats, runtime=None):
         {"end_time_utc": datetime.now(timezone.utc).isoformat()}
     )
 
-    etl.clear_log_dir(args.logroot)
-    print(f"[DATA] Logging completed for SPRT {sprt_id}.")
+    # Only clear log directory if ingestion succeeded
+    if args.log and ingestion_ok:
+        print("[DATA] Clearing log directory...")
+        etl.clear_log_dir(args.logroot)
+        print(f"[DATA] Logging completed for SPRT {sprt_id}.")
 
 
 def parse_args():
@@ -219,10 +265,11 @@ def parse_args():
     p.add_argument("--alpha", type=float, default=0.05)
     p.add_argument("--beta", type=float, default=0.05)
     p.add_argument("--max-games", type=int, default=1000)
+    p.add_argument("--concurrency", type=int, default=2, help="Number of concurrent games")
 
     # Opening book
     p.add_argument("--book", default= PROJECT_ROOT / "bin" / "opening_books" / "8moves_v3.pgn" , help="Opening book file")
-    p.add_argument("--book-depth", type=int, default=8)
+    p.add_argument("--book-depth", type=int, default=16) # 8 full moves
 
     # Logging
     p.add_argument('--log', action="store_true", help="Flag to turn on logging for candidate engine")
@@ -249,6 +296,16 @@ def main(args=None):
     engine_a = os.path.abspath(args.engine_a)
     engine_b = os.path.abspath(args.engine_b)
 
+    if args.time is not None:
+        fast_tc = args.time <= 0.25
+    else:  # args.tc must exist
+        base_sec = 60*int(re.split(":", args.tc)[0]) + int(re.split(":", args.tc)[1][:2])
+        fast_tc = base_sec <= 30
+    should_log = args.log and fast_tc
+
+    if (should_log):
+        print("[SPRT] Logging enabled for candidate engine (low time control ... logging can affect performance at these search speeds)")
+
     each_block = [
         "-each",
         "proto=uci"
@@ -258,20 +315,23 @@ def main(args=None):
         f"option.timer_logging={"true" if args.log else "false"}",
         f"option.stats_logging={"true" if args.log else "false"}",
         f"option.game_logging={"true" if args.log else "false"}",
-        f"option.uci_logging=false",
+        f"option.root_moves_logging={"true" if args.log else "false"}",
+        f"option.uci_logging=true",
     ]
     log_b_block = [
-        "option.timer_logging=false",
-        "option.stats_logging=false",
-        "option.game_logging=false",
-        "option.uci_logging=false",
+        f"option.log_dir={args.logroot}",
+        f"option.timer_logging={"true" if should_log else "false"}",
+        f"option.stats_logging={"true" if should_log else "false"}",
+        f"option.game_logging={"true" if should_log else "false"}",
+        f"option.root_moves_logging={"true" if should_log else "false"}",
+        f"option.uci_logging={"true" if should_log else "false"}",
     ]
 
     # Time control
     if args.depth is not None:
         each_block.append(f"depth={args.depth}")
     elif args.time is not None:
-        each_block += [f"st={args.time}", "timemargin=100"]
+        each_block += [f"st={args.time}", "timemargin=30"]
     else:
         each_block.append(f"tc={args.tc}")
 
@@ -316,7 +376,7 @@ def main(args=None):
 
         # Runtime
         "-repeat",
-        "-concurrency", "2",
+        "-concurrency", str(args.concurrency),
         "-pgnout", os.path.join(args.logroot, "cc_sprt.pgn"),
     ]
 
@@ -326,19 +386,48 @@ def main(args=None):
     output_lines = []
     start_time = time.time()
 
+    stdout_log_path = Path(args.logroot) / "cutechess_stdout.log"
+    stderr_log_path = Path(args.logroot) / "cutechess_stderr.log"
+
+    #stdout_f = open(stdout_log_path, "w", encoding="utf-8")
+    #stderr_f = open(stderr_log_path, "w", encoding="utf-8")
+
     with subprocess.Popen(
         cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
+        #stderr=subprocess.PIPE,   # IMPORTANT: do NOT merge streams
         text=True,
         bufsize=1  # line-buffered
     ) as proc:
-
+        
         for line in proc.stdout:
             print(line, end="")      # live console output
             output_lines.append(line)
 
+        """
+        # read both streams until process ends
+        while True:
+            out_line = proc.stdout.readline() if proc.stdout else ""
+            err_line = proc.stderr.readline() if proc.stderr else ""
+
+            if out_line:
+                print(out_line, end="")
+                stdout_f.write(out_line)
+                output_lines.append(out_line)
+
+            if err_line:
+                print("[ERR]", err_line, end="")
+                stderr_f.write(err_line)
+
+            if not out_line and not err_line and proc.poll() is not None:
+                break
+        """
+
         ret = proc.wait()
+
+    #stdout_f.close()
+    #stderr_f.close()
 
     if ret != 0:
         raise subprocess.CalledProcessError(ret, cmd)
@@ -350,7 +439,7 @@ def main(args=None):
     upload_logs(args, cute_chess_stats=stats, runtime=run_time)
 
     print("[SPRT] Completed successfully")
-    print(f"[SPRT] Logs written to {args.logroot}")
+    #print(f"[SPRT] Logs written to {args.logroot}")
 
 
 if __name__ == "__main__":

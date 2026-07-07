@@ -80,7 +80,7 @@ bool MoveGenerator::hasLegalMoves(const Board& _board) {
         if (count > 0) {return true;}
         generateKnightMoves(true);
         if (count > 0) {return true;}
-        generateSlidingMoves(true);
+        generateSlidingMoves(false);
         if (count > 0) {return true;}
         generateKingMoves(true);
         if (count > 0) {return true;}
@@ -169,8 +169,11 @@ bool MoveGenerator::isEnpassantPinned(int start_square, int target_file) {
     return false;
 }
 
-// post_move_attacks_only is used to update postEnpassantOpponentAttackMap without updating other vars
-//      since this is used to ensure enpassant legality it is only necessary for rook/queen pieces
+// -----------------------
+// ---- sliding moves ----
+// -----------------------
+
+// magic bitboards
 void MoveGenerator::generateSlidingMoves(bool ours) {
     U64 occ = own | opp;
     Move potential_move;
@@ -215,6 +218,67 @@ void MoveGenerator::generateSlidingMoves(bool ours) {
     }
 }
 
+// sliding bitboards
+/*
+U64 MoveGenerator::odiff(U64 occ, SMasks pMask) {
+    U64 lower, upper, ms1b, odiff_board;
+    lower = pMask.lower & occ;
+    upper = pMask.upper & occ;
+
+    ms1b = U64(0x8000000000000000) >> __builtin_clzll(lower | 1); // ms1b of lower (at least bit zero)
+    odiff_board = upper ^ (upper - ms1b);
+
+    return pMask.lineEx & odiff_board;
+}
+
+void MoveGenerator::generateSlidingMoves(bool ours) {
+
+    auto processSlider = [&](U64 pieces, int num_dirs, auto attack_fn) {
+        while (pieces) {
+            int start_square = getLSB(pieces);
+            pieces &= pieces - 1;
+
+            for (int dir = 0; dir < num_dirs; dir++) {
+                const auto& atk = attack_fn(start_square, dir);
+                U64 potential = Bits::fullSet;
+
+                if (!ours) {
+                     U64 o_diff = odiff(own | opp, atk);
+                    potential &= o_diff & ~opp;
+                    opponentAttackMap |= o_diff;
+
+                    if (potential & (own & kings)) {
+                        in_double_check = in_check;
+                        check_ray_mask     |= PrecomputedMoveData::rayMasks[start_square][own_king_square];
+                        check_ray_mask_ext |= PrecomputedMoveData::alignMasks[start_square][own_king_square];
+                        in_check = true;
+                    }
+                    if (atk.lineEx & (own & kings))
+                        pin_rays |= PrecomputedMoveData::rayMasks[start_square][own_king_square] & ~(1ULL << own_king_square);
+
+                } else {
+                    potential &= odiff(own | opp, atk) & ~own;
+                    ownAttackMap |= potential;
+
+                    potential = limitPinnedMoves(start_square, potential);
+                    potential = restrictCheckMoves(potential);
+
+                    addMovesFromBitboard(start_square, potential);
+                }
+            }
+        }
+    };
+
+    processSlider(rooks   & (ours ? own : opp), 2, [](int s, int d) -> const auto& { return PrecomputedMoveData::blankRookAttacks[s][d];   });
+    processSlider(bishops & (ours ? own : opp), 2, [](int s, int d) -> const auto& { return PrecomputedMoveData::blankBishopAttacks[s][d]; });
+    processSlider(queens  & (ours ? own : opp), 4, [](int s, int d) -> const auto& { return PrecomputedMoveData::blankQueenAttacks[s][d];  });
+}
+*/
+
+// ----------------------------
+// -- static move generation --
+// ----------------------------
+
 void MoveGenerator::generateKnightMoves(bool ours) {
     U64 valid_knights = ours ? knights & own : knights & opp;
     Move potential_move;
@@ -245,21 +309,32 @@ void MoveGenerator::generatePawnPushes(bool ours) {
     if (!ours) {return;}
 
     U64 valid_pawns = ours ? pawns & own : pawns & opp;
+    U64 potential_moves_bb;
     Move potential_move;
+    int start_square;
+
+    bool on_starting_rank;
+    int one_step, two_step;
+
+    bool print_output = false;
 
     while (valid_pawns) {
-        int start_square = getLSB(valid_pawns);
+        start_square = getLSB(valid_pawns);
         valid_pawns &= valid_pawns - 1;
+
+        print_output = false;
 
         // Start with the pawn's forward move mask
         // do not update attacks as pawn pushes cannot be direct attacks
-        U64 potential_moves_bb = PrecomputedMoveData::blankPawnMoves[start_square][side];
+        potential_moves_bb = PrecomputedMoveData::blankPawnMoves[start_square][side];
         potential_moves_bb &= ~(own|opp);  // cannot push into pieces
 
         // Remove double push if blocked
-        int one_step = start_square + ((side == 0) ? 8 : -8);
-        int two_step = start_square + ((side == 0) ? 16 : -16);
-        if (!get_bit(potential_moves_bb, one_step)) {
+        on_starting_rank = (side == 0) ? (((1ULL << start_square) & Bits::mask_rank_2) != 0) 
+                                        : (((1ULL << start_square) & Bits::mask_rank_7) != 0);
+        one_step = start_square + ((side == 0) ? 8 : -8);
+        two_step = start_square + ((side == 0) ? 16 : -16);
+        if (on_starting_rank && !get_bit(potential_moves_bb, one_step)) {
             potential_moves_bb &= ~(1ULL << two_step);
         }
 

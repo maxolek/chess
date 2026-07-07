@@ -22,14 +22,22 @@
 #include <cstring>
 #include <cassert>
 #include <mutex>
+#include <climits>
+#include <cstddef>
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 typedef uint64_t U64;
 typedef unsigned short ushort;
 
-constexpr const char* STARTPOS_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-constexpr int MATE_SCORE = 100000;
-constexpr int MAX_DEPTH = 64;
-constexpr int MAX_MOVES = 256; 
+// config defaults
+inline constexpr const char* STARTPOS_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"; 
+inline constexpr int  INF                   = 999'999;
+inline constexpr int  MATE_SCORE            = 100'000;
+inline constexpr int  KILL_SEARCH_RETURN    = -5 * MATE_SCORE;
+inline constexpr int  MAX_MOVES             = 256;
+inline constexpr int  MAX_DEPTH             = 32;
 
 // board squares
 enum {
@@ -129,6 +137,8 @@ uint64_t read_u64_be(std::ifstream &file);
 uint32_t read_u32_be(std::ifstream &file);
 uint16_t read_u16_be(std::ifstream &file);
 
+// config file functions
+std::unordered_map<std::string, std::string> parse_kv(const fs::path& path);
 
 // function to get the cardinal direction from start_square -> target_square
 //      clockwise from N indexing

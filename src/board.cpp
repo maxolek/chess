@@ -41,6 +41,8 @@ Board::Board(const Board& other) {
 void Board::MakeMove(Move move) {
     ScopedTimer timer(T_MAKEMOVE);
 
+    //currentGameState.was_in_check = is_in_check;
+
     int old_castling = currentGameState.castlingRights;
     int oldEp = currentGameState.enPassantFile;
     if (oldEp > -1) zobrist_hash ^= zobrist_enpassant[oldEp];
@@ -210,6 +212,7 @@ void Board::UnmakeMove(Move move) {
     is_in_check = inCheck(true);
     gameStateHistory.pop_back();
     currentGameState = gameStateHistory.back();
+    //is_in_check = currentGameState.was_in_check;
     
 
     // --- Castling hash ---
@@ -227,6 +230,53 @@ void Board::UnmakeMove(Move move) {
     allGameMoves.pop_back();
 }
 
+// -----------------------------------
+// Null Moves
+// -----------------------------------
+
+// minimal implementations of moves
+// no hash updates, move history, or game state updates since these are not needed 
+// for null move pruning and would be expensive to maintain
+void Board::MakeNullMove() {
+    //ScopedTimer timer(T_MAKENULLMOVE);
+
+    //zobrist_hash ^= zobrist_side_to_move;
+    is_white_move = !is_white_move;
+    move_color = 1 - move_color;
+
+    currentGameState.enPassantFile = -1; // clear EP square on null move
+    currentGameState.capturedPieceType = -1; // clear last capture on null move
+
+    //hash_history[zobrist_hash]++;
+    //zobrist_history.push_back(zobrist_hash);
+    //gameStateHistory.push_back(currentGameState);
+}
+
+void Board::UnmakeNullMove() {
+    //ScopedTimer timer(T_UNMAKENULLMOVE);
+
+    //auto it = hash_history.find(zobrist_hash);
+    //if (it != hash_history.end()) {
+    //    it->second--;
+    //   if (it->second <= 0)
+    //        hash_history.erase(it);
+    //    zobrist_history.pop_back();
+    //} //else {
+        // Optional: error check
+        //std::cerr << "UnmakeNullMove: hash not found in history!\n";
+        // Maybe abort or handle gracefully
+    //}
+
+    //zobrist_hash ^= zobrist_side_to_move;
+    is_white_move = !is_white_move;
+    move_color = 1 - move_color;
+
+    //gameStateHistory.pop_back();
+
+    // since we never touch the gameStateHistory() in null move
+    // we dont need to .pop_back() and can just restore the previous state
+    currentGameState = gameStateHistory.back();
+}
 
 // ------------------------------------------------------------
 // Bitboard manipulation helpers
@@ -268,6 +318,18 @@ void Board::CapturePiece(int piece, int target_square, bool is_enpassant, bool c
         pop_bit(pieceBitboards[piece], target_square);
         pop_bit(colorBitboards[1-move_color], target_square);
         zobrist_hash ^= zobrist_table[(1-move_color)*6 + piece][target_square];
+    }
+
+    if (
+        !pawn_endgame
+        && (
+            pieceBitboards[knight] == 0
+            && pieceBitboards[bishop] == 0
+            && pieceBitboards[rook] == 0
+            && pieceBitboards[queen] == 0
+        )
+    ) {
+        pawn_endgame = true;
     }
 }
 
@@ -494,7 +556,7 @@ void Board::setBoardFEN() {
 // ------------------------------------------------------------
 // print board
 // ------------------------------------------------------------
-void Board::print_board() const {
+void Board::print_board() {
     char pieces[64];
     for (int i=63;i>=0;i--) pieces[i]='.';
 
@@ -512,20 +574,22 @@ void Board::print_board() const {
 
     if (!allGameMoves.empty()) allGameMoves.back().PrintMove();
     std::cout << "\n\n";
-    for (int row=7;row>=0;row++){
+    for (int row=7;row>=0;row--){
         std::cout << row+1 << "  ";
         for (int col=0;col<8;col++) std::cout << "[" << pieces[row*8+col] << "] ";
         std::cout << "\n";
     }
     std::cout << "\n    a   b   c   d   e   f   g   h\n\n";
 
+    setBoardFEN();
     std::cout << fen << "\n";
     std::cout << "\nMove: " << plyCount/2 << "\n";
     std::cout << (is_white_move?"White to move":"Black to move") << "\n";
     std::cout << (is_in_check?"Check":"") << "\n";
     std::cout << "Castling Rights: " << currentGameState.castlingRights << "\n";
     std::cout << "50 Move Counter: " << currentGameState.fiftyMoveCounter << "\n";
-    std::cout << "En Passant: " << currentGameState.enPassantFile << "\n\n";
+    std::cout << "En Passant: " << currentGameState.enPassantFile << "\n";
+    std::cout << "Captured Piece: " << currentGameState.capturedPieceType << "\n\n";
 }
 
 // ------------------------------------------------------------

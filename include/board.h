@@ -30,7 +30,7 @@ public:
     bool is_white_move;                  ///< True if white to move
     int move_color;                      ///< 0=white, 1=black
     bool is_in_check;                    ///< True if the side to move is in check
-    bool is_audit_mode = true;
+    bool pawn_endgame = false;          ///< True if only kings and pawns remain (for quick NMP verification)
 
     // ==================== Move & position history ====================
     std::vector<Move> allGameMoves;            ///< All moves played
@@ -69,8 +69,10 @@ public:
     Board(const Board& other); // deep copy search->game boards
 
     // ==================== Move execution ====================
-    void MakeMove(Move move = false);   ///< Apply a move and update board state
-    void UnmakeMove(Move move = false); ///< Undo a move
+    void MakeMove(Move move = false);               ///< Apply a move and update board state
+    void UnmakeMove(Move move = false);             ///< Undo a move
+    void MakeNullMove();                            ///< Apply a null move (pass turn)
+    void UnmakeNullMove();  ///< Undo a null move
 
     // ==================== Piece manipulation ====================
     void putPiece(int pt12, int sq);         ///< Place a piece on a square
@@ -116,7 +118,7 @@ public:
     //U64 polyglotCastlingHash(int castling_rights); ///< Hash from castling rights
 
     // ==================== Debug ====================
-    void print_board() const; ///< Pretty-print board with FEN and additional info
+    void print_board(); ///< Pretty-print board with FEN and additional info
 };
 
 #endif // BOARD_H

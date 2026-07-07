@@ -1,12 +1,11 @@
 import sqlite3
 from pathlib import Path
-
-dir = "F:/databases"
+from ..etl.paths import RAW_DB
 
 # long form function that create the database
 # and some associated tables
 
-def init_engine_db(db_dir=dir) -> None:
+def init_raw_db(db_dir=None) -> None:
 
     """
         input: directory of database
@@ -14,6 +13,7 @@ def init_engine_db(db_dir=dir) -> None:
 
         executed: creates the engine database and 6 tables
             engines         -- information about engines and versions
+            engine_ratings  -- ratings for ^^ calculated from round-robin tournament
             experiments     -- information about engine processes (e.g. sprt/sts)
             search_summary  -- high level search info (e.g. nodes, time)
             search_depth    -- per-depth search info (e.g. eval per depth)
@@ -22,10 +22,11 @@ def init_engine_db(db_dir=dir) -> None:
     """
 
     # dir + path
-    db_dir = Path(db_dir)
+    db_dir = Path(db_dir) if db_dir else RAW_DB.parent
     db_dir.mkdir(parents=True, exist_ok=True)
 
     db_path = db_dir / "chess.db"
+    print(f"[DB] Initializing raw database at: {db_path}")
 
     # cnxn + cursor
     cnxn = sqlite3.connect(db_path)
@@ -43,7 +44,29 @@ def init_engine_db(db_dir=dir) -> None:
             version                     TEXT NOT NULL,
             description                 TEXT,
             compile_flags               TEXT,
-            uci_options                 TEXT, 
+            
+            -- UCI engine options
+            move_overhead_ms            INTEGER,
+            max_threads                 INTEGER,
+            hash_size_mb                INTEGER,
+            pondering                   BOOLEAN,
+
+            -- search params
+            delta_prune_threshold       INTEGER,
+            see_prune_threshold         INTEGER,
+            aspiration_window           INTEGER,
+            aspiration_start_depth      INTEGER,
+            aspiration_depth_scale      INTEGER,
+            aspiration_research_scale   REAL,
+            draw_eval                   INTEGER,
+            contempt                    INTEGER,
+            r_nmp                       INTEGER,
+            r_lmr_const                 REAL,
+            r_lmr_denom                 REAL,
+            lmr_move_order_threshold    INTEGER,
+            lmr_depth_threshold         INTEGER,
+
+            --
 
             ingestion_timestamp_utc   DATETIME DEFAULT CURRENT_TIMESTAMP
         );
@@ -61,6 +84,31 @@ def init_engine_db(db_dir=dir) -> None:
             start_time_utc          DATETIME DEFAULT CURRENT_TIMESTAMP,
             end_time_utc            DATETIME,
             metadata                TEXT, 
+
+            FOREIGN KEY (engine_id) REFERENCES engines(id)
+        );
+    """
+
+    engine_ratings_str = """
+        CREATE TABLE IF NOT EXISTS engine_ratings (
+            id                          INTEGER PRIMARY KEY AUTOINCREMENT,
+            engine_id                   INTEGER NOT NULL,
+
+            -- elo by time control
+            elo_ultra_fast              REAL, -- < 15 sec/game
+            elo_bullet                  REAL, -- < 1 min/game
+            elo_blitz                   REAL, -- < 10 min/game
+            elo_rapid                   REAL, -- < 30 min/game
+            elo_classical               REAL, -- >= 30 min/game
+
+            -- supporting stats
+            games_ultra_fast            INTEGER DEFAULT 0,
+            games_bullet                INTEGER DEFAULT 0,
+            games_blitz                 INTEGER DEFAULT 0,
+            games_rapid                 INTEGER DEFAULT 0,
+            games_classical             INTEGER DEFAULT 0,
+
+            ingestion_timestamp_utc     DATETIME DEFAULT CURRENT_TIMESTAMP,
 
             FOREIGN KEY (engine_id) REFERENCES engines(id)
         );
@@ -98,6 +146,9 @@ def init_engine_db(db_dir=dir) -> None:
             fail_low_researches         INTEGER,
             see_prunes                  INTEGER,
             delta_prunes                INTEGER,
+            nmp                         INTEGER,
+            nmp_fail                    INTEGER,
+            tt_overwritten              INTEGER,
 
             ingestion_timestamp_utc     DATETIME DEFAULT CURRENT_TIMESTAMP,
             
@@ -133,6 +184,9 @@ def init_engine_db(db_dir=dir) -> None:
             fail_low_researches         INTEGER,
             see_prunes                  INTEGER,
             delta_prunes                INTEGER,
+            pvs_researches              INTEGER,
+            nmp                         INTEGER,
+            nmp_fail                    INTEGER,
 
             ingestion_timestamp_utc     DATETIME DEFAULT CURRENT_TIMESTAMP,
             
@@ -160,6 +214,9 @@ def init_engine_db(db_dir=dir) -> None:
             fail_high_late              INTEGER,
             see_prunes                  INTEGER,
             delta_prunes                INTEGER,
+            pvs_researches              INTEGER,
+            nmp                         INTEGER,
+            nmp_fail                    INTEGER,
 
             ingestion_timestamp_utc     DATETIME DEFAULT CURRENT_TIMESTAMP,
 
@@ -179,6 +236,24 @@ def init_engine_db(db_dir=dir) -> None:
             ingestion_timestamp_utc   DATETIME DEFAULT CURRENT_TIMESTAMP,
 
             PRIMARY KEY (search_id, function),
+            FOREIGN KEY (search_id) REFERENCES searches(id)
+        );
+    """
+
+    # per-root-move timing and node counts
+    root_moves_str = """
+        CREATE TABLE IF NOT EXISTS root_moves (
+            id                          INTEGER PRIMARY KEY AUTOINCREMENT,
+            search_id                   INTEGER NOT NULL,
+            depth                       INTEGER NOT NULL,
+            move_index                  INTEGER NOT NULL,
+            move                        TEXT NOT NULL,
+            eval                        INTEGER,
+            time_ms                     INTEGER,
+            nodes                       INTEGER,
+
+            ingestion_timestamp_utc     DATETIME DEFAULT CURRENT_TIMESTAMP,
+
             FOREIGN KEY (search_id) REFERENCES searches(id)
         );
     """
@@ -253,7 +328,7 @@ def init_engine_db(db_dir=dir) -> None:
             candidate_black_draws           INTEGER,
         -- summaries
             games_played                    INTEGER,
-            run_time_s                      INTEGER,
+            run_time_s                      REAL,
 
             ingestion_timestamp_utc         DATETIME DEFAULT CURRENT_TIMESTAMP,
             
@@ -318,6 +393,7 @@ def init_engine_db(db_dir=dir) -> None:
     #   order: top -> down ... engines -> tests -> games -> searches -> timing/details
     for script in [
         engines_str,
+        engine_ratings_str,         # FK(engines.id)
         experiments_str,            # FK(engines.id)
         sprt_test_str,              # FK(engines.id)
         sts_test_str,               # FK(engines.id)
@@ -326,11 +402,12 @@ def init_engine_db(db_dir=dir) -> None:
         search_summary_stats_str,   # FK(engines.id) + FK(games.id) + FK(sprt.id) + FK(sts.id)
         search_depth_stats_str,     # FK(searches.id)
         search_ply_stats_str,       # FK(searches.id)
-        timing_stats_str            # FK(searches.id)
+        timing_stats_str,           # FK(searches.id)
+        root_moves_str              # FK(searches.id)
     ]:
         cur.executescript(script)
-
     cnxn.commit()
+    print(f"[DB] Raw database initialized with schema at {db_path}")
 
 if __name__ == "__main__":
-    init_engine_db()
+    init_raw_db()

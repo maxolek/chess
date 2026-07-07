@@ -1,7 +1,6 @@
 #ifndef EVALUATOR_H
 #define EVALUATOR_H
 
-#include "NNUE.h"
 #include "board.h"
 #include "helpers.h"
 #include "PrecomputedMoveData.h" // masks
@@ -101,9 +100,6 @@ class Evaluator {
 private:
 public:
     Evaluator();
-
-    // nnue
-    NNUE nnue;
 
     // MVV-LVA
     int mvvLvaTable[6][6];

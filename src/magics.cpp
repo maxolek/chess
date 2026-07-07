@@ -9,6 +9,46 @@ namespace Magics {
     U64 bishopMagics[64];
     int rookShifts[64];
     int bishopShifts[64];
+
+    // Known-good magic numbers (from Surge engine, public domain)
+    // These work at standard bit counts (popcount of mask)
+    static constexpr U64 ROOK_MAGICS_CONST[64] = {
+        0x0080001020400080ULL, 0x0040001000200040ULL, 0x0080081000200080ULL, 0x0080040800100080ULL,
+        0x0080020400080080ULL, 0x0080010200040080ULL, 0x0080008001000200ULL, 0x0080002040800100ULL,
+        0x0000800020400080ULL, 0x0000400020005000ULL, 0x0000801000200080ULL, 0x0000800800100080ULL,
+        0x0000800400080080ULL, 0x0000800200040080ULL, 0x0000800100020080ULL, 0x0000800040800100ULL,
+        0x0000208000400080ULL, 0x0000404000201000ULL, 0x0000808010002000ULL, 0x0000808008001000ULL,
+        0x0000808004000800ULL, 0x0000808002000400ULL, 0x0000010100020004ULL, 0x0000020000408104ULL,
+        0x0000208080004000ULL, 0x0000200040005000ULL, 0x0000100080200080ULL, 0x0000080080100080ULL,
+        0x0000040080080080ULL, 0x0000020080040080ULL, 0x0000010080800200ULL, 0x0000800080004100ULL,
+        0x0000204000800080ULL, 0x0000200040401000ULL, 0x0000100080802000ULL, 0x0000080080801000ULL,
+        0x0000040080800800ULL, 0x0000020080800400ULL, 0x0000020001010004ULL, 0x0000800040800100ULL,
+        0x0000204000808000ULL, 0x0000200040008080ULL, 0x0000100020008080ULL, 0x0000080010008080ULL,
+        0x0000040008008080ULL, 0x0000020004008080ULL, 0x0000010002008080ULL, 0x0000004081020004ULL,
+        0x0000204000800080ULL, 0x0000200040008080ULL, 0x0000100020008080ULL, 0x0000080010008080ULL,
+        0x0000040008008080ULL, 0x0000020004008080ULL, 0x0000800100020080ULL, 0x0000800041000080ULL,
+        0x00FFFCDDFCED714AULL, 0x007FFCDDFCED714AULL, 0x003FFFCDFFD88096ULL, 0x0000040810002101ULL,
+        0x0001000204080011ULL, 0x0001000204000801ULL, 0x0001000082000401ULL, 0x0001FFFAABFAD1A2ULL
+    };
+
+    static constexpr U64 BISHOP_MAGICS_CONST[64] = {
+        0x0002020202020200ULL, 0x0002020202020000ULL, 0x0004010202000000ULL, 0x0004040080000000ULL,
+        0x0001104000000000ULL, 0x0000821040000000ULL, 0x0000410410400000ULL, 0x0000104104104000ULL,
+        0x0000040404040400ULL, 0x0000020202020200ULL, 0x0000040102020000ULL, 0x0000040400800000ULL,
+        0x0000011040000000ULL, 0x0000008210400000ULL, 0x0000004104104000ULL, 0x0000002082082000ULL,
+        0x0004000808080800ULL, 0x0002000404040400ULL, 0x0001000202020200ULL, 0x0000800802004000ULL,
+        0x0000800400A00000ULL, 0x0000200100884000ULL, 0x0000400082082000ULL, 0x0000200041041000ULL,
+        0x0002080010101000ULL, 0x0001040008080800ULL, 0x0000208004010400ULL, 0x0000404004010200ULL,
+        0x0000840000802000ULL, 0x0000404002011000ULL, 0x0000808001041000ULL, 0x0000404000820800ULL,
+        0x0001041000202000ULL, 0x0000820800101000ULL, 0x0000104400080800ULL, 0x0000020080080080ULL,
+        0x0000404040040100ULL, 0x0000808100020100ULL, 0x0001010100020800ULL, 0x0000808080010400ULL,
+        0x0000820820004000ULL, 0x0000410410002000ULL, 0x0000082088001000ULL, 0x0000002011000800ULL,
+        0x0000080100400400ULL, 0x0001010101000200ULL, 0x0002020202000400ULL, 0x0001010101000200ULL,
+        0x0000410410400000ULL, 0x0000208208200000ULL, 0x0000002084100000ULL, 0x0000000020880000ULL,
+        0x0000001002020000ULL, 0x0000040408020000ULL, 0x0004040404040000ULL, 0x0002020202020000ULL,
+        0x0000104104104000ULL, 0x0000002082082000ULL, 0x0000000020841000ULL, 0x0000000000208800ULL,
+        0x0000000010020200ULL, 0x0000000404080200ULL, 0x0000040404040400ULL, 0x0002020202020200ULL
+    };
     
     void initMagics() {
         for (int sq = 0; sq < 64; ++sq) {
@@ -16,139 +56,28 @@ namespace Magics {
             rookMasks[sq] = maskRook(sq);
             int rookBits = __builtin_popcountll(rookMasks[sq]);
             rookShifts[sq] = 64 - rookBits;
+            rookMagics[sq] = ROOK_MAGICS_CONST[sq];
 
             std::vector<U64> occupancies = generateAllOccupancies(rookMasks[sq]);
-            std::vector<U64> attacks(occupancies.size());
             for (size_t i = 0; i < occupancies.size(); ++i) {
-                attacks[i] = rookAttacksOnTheFly(sq, occupancies[i]);
-            }
-
-            while (true) {
-                U64 magic = generateCandidateMagic();
-                std::vector<U64> used(1ULL << rookBits, 0ULL);
-                bool fail = false;
-
-                for (size_t i = 0; i < occupancies.size(); ++i) {
-                    size_t index = (occupancies[i] * magic) >> (64 - rookBits);
-                    if (used[index] == 0ULL) {
-                        used[index] = attacks[i];
-                    } else if (used[index] != attacks[i]) {
-                        fail = true;
-                        break;
-                    }
-                }
-
-                if (!fail) {
-                    rookMagics[sq] = magic;
-                    for (size_t i = 0; i < occupancies.size(); ++i) {
-                        size_t index = (occupancies[i] * magic) >> (64 - rookBits);
-                        rookAttackTable[sq][index] = attacks[i];
-                    }
-                    break;
-                }
+                size_t index = (occupancies[i] * rookMagics[sq]) >> rookShifts[sq];
+                rookAttackTable[sq][index] = rookAttacksOnTheFly(sq, occupancies[i]);
             }
 
             // Bishop
             bishopMasks[sq] = maskBishop(sq);
             int bishopBits = __builtin_popcountll(bishopMasks[sq]);
             bishopShifts[sq] = 64 - bishopBits;
+            bishopMagics[sq] = BISHOP_MAGICS_CONST[sq];
 
             std::vector<U64> bOccupancies = generateAllOccupancies(bishopMasks[sq]);
-            std::vector<U64> bAttacks(bOccupancies.size());
             for (size_t i = 0; i < bOccupancies.size(); ++i) {
-                bAttacks[i] = bishopAttacksOnTheFly(sq, bOccupancies[i]);
-            }
-
-            while (true) {
-                U64 magic = generateCandidateMagic();
-                std::vector<U64> used(1ULL << bishopBits, 0ULL);
-                bool fail = false;
-
-                for (size_t i = 0; i < bOccupancies.size(); ++i) {
-                    size_t index = (bOccupancies[i] * magic) >> (64 - bishopBits);
-                    if (used[index] == 0ULL) {
-                        used[index] = bAttacks[i];
-                    } else if (used[index] != bAttacks[i]) {
-                        fail = true;
-                        break;
-                    }
-                }
-
-                if (!fail) {
-                    bishopMagics[sq] = magic;
-                    for (size_t i = 0; i < bOccupancies.size(); ++i) {
-                        size_t index = (bOccupancies[i] * magic) >> (64 - bishopBits);
-                        bishopAttackTable[sq][index] = bAttacks[i];
-                    }
-                    break;
-                }
+                size_t index = (bOccupancies[i] * bishopMagics[sq]) >> bishopShifts[sq];
+                bishopAttackTable[sq][index] = bishopAttacksOnTheFly(sq, bOccupancies[i]);
             }
         }
-
-        /*for (int sq = 0; sq < 64; ++sq) {
-            for (U64 occ : generateAllOccupancies(rookMasks[sq])) {
-                int index = (occ * rookMagics[sq]) >> rookShifts[sq];
-                if (rookAttackTable[sq][index] != rookAttacksOnTheFly(sq, occ)) {
-                    std::cerr << "Mismatch at rook square " << sq << std::endl;
-                }
-                if (bishopAttackTable[sq][index] != bishopAttacksOnTheFly(sq, occ)) {
-                    std::cerr << "Mismatch at bishop square " << sq << std::endl;
-                }
-            }
-        }*/
     }
 
-
-    // brute force
-    bool findMagic(int sq, int bits, bool rook, Magic& outMagic) {
-        U64 mask = rook ? maskRook(sq) : maskBishop(sq);
-        std::vector<U64> occupancies = generateAllOccupancies(mask);
-        std::vector<U64> attacks(occupancies.size());
-
-        for (size_t i = 0; i < occupancies.size(); ++i) {
-            attacks[i] = rook
-                ? rookAttacksOnTheFly(sq, occupancies[i])
-                : bishopAttacksOnTheFly(sq, occupancies[i]);
-        }
-
-        for (int trial = 0; trial < 1000000; ++trial) {
-            U64 magic = generateCandidateMagic(); // You need a good generator
-            std::vector<U64> table(1ULL << bits, 0ULL);
-            bool fail = false;
-
-            for (size_t i = 0; i < occupancies.size(); ++i) {
-                size_t index = (occupancies[i] * magic) >> (64 - bits);
-                if (table[index] == 0ULL) {
-                    table[index] = attacks[i];
-                } else if (table[index] != attacks[i]) {
-                    fail = true;
-                    break;
-                }
-            }
-
-            if (!fail) {
-                outMagic = { mask, magic, 64 - bits, new U64[1ULL << bits] };
-                for (size_t i = 0; i < occupancies.size(); ++i) {
-                    size_t index = (occupancies[i] * magic) >> (64 - bits);
-                    outMagic.attacks[index] = attacks[i];
-                }
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    
-    U64 randomU64() {
-        //std::mt19937_64 rng(time(0));
-        return rng();
-    }
-
-    U64 generateCandidateMagic() {
-        // AND multiple randoms to get sparse number, which is typical for magic numbers
-        return randomU64() & randomU64() & randomU64();
-    }
 
     // relevant occupancy masks
     U64 maskRook(int sq) {
