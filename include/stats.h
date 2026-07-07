@@ -78,6 +78,7 @@ struct SearchStats {
     std::array<int, STATS_MAX_ITER_DEPTH> it_depth_eval{};
     std::array<Move, STATS_MAX_ITER_DEPTH> it_depth_move{};
     //std::vector<std::vector<Move>> it_depth_pv;
+    std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_qdepth{};
     std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_nodes{};
     std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_qnodes{};
     std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_ttstores{};
@@ -149,6 +150,7 @@ inline void resetSearchStats() {
             /*STATS_BOUNDS_CHECK(it_d, ply);*/                    \
             g_stats.qnodes++;                               \
             g_stats.it_depth_qnodes[it_d]++;                \
+            g_stats.it_depth_qdepth[it_d] = std::max(g_stats.it_depth_qdepth[it_d], ply); \
             g_stats.tree_depth_qnodes[ply]++;               \
             g_stats.max_qdepth = std::max(g_stats.max_qdepth, ply); \
         }                                                   \
@@ -385,6 +387,7 @@ inline void logSearchStats(const std::string& fen = "") {
         << "\"itdepth_move\":" << moves_to_json(g_stats.it_depth_move, n) << ","
         << "\"itdepth_nodes\":" << array_to_json(g_stats.it_depth_nodes, n) << ","
         << "\"itdepth_qnodes\":" << array_to_json(g_stats.it_depth_qnodes, n) << ","
+        << "\"itdepth_qdepth\":" << array_to_json(g_stats.it_depth_qdepth, n) << ","
         << "\"itdepth_tthits\":" << array_to_json(g_stats.it_depth_tthits, n) << ","
         << "\"itdepth_ttstores\":" << array_to_json(g_stats.it_depth_ttstores, n) << ","
         << "\"itdepth_fail_highs\":" << array_to_json(g_stats.it_depth_fail_highs, n) << ","

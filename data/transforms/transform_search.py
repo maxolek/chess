@@ -8,22 +8,47 @@ single wide fact table for dashboarding and analysis:
 
 ASPIRATION_START_DEPTH = 6
 
-def build_search_iterations_features(cnxn):
+
+def _table_exists(cnxn, table):
+    try:
+        cnxn.execute(f"SELECT 1 FROM {table} LIMIT 1")
+        return True
+    except Exception:
+        return False
+
+
+def _max_search_id(cnxn, table, col='search_id'):
+    """Get the max search_id already processed in a feature table."""
+    try:
+        val = cnxn.execute(f"SELECT COALESCE(MAX({col}), 0) FROM {table}").fetchone()[0]
+        return val or 0
+    except Exception:
+        return 0
+
+def build_search_iterations_features(cnxn, full=False):
     print("  [BUILD] Creating search iteration features...")
     rolling_window = 5
     window_spec = "(PARTITION BY search_id ORDER BY depth ASC)"
     rolling_window_spec = f"(PARTITION BY search_id ORDER BY depth ASC ROWS BETWEEN {rolling_window} PRECEDING AND CURRENT ROW)"
-    # Use source numeric columns directly now that SQLite schema was fixed.
-    cnxn.execute(f"""
-        CREATE OR REPLACE TABLE search_iteration_features AS
 
+    incremental = not full and _table_exists(cnxn, 'search_iteration_features')
+    if incremental:
+        max_id = _max_search_id(cnxn, 'search_iteration_features')
+        where_clause = f"WHERE search_id > {max_id}"
+        print(f"    (incremental: processing search_id > {max_id})")
+    else:
+        where_clause = ""
+
+    source_query = f"SELECT * FROM iterative_deepening_stats {where_clause}"
+
+    select_sql = f"""
         WITH base_metrics AS (
             SELECT *,
                 -- total nodes and move grouping come from original numeric columns
                 (nodes + qnodes) AS total_nodes,
                 ROW_NUMBER() OVER (PARTITION BY search_id ORDER BY depth) -
                 ROW_NUMBER() OVER (PARTITION BY search_id, move ORDER BY depth) as move_grp
-            FROM iterative_deepening_stats
+            FROM ({source_query})
         )
         SELECT
             search_id, depth, qdepth,
@@ -72,17 +97,28 @@ def build_search_iterations_features(cnxn):
             ROW_NUMBER() OVER (PARTITION BY search_id, move_grp ORDER BY depth) - 1 AS move_stability
 
         FROM base_metrics
-    """)
+    """
 
-def build_search_tree_features(cnxn):
+    if incremental:
+        cnxn.execute(f"INSERT INTO search_iteration_features {select_sql}")
+        new_count = cnxn.execute(f"SELECT COUNT(*) FROM search_iteration_features WHERE search_id > {max_id}").fetchone()[0]
+        print(f"    +{new_count:,} rows inserted")
+    else:
+        cnxn.execute(f"CREATE OR REPLACE TABLE search_iteration_features AS {select_sql}")
+
+def build_search_tree_features(cnxn, full=False):
     print("  [BUILD] Creating search tree features...")
     window_spec = "(PARTITION BY search_id ORDER BY depth asc)"
-    # Cast numeric-like columns to DOUBLE in a temporary view to avoid
-    # arithmetic errors when source columns are stored as VARCHAR (from
-    # `sqlite_all_varchar=true` in the import step).
-    # Use original columns directly now that schema is fixed
-    cnxn.execute(f"""
-        CREATE OR REPLACE TABLE search_tree_features AS
+
+    incremental = not full and _table_exists(cnxn, 'search_tree_features')
+    if incremental:
+        max_id = _max_search_id(cnxn, 'search_tree_features')
+        where_clause = f"WHERE search_id > {max_id}"
+        print(f"    (incremental: processing search_id > {max_id})")
+    else:
+        where_clause = ""
+
+    select_sql = f"""
         SELECT
             search_id, depth,
             tt_stores AS tt_stores, tt_hits AS tt_hits,
@@ -110,16 +146,30 @@ def build_search_tree_features(cnxn):
             (nodes + qnodes) / NULLIF(LAG(nodes + qnodes) OVER {window_spec}, 0) as ebf,
             qnodes / NULLIF(LAG(qnodes) OVER {window_spec}, 0) as qebf
 
-        FROM search_tree_stats
-    """)
+        FROM search_tree_stats {where_clause}
+    """
+
+    if incremental:
+        cnxn.execute(f"INSERT INTO search_tree_features {select_sql}")
+        new_count = cnxn.execute(f"SELECT COUNT(*) FROM search_tree_features WHERE search_id > {max_id}").fetchone()[0]
+        print(f"    +{new_count:,} rows inserted")
+    else:
+        cnxn.execute(f"CREATE OR REPLACE TABLE search_tree_features AS {select_sql}")
     
-def build_search_features(cnxn):
+def build_search_features(cnxn, full=False):
     print("  [BUILD] Creating search features...")
+
+    incremental = not full and _table_exists(cnxn, 'search_features')
+    if incremental:
+        max_id = _max_search_id(cnxn, 'search_features', col='search_id')
+        where_clause = f"WHERE s.id > {max_id}"
+        print(f"    (incremental: processing search_id > {max_id})")
+    else:
+        where_clause = ""
+
     # Ensure numeric search-level columns for arithmetic
     # Use search tables' original numeric columns directly
-    cnxn.execute(f"""
-        CREATE OR REPLACE TABLE search_features AS
-                 
+    select_sql = f"""
         WITH times AS (
             SELECT
                 search_id, 
@@ -163,6 +213,7 @@ def build_search_features(cnxn):
                 MAX(CASE WHEN function = 'TT_STORE' THEN total_time_ms / NULLIF(num_calls, 0) END) AS tt_store_avg_ms,
                     
             FROM search_timings
+            {"WHERE search_id > " + str(max_id) if incremental else ""}
             GROUP BY search_id
         ),
                  
@@ -228,6 +279,7 @@ def build_search_features(cnxn):
             STDDEV(itdeep.eval) AS stddev_eval,
             
             FROM search_iteration_features itdeep
+            {"WHERE itdeep.search_id > " + str(max_id) if incremental else ""}
             GROUP BY search_id
         )
 
@@ -386,21 +438,36 @@ def build_search_features(cnxn):
             ON s.game_id = g.id
         LEFT JOIN sts_runs sts
             ON s.sts_id = sts.id
-        
-    """)
+        {where_clause}
+    """
+
+    if incremental:
+        cnxn.execute(f"INSERT INTO search_features {select_sql}")
+        new_count = cnxn.execute(f"SELECT COUNT(*) FROM search_features WHERE search_id > {max_id}").fetchone()[0]
+        print(f"    +{new_count:,} rows inserted")
+    else:
+        cnxn.execute(f"CREATE OR REPLACE TABLE search_features AS {select_sql}")
 
 import duckdb
 import os
+import argparse
 from ..etl.paths import ANALYTICS_DB
 
 if __name__ == "__main__":
-    DB = os.environ.get('CHESS_ANALYTICS_DB') or str(ANALYTICS_DB)
+    parser = argparse.ArgumentParser(description="Build search feature tables")
+    parser.add_argument('--full', action='store_true', help='Full rebuild (drop + recreate all feature tables)')
+    args = parser.parse_args()
 
+    DB = os.environ.get('CHESS_ANALYTICS_DB') or str(ANALYTICS_DB)
     cnxn = duckdb.connect(DB)
 
-    build_search_tree_features(cnxn)
-    build_search_iterations_features(cnxn)
-    build_search_features(cnxn)
+    full = args.full
+    if full:
+        print("  [BUILD] Full rebuild requested")
+
+    build_search_tree_features(cnxn, full=full)
+    build_search_iterations_features(cnxn, full=full)
+    build_search_features(cnxn, full=full)
 
     # Persist eval_diff into `search_stats` so downstream tools (dashboard, queries)
     # can read it directly from the table instead of recomputing client-side.
@@ -411,7 +478,7 @@ if __name__ == "__main__":
         if 'eval_diff' not in cols:
             cnxn.execute("ALTER TABLE search_stats ADD COLUMN eval_diff DOUBLE")
         # populate eval_diff from existing eval and sf_eval values
-        cnxn.execute("UPDATE search_stats SET eval_diff = CASE WHEN eval IS NOT NULL AND sf_eval IS NOT NULL THEN eval - sf_eval ELSE NULL END")
+        cnxn.execute("UPDATE search_stats SET eval_diff = CASE WHEN eval IS NOT NULL AND sf_eval IS NOT NULL THEN eval - sf_eval ELSE NULL END WHERE eval_diff IS NULL")
         print("  [BUILD] Completed building (wide) feature tables.")
     except Exception:
         print("  [BUILD] Failed to build tables !!!!!!")

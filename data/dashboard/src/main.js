@@ -19,6 +19,10 @@ import { renderIterations } from './views/iterations.js';
 import { renderTree } from './views/tree.js';
 import { renderTiming } from './views/timing.js';
 import { renderSprt } from './views/sprt.js';
+import { renderRootMoves } from './views/rootmoves.js';
+import { renderQuality } from './views/quality.js';
+import { renderOpenings } from './views/openings.js';
+import { renderTimeMgmt } from './views/timemgmt.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TABS CONFIGURATION
@@ -28,11 +32,15 @@ const TABS = [
   { id: 'overview',   label: 'Overview',    render: renderOverview },
   { id: 'search',     label: 'Searches',    render: renderSearch },
   { id: 'games',      label: 'Games',       render: renderGames },
+  { id: 'openings',   label: 'Openings',    render: renderOpenings },
   { id: 'trends',     label: 'Trends',      render: renderTrends },
   { id: 'compare',    label: 'Compare',     render: renderCompare },
   { id: 'iterations', label: 'Iterations',  render: renderIterations },
   { id: 'tree',       label: 'Tree Depth',  render: renderTree },
   { id: 'timing',     label: 'Timing',      render: renderTiming },
+  { id: 'timemgmt',   label: 'Time Mgmt',   render: renderTimeMgmt },
+  { id: 'rootmoves',  label: 'Root Moves',  render: renderRootMoves },
+  { id: 'quality',    label: 'Eval Quality', render: renderQuality },
   { id: 'sprt',       label: 'SPRT',        render: renderSprt },
 ];
 
@@ -148,11 +156,41 @@ async function setupDashboard() {
   // Detect available tables
   const tables = await detectTables();
   
+  // Show data freshness
+  await showFreshness();
+  
   // Render tabs
   renderTabs();
   
   // Render initial tab
   await switchTab('overview');
+}
+
+async function showFreshness() {
+  const indicator = document.getElementById('db-freshness');
+  if (!indicator) return;
+  try {
+    const result = await coordinator().query(`
+      SELECT COUNT(*) as searches,
+        MAX(id) as latest_id
+      FROM search_stats
+    `);
+    const row = Array.from(result)[0];
+    if (row) {
+      indicator.textContent = `${Number(row.searches).toLocaleString()} searches | latest id: ${row.latest_id}`;
+      indicator.style.display = 'inline';
+    }
+  } catch {
+    // Also try search_features
+    try {
+      const result = await coordinator().query(`SELECT COUNT(*) as n FROM search_features`);
+      const row = Array.from(result)[0];
+      if (row) {
+        indicator.textContent = `${Number(row.n).toLocaleString()} searches`;
+        indicator.style.display = 'inline';
+      }
+    } catch { /* no data */ }
+  }
 }
 
 async function detectTables() {
