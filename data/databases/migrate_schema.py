@@ -73,15 +73,6 @@ MIGRATIONS = [
         columns=[
             ("completed_depth", "INTEGER", "NULL")
         ]
-    ),
-    Migration(
-        id="2026_07_04_completed_search_depth_analyticsDB",
-        description="including the compelted depth in analytics",
-        db="analytics",
-        table="search_stats",
-        columns=[
-            ("completed_depth", "INTEGER", "NULL")
-        ]
     )
 ]
 
