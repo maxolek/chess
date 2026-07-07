@@ -127,6 +127,7 @@ def init_raw_db(db_dir=None) -> None:
             ply                         INTEGER,
             time_ms                     REAL,
             eval                        INTEGER,
+            completed_depth             INTEGER, -- fully completed (all root moves searched) depth (max_depth -= 1/0)
             depth                       INTEGER,
             qdepth                      INTEGER, -- depth reached through quiescence (leaf extension of search depth ^^)
             move                        TEXT,
@@ -149,6 +150,7 @@ def init_raw_db(db_dir=None) -> None:
             fh_index_3                  INTEGER, -- move index 3
             fh_index_4to7               INTEGER, -- move index 4-7
             fh_index_8plus              INTEGER, -- move index 8+
+            -- pruning
             see_prunes                  INTEGER,
             delta_prunes                INTEGER,
             nmp                         INTEGER,
