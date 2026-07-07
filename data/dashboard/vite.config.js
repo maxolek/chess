@@ -12,4 +12,7 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['@duckdb/duckdb-wasm'],
   },
+  worker: {
+    format: 'es',
+  },
 });

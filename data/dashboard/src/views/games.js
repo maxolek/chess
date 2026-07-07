@@ -67,14 +67,10 @@ export async function renderGames() {
   container.appendChild(plotPanel('Termination Types', termBar));
 
   // Opening frequency (top 20)
+  await coordinator().exec(`CREATE OR REPLACE TEMP VIEW top_openings AS SELECT opening, COUNT(*) as count FROM game_stats GROUP BY opening ORDER BY count DESC LIMIT 20`);
   const openingBar = vg.plot(
     vg.barX(
-      vg.from('game_stats', {
-        select: { opening: 'opening', count: vg.sql`COUNT(*)` },
-        groupBy: ['opening'],
-        orderBy: [{ count: 'desc' }],
-        limit: 20,
-      }),
+      vg.from('top_openings'),
       { x: 'count', y: 'opening', fill: 'steelblue', sort: { y: '-x' } }
     ),
     vg.width(700),
@@ -86,8 +82,9 @@ export async function renderGames() {
   container.appendChild(plotPanel('Top 20 Openings', openingBar));
 
   // Game length distribution
+  await coordinator().exec(`CREATE OR REPLACE TEMP VIEW games_with_time AS SELECT * FROM game_stats WHERE run_time_s IS NOT NULL`);
   const lengthHist = vg.plot(
-    vg.rectY(vg.from('game_stats', { filterBy: vg.sql`run_time_s IS NOT NULL` }), {
+    vg.rectY(vg.from('games_with_time'), {
       x: vg.bin('run_time_s'),
       y: vg.count(),
       fill: 'steelblue',

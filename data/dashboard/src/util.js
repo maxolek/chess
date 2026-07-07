@@ -5,10 +5,11 @@ import { coordinator } from '@uwdata/mosaic-core';
 import * as vg from '@uwdata/vgplot';
 
 /**
- * Run a SQL query and return results as an Arrow table.
+ * Run a SQL query and return results as an array of plain objects.
  */
 export async function sql(query) {
-  return coordinator().query(query);
+  const result = await coordinator().query(query);
+  return Array.from(result);
 }
 
 /**

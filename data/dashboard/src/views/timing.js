@@ -27,14 +27,10 @@ export async function renderTiming() {
   `);
 
   // Top functions bar chart
+  await coordinator().exec(`CREATE OR REPLACE TEMP VIEW timing_by_func AS SELECT "function", SUM(total_time_ms) as total_ms FROM search_timings GROUP BY "function" ORDER BY total_ms DESC LIMIT 15`);
   const funcBar = vg.plot(
     vg.barX(
-      vg.from('search_timings', {
-        select: { function: 'function', total_ms: vg.sql`SUM(total_time_ms)` },
-        groupBy: ['function'],
-        orderBy: [{ total_ms: 'desc' }],
-        limit: 15,
-      }),
+      vg.from('timing_by_func'),
       { x: 'total_ms', y: 'function', fill: 'steelblue', sort: { y: '-x' } }
     ),
     vg.width(700),
@@ -46,14 +42,10 @@ export async function renderTiming() {
   container.appendChild(plotPanel('Top Functions by Total Time', funcBar));
 
   // Call count bar
+  await coordinator().exec(`CREATE OR REPLACE TEMP VIEW calls_by_func AS SELECT "function", SUM(num_calls) as total_calls FROM search_timings GROUP BY "function" ORDER BY total_calls DESC LIMIT 15`);
   const callBar = vg.plot(
     vg.barX(
-      vg.from('search_timings', {
-        select: { function: 'function', total_calls: vg.sql`SUM(num_calls)` },
-        groupBy: ['function'],
-        orderBy: [{ total_calls: 'desc' }],
-        limit: 15,
-      }),
+      vg.from('calls_by_func'),
       { x: 'total_calls', y: 'function', fill: 'var(--accent)', sort: { y: '-x' } }
     ),
     vg.width(700),
@@ -65,15 +57,10 @@ export async function renderTiming() {
   container.appendChild(plotPanel('Top Functions by Call Count', callBar));
 
   // Time per call scatter
+  await coordinator().exec(`CREATE OR REPLACE TEMP VIEW timing_per_call AS SELECT "function", total_time_ms / NULLIF(num_calls, 0) as avg_time_per_call, num_calls FROM search_timings`);
   const tpcPlot = vg.plot(
     vg.dot(
-      vg.from('search_timings', {
-        select: {
-          function: 'function',
-          avg_time_per_call: vg.sql`total_time_ms / NULLIF(num_calls, 0)`,
-          num_calls: 'num_calls',
-        },
-      }),
+      vg.from('timing_per_call'),
       { x: 'num_calls', y: 'avg_time_per_call', fill: 'function', opacity: 0.5, r: 3 }
     ),
     vg.width(700),

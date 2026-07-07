@@ -45,8 +45,9 @@ export async function renderOverview() {
   container.appendChild(plotPanel('Depth Distribution', depthPlot));
 
   // Eval distribution
+  await coordinator().exec(`CREATE OR REPLACE TEMP VIEW eval_filtered AS SELECT * FROM ${searchTable} WHERE ABS(eval) <= 1500`);
   const evalPlot = vg.plot(
-    vg.rectY(vg.from(searchTable, { filterBy: vg.sql`ABS(eval) <= 1500` }), {
+    vg.rectY(vg.from('eval_filtered'), {
       x: vg.bin('eval'),
       y: vg.count(),
       fill: 'steelblue',
@@ -60,8 +61,9 @@ export async function renderOverview() {
   container.appendChild(plotPanel('Eval Distribution (±1500cp)', evalPlot));
 
   // Nodes distribution (log scale)
+  await coordinator().exec(`CREATE OR REPLACE TEMP VIEW nodes_filtered AS SELECT * FROM ${searchTable} WHERE nodes > 0`);
   const nodesPlot = vg.plot(
-    vg.rectY(vg.from(searchTable, { filterBy: vg.sql`nodes > 0` }), {
+    vg.rectY(vg.from('nodes_filtered'), {
       x: vg.bin('nodes'),
       y: vg.count(),
       fill: 'steelblue',
@@ -77,12 +79,10 @@ export async function renderOverview() {
 
   // Engine breakdown
   if (tables.includes('engines')) {
+    await coordinator().exec(`CREATE OR REPLACE TEMP VIEW engine_counts AS SELECT engine_id, COUNT(*) as count FROM ${searchTable} GROUP BY engine_id`);
     const enginePlot = vg.plot(
       vg.barX(
-        vg.from(searchTable, { 
-          select: { engine_id: 'engine_id', count: vg.sql`COUNT(*)` },
-          groupBy: ['engine_id'],
-        }),
+        vg.from('engine_counts'),
         { x: 'count', y: 'engine_id', fill: 'var(--accent)', sort: { y: '-x' } }
       ),
       vg.width(600),

@@ -3,6 +3,11 @@
  * Initializes DuckDB-WASM, sets up navigation, and renders views.
  */
 import { coordinator, wasmConnector } from '@uwdata/mosaic-core';
+import * as duckdb from '@duckdb/duckdb-wasm';
+import duckdb_wasm from '@duckdb/duckdb-wasm/dist/duckdb-mvp.wasm?url';
+import mvp_worker from '@duckdb/duckdb-wasm/dist/duckdb-browser-mvp.worker.js?url';
+import duckdb_wasm_eh from '@duckdb/duckdb-wasm/dist/duckdb-eh.wasm?url';
+import eh_worker from '@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js?url';
 import * as vg from '@uwdata/vgplot';
 import { getCount, getTables, tableExists } from './connection.js';
 import { renderOverview } from './views/overview.js';
@@ -43,13 +48,27 @@ async function init() {
   try {
     status.textContent = 'Initializing DuckDB-WASM...';
     
-    const wasm = wasmConnector();
+    // Manually instantiate DuckDB-WASM so we have access to the db handle
+    const bundle = await duckdb.selectBundle({
+      mvp: { mainModule: duckdb_wasm, mainWorker: mvp_worker },
+      eh: { mainModule: duckdb_wasm_eh, mainWorker: eh_worker },
+    });
+    
+    const logger = new duckdb.ConsoleLogger();
+    const worker = new Worker(bundle.mainWorker);
+    const db = new duckdb.AsyncDuckDB(logger, worker);
+    await db.instantiate(bundle.mainModule);
+    
+    // Store globally for file picker access
+    window.__duckdb = db;
+    
+    // Connect Mosaic using the manual DuckDB instance
+    const wasm = wasmConnector({ duckdb: db });
     coordinator().databaseConnector(wasm);
     
     status.textContent = 'Loading database...';
     
     // Try to load from the default path (configure this for your setup)
-    // For local development, we'll use a file input fallback
     const dbPath = getDbPath();
     
     if (dbPath) {
@@ -104,11 +123,9 @@ function showFilePicker(status) {
       const arrayBuffer = await file.arrayBuffer();
       const uint8 = new Uint8Array(arrayBuffer);
       
-      // Register and attach
-      await coordinator().exec(`INSTALL httpfs`);
-      // For local file, use opfs or direct buffer registration
-      const db = coordinator().databaseConnector();
-      await db.db.registerFileBuffer(file.name, uint8);
+      // Register buffer with the DuckDB instance directly
+      const db = window.__duckdb;
+      await db.registerFileBuffer(file.name, uint8);
       await coordinator().exec(`ATTACH '${file.name}' AS db (READ_ONLY)`);
       await coordinator().exec(`USE db`);
       
@@ -141,7 +158,7 @@ async function setupDashboard() {
 async function detectTables() {
   try {
     const result = await coordinator().query(`SHOW TABLES`);
-    const tables = result.map(r => r.name);
+    const tables = Array.from(result).map(r => r.name);
     window.__tables = tables;
     return tables;
   } catch {

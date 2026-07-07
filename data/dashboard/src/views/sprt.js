@@ -32,8 +32,9 @@ export async function renderSprt() {
   container.appendChild(panel('SPRT Results', metrics));
 
   // Elo difference distribution
+  await coordinator().exec(`CREATE OR REPLACE TEMP VIEW sprt_with_elo AS SELECT * FROM sprt_runs WHERE elo_diff IS NOT NULL`);
   const eloHist = vg.plot(
-    vg.rectY(vg.from('sprt_runs', { filterBy: vg.sql`elo_diff IS NOT NULL` }), {
+    vg.rectY(vg.from('sprt_with_elo'), {
       x: vg.bin('elo_diff'),
       y: vg.count(),
       fill: 'steelblue',
@@ -47,8 +48,9 @@ export async function renderSprt() {
   container.appendChild(plotPanel('Elo Bounds Distribution', eloHist));
 
   // Games played per SPRT
+  await coordinator().exec(`CREATE OR REPLACE TEMP VIEW sprt_with_games AS SELECT * FROM sprt_runs WHERE games_played IS NOT NULL`);
   const gamesHist = vg.plot(
-    vg.rectY(vg.from('sprt_runs', { filterBy: vg.sql`games_played IS NOT NULL` }), {
+    vg.rectY(vg.from('sprt_with_games'), {
       x: vg.bin('games_played'),
       y: vg.count(),
       fill: 'steelblue',
@@ -62,13 +64,10 @@ export async function renderSprt() {
   container.appendChild(plotPanel('Games per SPRT Test', gamesHist));
 
   // Result by opening book
+  await coordinator().exec(`CREATE OR REPLACE TEMP VIEW sprt_by_book AS SELECT opening_book, COUNT(*) as count FROM sprt_runs GROUP BY opening_book ORDER BY count DESC`);
   const bookPlot = vg.plot(
     vg.barX(
-      vg.from('sprt_runs', {
-        select: { opening_book: 'opening_book', count: vg.sql`COUNT(*)` },
-        groupBy: ['opening_book'],
-        orderBy: [{ count: 'desc' }],
-      }),
+      vg.from('sprt_by_book'),
       { x: 'count', y: 'opening_book', fill: 'steelblue', sort: { y: '-x' } }
     ),
     vg.width(600),
@@ -81,8 +80,9 @@ export async function renderSprt() {
 
   // Timeline of SPRT results
   if (await sql(`SELECT column_name FROM information_schema.columns WHERE table_name='sprt_runs' AND column_name='start_time_utc' LIMIT 1`).then(r => r.length > 0).catch(() => false)) {
+    await coordinator().exec(`CREATE OR REPLACE TEMP VIEW sprt_timeline AS SELECT * FROM sprt_runs WHERE start_time_utc IS NOT NULL`);
     const timeline = vg.plot(
-      vg.dot(vg.from('sprt_runs', { filterBy: vg.sql`start_time_utc IS NOT NULL` }), {
+      vg.dot(vg.from('sprt_timeline'), {
         x: 'start_time_utc',
         y: 'elo_diff',
         fill: 'result',
