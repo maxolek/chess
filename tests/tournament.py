@@ -49,7 +49,7 @@ TC_DEFAULTS = {
 # default elo for oldest engine to build each version off of
 # only needed for first tournament run (after that new elos are used)
 ANCHOR_ELO = 1500.0
-
+RATING_FLOOR = 100.0
 
 def get_all_engines(cnxn, n=3):
     """Get last n=3 engine versions ++ first version and their exe paths from the DB."""
@@ -503,7 +503,13 @@ def run_tournament(args, cnxn, engine_id):
                       f"+{p['wins']} -{p['losses']} ={p['draws']}  {diff_str}")
                 
         # compute performance rating
-        candidate_elo, total_games = compute_performance_ratings(candidate_pairwise, opponent_elos)
+        perf_elo, _ = compute_performance_ratings(candidate_pairwise, opponent_elos)
+
+        # compute pool elo (w_avg of opp_rating + pairwise_diff)
+        candidate_elo, total_games = compute_pool_elo(candidate_pairwise, opponents,
+                                                      {o['id']: opponent_elos[f"v{o['version']}"] for o in opponents})
+        if candidate_elo is not None: 
+            candidate_elo = max(candidate_elo, RATING_FLOOR)
 
         ratings[actual_cat] = {
             "elo": candidate_elo,
@@ -512,7 +518,7 @@ def run_tournament(args, cnxn, engine_id):
 
         avg_opp = (sum(opponent_elos[f"v{o['version']}"] for o in opponents) / len(opponents)
                    if opponents else 0)
-        print(f"[TOURNAMENT] {actual_cat}: perf_rating={candidate_elo} "
+        print(f"[TOURNAMENT] {actual_cat}: pool_elo={candidate_elo} perf_elo={candidate_elo} "
               f"avg_opp={avg_opp:.0f} games={total_games}")
 
     # update opponent ratings using standard elo formula
@@ -567,7 +573,7 @@ def run_tournament(args, cnxn, engine_id):
                 continue
 
             old_elo = elo_map[name]
-            new_elo = round(old_elo + delta, 1)
+            new_elo = max(round(old_elo + delta, 1), RATING_FLOOR)
             print(f"  {name:12s}: {old_elo:.0f} -> {new_elo:.0f} "
                   f"(delta={delta:+.1f}, games={games_count[name]})")
             # update engine ratings in DB for this engine name
