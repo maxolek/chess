@@ -79,7 +79,7 @@ struct SearchStats {
     std::array<int, STATS_MAX_ITER_DEPTH> it_depth_eval{};
     std::array<Move, STATS_MAX_ITER_DEPTH> it_depth_move{};
     //std::vector<std::vector<Move>> it_depth_pv;
-    std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_qdepth{};
+    std::array<int, STATS_MAX_ITER_DEPTH> it_depth_qdepth{};
     std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_nodes{};
     std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_qnodes{};
     std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_ttstores{};
