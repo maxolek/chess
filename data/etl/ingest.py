@@ -1,5 +1,6 @@
 """Bulk ingestion functions: games, searches, timing, STS, SPRT."""
 import json
+import shutil
 from pathlib import Path
 
 from .paths import GAME_JSON, SEARCH_JSON, TIMING_JSON, ROOT_MOVES_JSON, GAMES_LOG_DIR, LOG_DIRS, get_jsonl_paths
@@ -16,6 +17,8 @@ def _iter_json_objects_from_path(path):
                 data = json.loads(text)
             except json.JSONDecodeError:
                 print(f"[WARN] skipping malformed JSON line {line_no} in {path}")
+                print("\n\n\n")
+                print(text)
                 continue
 
             if not isinstance(data, dict):
@@ -55,7 +58,8 @@ def ingest_log_dir(cnxn, log_dir, clear=True):
     else:
         print(f"[INFO] No search log found: {paths['search']}")
 
-    if clear:
+    # clear only if searches+games
+    if clear and paths["search"].is_file() and paths["game"].is_file():
         clear_log_dir(log_dir)
 
 

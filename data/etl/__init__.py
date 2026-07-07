@@ -12,7 +12,7 @@ from .paths import (
     GAME_JSON, SEARCH_JSON, TIMING_JSON, ROOT_MOVES_JSON,
     LOG_DIRS, JSONL_FILES, get_jsonl_paths,
 )
-from .utils import safe_val, safe
+from .utils import safe_val, safe, consolidate_instance_logs
 from .openings import get_opening_from_moves
 from .db import get_db, get_engine_id, probe_engine_metadata, extract_engine_id_from_search, clear_log_dir
 from .ingest import (
