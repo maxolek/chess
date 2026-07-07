@@ -25,6 +25,7 @@ import { renderOpenings } from './views/openings.js';
 import { renderTimeMgmt } from './views/timemgmt.js';
 import { renderPruning } from './views/pruning.js';
 import { renderPositions } from './views/positions.js';
+import { renderMoveOrder } from './views/moveorder.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TABS CONFIGURATION
@@ -40,6 +41,7 @@ const TABS = [
   { id: 'iterations', label: 'Iterations',  render: renderIterations },
   { id: 'tree',       label: 'Tree Depth',  render: renderTree },
   { id: 'pruning',    label: 'Pruning',     render: renderPruning },
+  { id: 'moveorder',  label: 'Move Order',  render: renderMoveOrder },
   { id: 'positions',  label: 'Positions',   render: renderPositions },
   { id: 'timing',     label: 'Timing',      render: renderTiming },
   { id: 'timemgmt',   label: 'Time Mgmt',   render: renderTimeMgmt },

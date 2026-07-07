@@ -140,10 +140,15 @@ def init_raw_db(db_dir=None) -> None:
             fail_highs                  INTEGER,
             fail_lows                   INTEGER,
         -- specifics
-            fail_high_first             INTEGER,
-            fail_high_late              INTEGER, -- late is subjective
             fail_high_researches        INTEGER,
             fail_low_researches         INTEGER,
+            -- fail-high move index histogram [bucket0..bucket5]
+            fh_index_0                  INTEGER, -- move index 0 (TT/hash move)
+            fh_index_1                  INTEGER, -- move index 1
+            fh_index_2                  INTEGER, -- move index 2
+            fh_index_3                  INTEGER, -- move index 3
+            fh_index_4to7               INTEGER, -- move index 4-7
+            fh_index_8plus              INTEGER, -- move index 8+
             see_prunes                  INTEGER,
             delta_prunes                INTEGER,
             nmp                         INTEGER,
@@ -178,10 +183,15 @@ def init_raw_db(db_dir=None) -> None:
             fail_highs                  INTEGER,
             fail_lows                   INTEGER,
         -- specifics
-            fail_high_first             INTEGER,
-            fail_high_late              INTEGER,
             fail_high_researches        INTEGER,
             fail_low_researches         INTEGER,
+            -- fail-high move index histogram per iteration
+            fh_index_0                  INTEGER,
+            fh_index_1                  INTEGER,
+            fh_index_2                  INTEGER,
+            fh_index_3                  INTEGER,
+            fh_index_4to7               INTEGER,
+            fh_index_8plus              INTEGER,
             see_prunes                  INTEGER,
             delta_prunes                INTEGER,
             pvs_researches              INTEGER,
@@ -210,8 +220,13 @@ def init_raw_db(db_dir=None) -> None:
             --tt_fill                     REAL,
             fail_highs                  INTEGER,
             fail_lows                   INTEGER,
-            fail_high_first             INTEGER,
-            fail_high_late              INTEGER,
+            -- fail-high move index histogram per tree depth
+            fh_index_0                  INTEGER,
+            fh_index_1                  INTEGER,
+            fh_index_2                  INTEGER,
+            fh_index_3                  INTEGER,
+            fh_index_4to7               INTEGER,
+            fh_index_8plus              INTEGER,
             see_prunes                  INTEGER,
             delta_prunes                INTEGER,
             pvs_researches              INTEGER,

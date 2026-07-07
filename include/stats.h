@@ -20,6 +20,7 @@
 
 constexpr int STATS_MAX_PLY = 64;
 constexpr int STATS_MAX_ITER_DEPTH = 32;
+constexpr int STATS_FH_BUCKETS = 6; // move index buckets: 0, 1, 2, 3, 4-7, 8+
 
 #define STATS_BOUNDS_CHECK(it_d, ply) \
     assert((it_d) >= 0 && (it_d) <= STATS_MAX_ITER_DEPTH && \
@@ -62,8 +63,8 @@ struct SearchStats {
     uint64_t tt_overwritten = 0;
     uint64_t fail_highs = 0;
     uint64_t fail_lows = 0;
-    uint64_t fail_high_firsts = 0;
-    uint64_t fail_high_lates = 0;
+    // fail-high move index histogram: buckets [0, 1, 2, 3, 4-7, 8+]
+    std::array<uint64_t, STATS_FH_BUCKETS> fail_high_index{};
     uint64_t aspiration_fail_low_researches = 0;
     uint64_t aspiration_fail_high_researches = 0;
     uint64_t pvs_researches = 0;
@@ -86,8 +87,8 @@ struct SearchStats {
     std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_ttfill{};
     std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_fail_highs{};
     std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_fail_lows{};
-    std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_fail_high_firsts{};
-    std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_fail_high_lates{};
+    // per-iteration-depth fail-high index histogram
+    std::array<std::array<uint64_t, STATS_FH_BUCKETS>, STATS_MAX_ITER_DEPTH> it_depth_fh_index{};
     std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_aspiration_failhigh_researches{};
     std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_aspiration_faillow_researches{};
     std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_pvs_researches{};
@@ -106,8 +107,8 @@ struct SearchStats {
     std::array<uint64_t, STATS_MAX_PLY> tree_depth_tthits{};
     std::array<uint64_t, STATS_MAX_PLY> tree_depth_fail_highs{};
     std::array<uint64_t, STATS_MAX_PLY> tree_depth_fail_lows{};
-    std::array<uint64_t, STATS_MAX_PLY> tree_depth_fail_high_firsts{};
-    std::array<uint64_t, STATS_MAX_PLY> tree_depth_fail_high_lates{};
+    // per-tree-depth fail-high index histogram
+    std::array<std::array<uint64_t, STATS_FH_BUCKETS>, STATS_MAX_PLY> tree_depth_fh_index{};
     std::array<uint64_t, STATS_MAX_PLY> tree_depth_see_prunes{};
     std::array<uint64_t, STATS_MAX_PLY> tree_depth_delta_prunes{};
     std::array<uint64_t, STATS_MAX_PLY> tree_depth_pvs_researches{};
@@ -184,22 +185,24 @@ inline void resetSearchStats() {
         } \
     } while(0)
 
-#define STATS_FAILHIGH(it_d, ply, first)                     \
+// Helper to map move index to bucket [0,1,2,3,4-7,8+]
+inline int fh_bucket(int move_idx) {
+    if (move_idx <= 3) return move_idx;
+    if (move_idx <= 7) return 4;
+    return 5;
+}
+
+#define STATS_FAILHIGH(it_d, ply, move_idx)                  \
     do {                                                    \
         if (Logging::track_search_stats) {                  \
             /*STATS_BOUNDS_CHECK(it_d, ply);  */                  \
             g_stats.fail_highs++;                           \
             g_stats.it_depth_fail_highs[it_d]++;            \
             g_stats.tree_depth_fail_highs[ply]++;           \
-            if (first) {                                    \
-                g_stats.fail_high_firsts++;                 \
-                g_stats.it_depth_fail_high_firsts[it_d]++;  \
-                g_stats.tree_depth_fail_high_firsts[ply]++; \
-            } else {                                        \
-                g_stats.fail_high_lates++;                  \
-                g_stats.it_depth_fail_high_lates[it_d]++;   \
-                g_stats.tree_depth_fail_high_lates[ply]++;  \
-            }                                               \
+            int _fh_b = fh_bucket(move_idx);                \
+            g_stats.fail_high_index[_fh_b]++;               \
+            g_stats.it_depth_fh_index[it_d][_fh_b]++;       \
+            g_stats.tree_depth_fh_index[ply][_fh_b]++;      \
         }                                                   \
     } while (0)
 
@@ -305,6 +308,39 @@ std::string moves_to_json(const std::array<Move, N>& v, size_t len)
     return oss.str();
 };
 
+// Serialize a fixed-size array as JSON (no skipping index 0)
+template <typename T, size_t N>
+std::string bucket_array_to_json(const std::array<T, N>& v)
+{
+    std::ostringstream oss;
+    oss << "[";
+    for (size_t i = 0; i < N; ++i) {
+        if (i) oss << ",";
+        oss << v[i];
+    }
+    oss << "]";
+    return oss.str();
+};
+
+// Serialize per-depth bucket histogram as JSON array of arrays
+template <size_t D, size_t B>
+std::string depth_buckets_to_json(const std::array<std::array<uint64_t, B>, D>& v, size_t len)
+{
+    std::ostringstream oss;
+    oss << "[";
+    for (size_t i = 1; i < len; ++i) {
+        if (i-1) oss << ",";
+        oss << "[";
+        for (size_t j = 0; j < B; ++j) {
+            if (j) oss << ",";
+            oss << v[i][j];
+        }
+        oss << "]";
+    }
+    oss << "]";
+    return oss.str();
+};
+
 
 inline void logRootMoves(const SearchResult& result, int depth) {
     static std::ofstream root_log(Logging::log_file_name("root_moves.jsonl"), std::ios::app);
@@ -361,8 +397,7 @@ inline void logSearchStats(const std::string& fen = "") {
 
         << "\"fail_highs\":" << g_stats.fail_highs << ","
         << "\"fail_lows\":" << g_stats.fail_lows << ","
-        << "\"fail_high_first\":" << g_stats.fail_high_firsts << ","
-        << "\"fail_high_late\":" << g_stats.fail_high_lates << ","
+        << "\"fail_high_index\":" << bucket_array_to_json(g_stats.fail_high_index) << ","
 
         << "\"delta_prunes\":" << g_stats.delta_prunes << ","
         << "\"see_prunes\":" << g_stats.see_prunes << ","
@@ -392,8 +427,7 @@ inline void logSearchStats(const std::string& fen = "") {
         << "\"itdepth_ttstores\":" << array_to_json(g_stats.it_depth_ttstores, n) << ","
         << "\"itdepth_fail_highs\":" << array_to_json(g_stats.it_depth_fail_highs, n) << ","
         << "\"itdepth_fail_lows\":" << array_to_json(g_stats.it_depth_fail_lows, n) << ","
-        << "\"itdepth_fail_high_firsts\":" << array_to_json(g_stats.it_depth_fail_high_firsts, n) << ","
-        << "\"itdepth_fail_high_lates\":" << array_to_json(g_stats.it_depth_fail_high_lates, n) << ","
+        << "\"itdepth_fh_index\":" << depth_buckets_to_json(g_stats.it_depth_fh_index, n) << ","
         << "\"itdepth_aspiration_failhigh_researches\":" << array_to_json(g_stats.it_depth_aspiration_failhigh_researches, n) << ","
         << "\"itdepth_aspiration_faillow_researches\":" << array_to_json(g_stats.it_depth_aspiration_faillow_researches, n) << ","
         << "\"itdepth_see_prunes\":" << array_to_json(g_stats.it_depth_see_prunes, n) << ","
@@ -409,8 +443,7 @@ inline void logSearchStats(const std::string& fen = "") {
         << "\"treedepth_tt_stores\":" << array_to_json(g_stats.tree_depth_ttstores, q_n) << ","
         << "\"treedepth_fail_highs\":" << array_to_json(g_stats.tree_depth_fail_highs, q_n) << ","
         << "\"treedepth_fail_lows\":" << array_to_json(g_stats.tree_depth_fail_lows, q_n) << ","
-        << "\"treedepth_fail_high_firsts\":" << array_to_json(g_stats.tree_depth_fail_high_firsts, q_n) << ","
-        << "\"treedepth_fail_high_lates\":" << array_to_json(g_stats.tree_depth_fail_high_lates, q_n) << ","
+        << "\"treedepth_fh_index\":" << depth_buckets_to_json(g_stats.tree_depth_fh_index, q_n) << ","
         << "\"treedepth_see_prunes\":" << array_to_json(g_stats.tree_depth_see_prunes, q_n) << ","
         << "\"treedepth_delta_prunes\":" << array_to_json(g_stats.tree_depth_delta_prunes, q_n) << ","
         << "\"treedepth_pvs_researches\":" << array_to_json(g_stats.tree_depth_pvs_researches, q_n) << ","
@@ -440,11 +473,31 @@ inline void dumpSearchStats()
               static_cast<double>(g_stats.tt_hits + g_stats.tt_stores)
             : 0.0;
 
-    const double fh_first_pct =
-        g_stats.fail_highs > 0
-            ? 100.0 * static_cast<double>(g_stats.fail_high_firsts) /
-              static_cast<double>(g_stats.fail_highs)
-            : 0.0;
+    // Compute fail-high index summary stats (mean, median, p75)
+    // Expand histogram to effective index values: 0,1,2,3,5.5(avg 4-7),10(avg 8+)
+    const double bucket_midpoints[] = {0.0, 1.0, 2.0, 3.0, 5.5, 10.0};
+    double fh_mean = 0.0;
+    double fh_median = 0.0;
+    double fh_p75 = 0.0;
+    double fh_first_pct = 0.0;
+    if (g_stats.fail_highs > 0) {
+        const double fh_total = static_cast<double>(g_stats.fail_highs);
+        // mean
+        for (int b = 0; b < STATS_FH_BUCKETS; ++b)
+            fh_mean += bucket_midpoints[b] * static_cast<double>(g_stats.fail_high_index[b]);
+        fh_mean /= fh_total;
+        // percentiles via cumulative distribution
+        uint64_t cum = 0;
+        bool found_median = false, found_p75 = false;
+        const uint64_t median_target = (g_stats.fail_highs + 1) / 2;
+        const uint64_t p75_target = (g_stats.fail_highs * 3 + 3) / 4;
+        for (int b = 0; b < STATS_FH_BUCKETS; ++b) {
+            cum += g_stats.fail_high_index[b];
+            if (!found_median && cum >= median_target) { fh_median = bucket_midpoints[b]; found_median = true; }
+            if (!found_p75 && cum >= p75_target) { fh_p75 = bucket_midpoints[b]; found_p75 = true; }
+        }
+        fh_first_pct = 100.0 * static_cast<double>(g_stats.fail_high_index[0]) / fh_total;
+    }
 
     const double nmp_success_pct =
         g_stats.nmp > 0
@@ -483,9 +536,15 @@ inline void dumpSearchStats()
         << "--- Cutoffs ---\n"
         << "Fail Highs       : " << g_stats.fail_highs << "\n"
         << "Fail Lows        : " << g_stats.fail_lows << "\n"
-        << "FH First         : " << g_stats.fail_high_firsts << "\n"
-        << "FH Late          : " << g_stats.fail_high_lates << "\n"
-        << "FH First %       : " << fh_first_pct << "%\n\n"
+        << "FH Index [0]     : " << g_stats.fail_high_index[0] << "  (" << fh_first_pct << "%)\n"
+        << "FH Index [1]     : " << g_stats.fail_high_index[1] << "\n"
+        << "FH Index [2]     : " << g_stats.fail_high_index[2] << "\n"
+        << "FH Index [3]     : " << g_stats.fail_high_index[3] << "\n"
+        << "FH Index [4-7]   : " << g_stats.fail_high_index[4] << "\n"
+        << "FH Index [8+]    : " << g_stats.fail_high_index[5] << "\n"
+        << "FH Mean Index    : " << fh_mean << "\n"
+        << "FH Median Index  : " << fh_median << "\n"
+        << "FH p75 Index     : " << fh_p75 << "\n\n"
 
         << "--- Pruning ---\n"
         << "SEE              : " << g_stats.see_prunes << "\n"
