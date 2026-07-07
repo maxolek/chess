@@ -1,8 +1,11 @@
 /**
  * Shared utilities for building dashboard views.
  */
-import { coordinator } from '@uwdata/mosaic-core';
+import { coordinator, Selection } from '@uwdata/mosaic-core';
 import * as vg from '@uwdata/vgplot';
+
+// Chart color palette
+export const COLORS = ['#818cf8', '#34d399', '#f472b6', '#fbbf24', '#22d3ee', '#fb923c'];
 
 /**
  * Run a SQL query and return results as an array of plain objects.
@@ -55,11 +58,73 @@ export function metricCard(value, label) {
 }
 
 /**
+ * Create a summary stat (smaller than metric card).
+ */
+export function summaryStat(value, label) {
+  return el('div', { class: 'summary-stat' },
+    el('div', { class: 'stat-value' }, String(value)),
+    el('div', { class: 'stat-label' }, label),
+  );
+}
+
+/**
+ * Create a summary row from an object of { label: value }.
+ */
+export function summaryRow(stats) {
+  const row = el('div', { class: 'summary-row' });
+  for (const [label, value] of Object.entries(stats)) {
+    row.appendChild(summaryStat(fmt(value), label));
+  }
+  return row;
+}
+
+/**
+ * Create a controls bar with Mosaic inputs and/or native selects.
+ */
+export function controlsBar(...children) {
+  const bar = el('div', { class: 'controls-bar' });
+  for (const child of children) {
+    if (child) bar.appendChild(child);
+  }
+  return bar;
+}
+
+/**
+ * Create a labeled control group (label + element).
+ */
+export function controlGroup(label, input) {
+  return el('div', { class: 'control-group' },
+    el('label', {}, label),
+    input,
+  );
+}
+
+/**
+ * Create a native <select> that triggers a callback on change.
+ * options: [{value, label}]
+ */
+export function nativeSelect(options, onChange, defaultValue) {
+  const select = el('select', {});
+  for (const opt of options) {
+    const option = el('option', { value: opt.value }, opt.label || opt.value);
+    if (opt.value === defaultValue) option.selected = true;
+    select.appendChild(option);
+  }
+  select.addEventListener('change', () => onChange(select.value));
+  return select;
+}
+
+/**
  * Format a number with commas.
  */
 export function fmt(n) {
   if (n == null) return '—';
-  return Number(n).toLocaleString();
+  const num = Number(n);
+  if (isNaN(num)) return '—';
+  if (Math.abs(num) >= 1e6) return (num / 1e6).toFixed(1) + 'M';
+  if (Math.abs(num) >= 1e3) return (num / 1e3).toFixed(1) + 'K';
+  if (Number.isInteger(num)) return num.toLocaleString();
+  return num.toFixed(2);
 }
 
 /**

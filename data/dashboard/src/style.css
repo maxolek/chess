@@ -1,18 +1,27 @@
 :root {
-  --bg: #0a0c10;
-  --bg-surface: #12141a;
-  --bg-elevated: #1a1d25;
-  --border: #2a2d35;
-  --text-pri: #e4e4e7;
-  --text-sec: #8b8d94;
-  --accent: #6366f1;
-  --accent2: #22d3ee;
+  --bg: #0b0d12;
+  --bg-surface: #13161e;
+  --bg-elevated: #1c1f2a;
+  --border: #262a36;
+  --text-pri: #e8eaf0;
+  --text-sec: #7c8190;
+  --accent: #818cf8;
+  --accent2: #34d399;
+  --accent3: #f472b6;
+  --accent4: #fbbf24;
   --success: #10b981;
   --warning: #f59e0b;
   --danger: #ef4444;
+  --chart-1: #818cf8;
+  --chart-2: #34d399;
+  --chart-3: #f472b6;
+  --chart-4: #fbbf24;
+  --chart-5: #22d3ee;
+  --chart-6: #fb923c;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
   --font-sans: 'Inter', -apple-system, sans-serif;
-  --radius: 8px;
+  --radius: 10px;
+  --radius-sm: 6px;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -174,13 +183,21 @@ body {
   border-radius: var(--radius);
   padding: 16px;
   text-align: center;
+  transition: border-color 0.2s;
+}
+
+.metric-card:hover {
+  border-color: var(--accent);
 }
 
 .metric-card .value {
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 700;
   font-family: var(--font-mono);
-  color: var(--accent);
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .metric-card .label {
@@ -190,6 +207,85 @@ body {
   letter-spacing: 0.5px;
   color: var(--text-sec);
   margin-top: 4px;
+}
+
+/* Controls bar */
+.controls-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 18px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+}
+
+.controls-bar label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-sec);
+  margin-right: 4px;
+}
+
+.controls-bar select,
+.controls-bar input[type="range"] {
+  padding: 5px 10px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-pri);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.controls-bar select:hover,
+.controls-bar select:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Summary row */
+.summary-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.summary-stat {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  text-align: center;
+}
+
+.summary-stat .stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--accent);
+}
+
+.summary-stat .stat-label {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-sec);
+  margin-top: 2px;
 }
 
 /* Mosaic plot containers */
@@ -251,6 +347,36 @@ body {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   color: var(--text-pri);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 4px 8px;
+}
+
+/* Vgplot overrides for dark theme */
+.plot-container text {
+  fill: var(--text-sec) !important;
+}
+
+.plot-container [aria-label="x-axis tick label"],
+.plot-container [aria-label="y-axis tick label"] {
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.tab-btn.active {
+  background: linear-gradient(135deg, var(--accent), #6366f1);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(129, 140, 248, 0.3);
+}
+
+.panel {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 16px;
+  transition: border-color 0.2s;
+}
+
+.panel:hover {
+  border-color: color-mix(in srgb, var(--border) 50%, var(--accent) 50%);
 }
