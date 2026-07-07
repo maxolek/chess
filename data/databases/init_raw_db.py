@@ -1,6 +1,7 @@
 import sqlite3
 from pathlib import Path
 from ..etl.paths import RAW_DB
+from .run_analytics_pipeline import run_module
 
 # long form function that create the database
 # and some associated tables
@@ -428,3 +429,7 @@ def init_raw_db(db_dir=None) -> None:
 
 if __name__ == "__main__":
     init_raw_db()
+
+    # migrate schema after init db
+    # (will throw warning for analytics if any migrations there yet)
+    run_module("data.transforms.migrate_schema")
