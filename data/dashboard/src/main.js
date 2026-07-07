@@ -23,6 +23,8 @@ import { renderRootMoves } from './views/rootmoves.js';
 import { renderQuality } from './views/quality.js';
 import { renderOpenings } from './views/openings.js';
 import { renderTimeMgmt } from './views/timemgmt.js';
+import { renderPruning } from './views/pruning.js';
+import { renderPositions } from './views/positions.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TABS CONFIGURATION
@@ -37,6 +39,8 @@ const TABS = [
   { id: 'compare',    label: 'Compare',     render: renderCompare },
   { id: 'iterations', label: 'Iterations',  render: renderIterations },
   { id: 'tree',       label: 'Tree Depth',  render: renderTree },
+  { id: 'pruning',    label: 'Pruning',     render: renderPruning },
+  { id: 'positions',  label: 'Positions',   render: renderPositions },
   { id: 'timing',     label: 'Timing',      render: renderTiming },
   { id: 'timemgmt',   label: 'Time Mgmt',   render: renderTimeMgmt },
   { id: 'rootmoves',  label: 'Root Moves',  render: renderRootMoves },
