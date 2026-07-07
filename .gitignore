@@ -9,6 +9,7 @@ settings.json
 
 # profiling
 TomahawkChessEngine/
+Magic Bitboards Speed/
 
 # repos
 libs/
@@ -16,6 +17,7 @@ libs/
 # data
 logs/
 data/dashboard_dash/
+data/dashboard/node_modules/
 
 # ignore engines
 engines/

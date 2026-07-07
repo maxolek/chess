@@ -6,10 +6,11 @@ controls (bullet, blitz, rapid, classical) and computes Elo ratings using the
 standard pairwise comparison method.
 
 Time control categories:
-  - bullet:    < 1 min/game     (default: 0:30+0.3)
-  - blitz:     < 10 min/game    (default: 3+0.03)
-  - rapid:     < 30 min/game    (default: 10+0.1)
-  - classical: >= 30 min/game   (default: 60+0.6)
+  - ultra_fast: < 25s/game       (default: 0:10+0.01)
+  - bullet:     < 2 min/game     (default: 1:00+0.3)
+  - blitz:      < 10 min/game    (default: 3+0.03)
+  - rapid:      < 30 min/game    (default: 10+0.1)
+  - classical:  >= 30 min/game   (default: 60+0.6)
 
 Usage (standalone):
   python -m tests.tournament --engine engines/1.0.exe --tc blitz --games 50
@@ -48,7 +49,7 @@ TC_DEFAULTS = {
 # default elo for oldest engine to build each version off of
 # only needed for first tournament run (after that new elos are used)
 ANCHOR_ELO = 1500.0
-
+RATING_FLOOR = 100.0
 
 def get_all_engines(cnxn, n=3):
     """Get last n=3 engine versions ++ first version and their exe paths from the DB."""
@@ -74,6 +75,46 @@ def get_all_engines(cnxn, n=3):
         if not exe_path.exists():
             exe_path = ENGINES_DIR / version
             if not exe_path.exists():
+                continue
+        engines.append({"id": engine_id, "version": version, "path": str(exe_path)})
+    return engines
+
+
+def get_engines_by_names(cnxn, names):
+    """Look up engine records (id, version, path) for explicitly named versions.
+
+    `names` is a list of version strings (e.g. ["1.0", "0.9.3"]). Any name not
+    found in the DB, or whose exe can't be located, is skipped with a warning.
+    """
+    if not names:
+        return []
+
+    placeholders = ",".join("?" for _ in names)
+    rows = cnxn.execute(
+        f"SELECT id, version FROM engines WHERE version IN ({placeholders})",
+        list(names),
+    ).fetchall()
+
+    found_versions = {row[1] for row in rows}
+    missing = [n for n in names if n not in found_versions]
+    if missing:
+        print(f"[TOURNAMENT] WARNING: requested engine(s) not found in DB: {missing}")
+        for _ in missing:
+            engine_filepath = f"engines/{_}.exe"
+            print(f"[TOURNAMENT] Engine {_} not registered, registering now...")
+            
+            _id = etl.register_engine(cnxn, {"engine_path": engine_filepath})
+            _version = etl.probe_engine_metadata(engine_filepath)['version']
+            rows.append([_id, _version])
+
+    engines = []
+    for row in rows:
+        engine_id, version = row[0], row[1]
+        exe_path = ENGINES_DIR / f"{version}.exe"
+        if not exe_path.exists():
+            exe_path = ENGINES_DIR / version
+            if not exe_path.exists():
+                print(f"[TOURNAMENT] WARNING: exe not found for engine version={version}, skipping")
                 continue
         engines.append({"id": engine_id, "version": version, "path": str(exe_path)})
     return engines
@@ -285,7 +326,7 @@ def compute_pool_elo(candidate_pairwise, opponents, opponent_ratings):
     elo = sum(e*w for e,w in zip(estimates, weights)) / sum(weights)
     return round(elo, 1), total_games
 
-def run_cutechess_tournament(candidate_path, opponents, tc, games_per_pair, cutechess_cli, book=None):
+def run_cutechess_tournament(candidate_path, opponents, tc, games_per_pair, cutechess_cli, concurrency = 2, book=None):
     """Run candidate vs all opponents using cutechess-cli.
     
     Returns raw stdout text for parsing.
@@ -329,7 +370,7 @@ def run_cutechess_tournament(candidate_path, opponents, tc, games_per_pair, cute
         "-games", str(games_per_pair),
         "-repeat",
         "-maxmoves", "200",
-        "-concurrency", "2",
+        "-concurrency", f"{concurrency}",
         "-pgnout", str(TOURNAMENT_LOG_DIR / "tournament.pgn"),
     ] + book_block
 
@@ -381,7 +422,7 @@ def classify_tc(tc_str):
     # ultra-fast:  < 15 seconds total game time (0.25 minutes)
     if game_time_min < 0.25:
         return "ultra_fast"
-    elif game_time_min < 1:
+    elif game_time_min < 2:
         return "bullet"
     elif game_time_min < 10:
         return "blitz"
@@ -403,6 +444,7 @@ def run_tournament(args, cnxn, engine_id):
     tc_categories = getattr(args, "tournament_tc", ["blitz"])
     n_engines = getattr(args, "tournament_engines", 3)
     listed_opponents = getattr(args, "opps", [])
+    concurrency = getattr(args, "concurrency")
 
     if len(listed_opponents) == 0:
         # Get all other engines from DB
@@ -410,7 +452,13 @@ def run_tournament(args, cnxn, engine_id):
         # Exclude the candidate itself
         opponents = [e for e in all_engines if e["id"] != engine_id]
     else:
-        opponents = listed_opponents
+        # Explicit opponent list. Accept either version-name strings
+        # (resolved against the DB) or pre-built engine dicts.
+        if all(isinstance(o, dict) for o in listed_opponents):
+            resolved = listed_opponents
+        else:
+            resolved = get_engines_by_names(cnxn, listed_opponents)
+        opponents = [e for e in resolved if e["id"] != engine_id]
 
     if not opponents:
         print("[TOURNAMENT] No opponents in database, skipping tournament.")
@@ -429,7 +477,7 @@ def run_tournament(args, cnxn, engine_id):
         print(f"\n[TOURNAMENT] === {actual_cat.upper()} (tc={tc}) ===")
 
         output, names = run_cutechess_tournament(
-            candidate_path, opponents, tc, games_per_pair, cutechess_cli, book
+            candidate_path, opponents, tc, games_per_pair, cutechess_cli, concurrency, book
         )
 
         pairwise = parse_tournament_output(output, names)
@@ -455,7 +503,13 @@ def run_tournament(args, cnxn, engine_id):
                       f"+{p['wins']} -{p['losses']} ={p['draws']}  {diff_str}")
                 
         # compute performance rating
-        candidate_elo, total_games = compute_performance_ratings(candidate_pairwise, opponent_elos)
+        perf_elo, _ = compute_performance_ratings(candidate_pairwise, opponent_elos)
+
+        # compute pool elo (w_avg of opp_rating + pairwise_diff)
+        candidate_elo, total_games = compute_pool_elo(candidate_pairwise, opponents,
+                                                      {o['id']: opponent_elos[f"v{o['version']}"] for o in opponents})
+        if candidate_elo is not None: 
+            candidate_elo = max(candidate_elo, RATING_FLOOR)
 
         ratings[actual_cat] = {
             "elo": candidate_elo,
@@ -464,7 +518,7 @@ def run_tournament(args, cnxn, engine_id):
 
         avg_opp = (sum(opponent_elos[f"v{o['version']}"] for o in opponents) / len(opponents)
                    if opponents else 0)
-        print(f"[TOURNAMENT] {actual_cat}: perf_rating={candidate_elo} "
+        print(f"[TOURNAMENT] {actual_cat}: pool_elo={candidate_elo} perf_elo={candidate_elo} "
               f"avg_opp={avg_opp:.0f} games={total_games}")
 
     # update opponent ratings using standard elo formula
@@ -519,7 +573,7 @@ def run_tournament(args, cnxn, engine_id):
                 continue
 
             old_elo = elo_map[name]
-            new_elo = round(old_elo + delta, 1)
+            new_elo = max(round(old_elo + delta, 1), RATING_FLOOR)
             print(f"  {name:12s}: {old_elo:.0f} -> {new_elo:.0f} "
                   f"(delta={delta:+.1f}, games={games_count[name]})")
             # update engine ratings in DB for this engine name
@@ -594,34 +648,53 @@ def run_tournament(args, cnxn, engine_id):
 def main():
     parser = argparse.ArgumentParser(description="Round-robin tournament runner")
     parser.add_argument("--engine", required=True, help="Candidate engine path")
-    parser.add_argument("--opps", default=[], help="Names of opponent .exe files")
+    parser.add_argument("--opps", nargs="+", default=[],
+                        help="Explicit list of opponent engine version names "
+                             "(e.g. --opps 1.0 0.9.3). Overrides --n_engines auto-selection.")
     parser.add_argument("--n_engines", default=3, help="Number of last versions in tournament")
     parser.add_argument("--tc", nargs="+", default=["blitz"],
-                        choices=["ultra_fast", "bullet", "blitz", "rapid", "classical"],
-                        help="Time control categories to run")
+                        help="Time controls to run. Accepts category names "
+                             "(ultra_fast, bullet, blitz, rapid, classical), which "
+                             "map to their default tc string, and/or explicit tc "
+                             "strings (e.g. 15+0.15, 1:00+0.6) which are used as-is "
+                             "and auto-classified into a category for rating purposes.")
     parser.add_argument("--games", type=int, default=10, help="Games per opponent per TC")
     parser.add_argument("--book", default=str(PROJECT_ROOT / "bin" / "opening_books" / "8moves_v3.pgn"))
+    parser.add_argument("--concurrency", default=2, type=int, help="Number of games to run simultaneously (uses 2*concurrency threads)")
     parser.add_argument("--cutechess-cli",
                         default=r"C:\Program Files (x86)\Cute Chess\cutechess-cli.exe")
-
+ 
     args = parser.parse_args()
-
+ 
+    # Validate --tc entries up front: either a known category name, or a
+    # parseable explicit tc string (e.g. "15+0.15", "1:00+0.6").
+    for tc_entry in args.tc:
+        if tc_entry in TC_DEFAULTS:
+            continue
+        try:
+            classify_tc(tc_entry)
+        except (ValueError, IndexError):
+            parser.error(
+                f"invalid --tc value '{tc_entry}': must be one of "
+                f"{list(TC_DEFAULTS.keys())} or a parseable tc string like '15+0.15'"
+            )
+ 
     if system == "Windows":
         db_path = "F:/databases/chess.db"
     else:
         db_path = str(Path.home() / "Documents/databases/chess.db")
-
+ 
     cnxn = sqlite3.connect(db_path)
-
+ 
     # Get candidate engine ID
     meta = etl.probe_engine_metadata(args.engine)
     engine_id = etl.get_engine_id(cnxn, version=meta["version"])
-
+ 
     # auto-register if not found
     if engine_id is None:
         print(f"[TOURNAMENT] Engine {meta['version']} not registered, registering now...")
         engine_id = etl.register_engine(cnxn, {"engine_path": args.engine})
-
+ 
     # Build namespace for run_tournament
     ns = argparse.Namespace(
         engine=args.engine,
@@ -630,12 +703,14 @@ def main():
         tournament_games=args.games,
         tournament_tc=args.tc,
         tournament_engines=args.n_engines,
-        tournament_opponents=args.opponents,
+        opps=args.opps,
+        concurrency=args.concurrency,
     )
-
+ 
     run_tournament(ns, cnxn, engine_id)
     cnxn.close()
-
-
+ 
+ 
 if __name__ == "__main__":
     main()
+ 

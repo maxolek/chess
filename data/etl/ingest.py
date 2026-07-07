@@ -221,14 +221,15 @@ def register_engine(cnxn, engine):
         options = engine_meta.get("options", {})
         print(f"[ETL] Probed option keys: {list(options.keys())}")
         version = engine.get("version") or engine_meta.get("version")
-        name = engine.get("name") or Path(engine_path).stem
+        name = engine.get("name") or Path(engine_path).name.removesuffix('.exe')
         #description = engine.get("description") or f"Auto-registered from {engine_path}"
 
         # prompt user for description instead of auto-filling
         if engine.get("description"): 
             description = engine['description']
         else:
-            print(f"\n[ETL] Registerinng new engine: {name} ({version})")
+            print(f"\n[ETL] Registering new engine: {name} ({version})")
+            name        = input("  Enter a name for this engine version (or press Enter to skip): ").strip()
             description = input("  Enter a description for this engine version (or press Enter to skip): ").strip()
             if not description: 
                 description = f"Auto-registered from {engine_path}"

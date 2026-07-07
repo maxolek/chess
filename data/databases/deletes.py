@@ -35,7 +35,8 @@ def drop_all_tables(db_path) -> None:
             "position_features",
             "search_iteration_features",
             "search_tree_features",
-            "search_features"
+            "search_features",
+            "schema_migrations"
         ]
     else:
         tables = [
@@ -50,7 +51,8 @@ def drop_all_tables(db_path) -> None:
             "perft",
             "experiments",
             "engines",
-            "engine_ratings"
+            "engine_ratings",
+            "schema_migrations"
         ]
 
     dropped = []

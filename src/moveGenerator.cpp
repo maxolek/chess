@@ -173,6 +173,7 @@ bool MoveGenerator::isEnpassantPinned(int start_square, int target_file) {
 // ---- sliding moves ----
 // -----------------------
 
+// magic bitboards
 void MoveGenerator::generateSlidingMoves(bool ours) {
     U64 occ = own | opp;
     Move potential_move;
@@ -217,6 +218,7 @@ void MoveGenerator::generateSlidingMoves(bool ours) {
     }
 }
 
+// sliding bitboards
 /*
 U64 MoveGenerator::odiff(U64 occ, SMasks pMask) {
     U64 lower, upper, ms1b, odiff_board;
