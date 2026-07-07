@@ -43,7 +43,7 @@ async function init() {
   try {
     status.textContent = 'Initializing DuckDB-WASM...';
     
-    const wasm = wasmConnector();
+    const wasm = await wasmConnector();
     coordinator().databaseConnector(wasm);
     
     status.textContent = 'Loading database...';

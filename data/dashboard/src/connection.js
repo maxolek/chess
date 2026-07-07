@@ -31,7 +31,7 @@ export async function initDatabase(dbPath) {
  * Initialize from a local file selected by the user via file picker.
  */
 export async function initFromFile(file) {
-  const wasm = wasmConnector();
+  const wasm = await wasmConnector();
   coordinator().databaseConnector(wasm);
   
   // Register the file with DuckDB-WASM

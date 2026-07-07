@@ -228,7 +228,8 @@ def register_engine(cnxn, engine):
         if engine.get("description"): 
             description = engine['description']
         else:
-            print(f"\n[ETL] Registerinng new engine: {name} ({version})")
+            print(f"\n[ETL] Registering new engine: {name} ({version})")
+            name        = input("  Enter a name for this engine version (or press Enter to skip): ").strip()
             description = input("  Enter a description for this engine version (or press Enter to skip): ").strip()
             if not description: 
                 description = f"Auto-registered from {engine_path}"

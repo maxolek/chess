@@ -99,6 +99,13 @@ def get_engines_by_names(cnxn, names):
     missing = [n for n in names if n not in found_versions]
     if missing:
         print(f"[TOURNAMENT] WARNING: requested engine(s) not found in DB: {missing}")
+        for _ in missing:
+            engine_filepath = f"engines/{_}.exe"
+            print(f"[TOURNAMENT] Engine {_} not registered, registering now...")
+            
+            _id = etl.register_engine(cnxn, {"engine_path": engine_filepath})
+            _version = etl.probe_engine_metadata(engine_filepath)['version']
+            rows.append([_id, _version])
 
     engines = []
     for row in rows:

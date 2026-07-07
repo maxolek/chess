@@ -105,6 +105,17 @@ elseif (CMAKE_BUILD_TYPE STREQUAL "Asan")
     )
     target_compile_definitions(tomahawk PRIVATE DEBUG)
 
+# profile with full optimization
+elseif (CMAKE_BUILD_TYPE STREQUAL "Profile")
+    target_compile_options(tomahawk PRIVATE
+        -O3
+        -ffast-math
+        -march=native
+        -flto
+        -g
+        -fno-omit-frame-pointer
+    )
+
 # RELEASE
 else()
     target_compile_options(tomahawk PRIVATE
