@@ -376,7 +376,7 @@ def build_search_features(cnxn, full=False):
 
             -- total ratios
             (s.nodes + s.qnodes) / NULLIF(s.time_ms / 1000,0) AS nps,
-            s.qnodes / NULLIF(s.nodes,0) AS qratio,
+            s.qnodes / NULLIF(s.nodes + s.qnodes,0) AS qratio,
             s.tt_hits / NULLIF(s.nodes + s.qnodes,0) AS tt_hit_ratio,
             s.tt_stores / NULLIF(s.nodes + s.qnodes,0) AS tt_store_ratio,
             s.fail_highs / NULLIF(s.nodes + s.qnodes,0) AS fail_high_ratio,

@@ -4,7 +4,7 @@ import shutil
 from pathlib import Path
 
 from .paths import GAME_JSON, SEARCH_JSON, TIMING_JSON, ROOT_MOVES_JSON, GAMES_LOG_DIR, LOG_DIRS, get_jsonl_paths
-from .utils import safe_val, safe
+from .utils import safe_val, safe, consolidate_instance_logs
 from .db import get_engine_id, clear_log_dir, extract_engine_id_from_search, probe_engine_metadata, save_engine_config
 
 def _iter_json_objects_from_path(path):
@@ -39,6 +39,8 @@ def ingest_log_dir(cnxn, log_dir, clear=True):
     """Ingest all JSONL files from a given log directory."""
     paths = get_jsonl_paths(log_dir)
     game_map = {}
+
+    consolidate_instance_logs(log_dir)
 
     if paths["game"].is_file():
         game_map = bulk_log_game(cnxn, paths["game"])

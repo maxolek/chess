@@ -258,6 +258,7 @@ def parse_args():
     p.add_argument("--book-depth", type=int, default=16) # 8 full moves
 
     # Logging
+    p.add_argument('--stats_test', action='store_true', help='Flag to have an engine/version play itself but with the candidate logging off and the baseline logging on.')
     p.add_argument('--log', action="store_true", help="Flag to turn on logging for candidate engine")
     p.add_argument(
         "--logroot",
@@ -287,9 +288,11 @@ def main(args=None):
     else:  # args.tc must exist
         base_sec = 60*int(re.split(":", args.tc)[0]) + int(re.split(":", args.tc)[1][:2])
         fast_tc = base_sec <= 30
-    should_log = args.log and fast_tc
+    should_log = (args.log and fast_tc) or args.stats_test
 
-    if (should_log):
+    if (args.stats_test):
+        print("[SPRT] Stats Test: Candidate all logging off, Baseline all logging on.\nCheck if stats collection is notably detrimental to performance.\n Candidate logging off allows typical [0,10] bounds as we know this can only improve performance.")
+    elif (should_log):
         print("[SPRT] Logging enabled for candidate engine (low time control ... logging can affect performance at these search speeds)")
 
     each_block = [
@@ -298,11 +301,11 @@ def main(args=None):
     ]
     log_a_block = [
         f"option.log_dir={args.logroot}",
-        f"option.timer_logging={"true" if args.log else "false"}",
-        f"option.stats_logging={"true" if args.log else "false"}",
-        f"option.game_logging={"true" if args.log else "false"}",
-        f"option.root_moves_logging={"true" if args.log else "false"}",
-        f"option.uci_logging=true",
+        f"option.timer_logging={"true" if args.log & ~args.stats_test else "false"}",
+        f"option.stats_logging={"true" if args.log & ~args.stats_test else "false"}",
+        f"option.game_logging={"true" if args.log & ~args.stats_test else "false"}",
+        f"option.root_moves_logging={"true" if args.log & ~args.stats_test else "false"}",
+        f"option.uci_logging={"true" if ~args.stats_test else "false"}",
     ]
     log_b_block = [
         f"option.log_dir={args.logroot}",
