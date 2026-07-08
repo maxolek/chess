@@ -17,8 +17,6 @@ def _iter_json_objects_from_path(path):
                 data = json.loads(text)
             except json.JSONDecodeError:
                 print(f"[WARN] skipping malformed JSON line {line_no} in {path}")
-                print("\n\n\n")
-                print(text)
                 continue
 
             if not isinstance(data, dict):

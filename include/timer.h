@@ -91,7 +91,7 @@ inline void logTimingStats(const std::string& fen = "") {
     out << "\"session\":" << currentSession() << ",";
     out << "\"game_uuid\":\"" << g_run_context.game_uuid << "\",";
     out << "\"search_uuid\":\"" << g_run_context.search_uuid << "\",";
-    out << "\"fen\":\"" << fen;
+    out << "\"fen\":\"" << fen << "\"";
     //out << "\"total_search_time_ms\":" << total_ms;
 
     for (int i = 0; i < T_COUNT; ++i) {

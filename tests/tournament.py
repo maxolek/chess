@@ -639,7 +639,7 @@ def run_tournament(args, cnxn, engine_id):
         print("[DATA] Log files preserved due to ingestion failure.")
 
     # !!! outdated ... printing perf-rating not new-rating !!!
-    #print(f"\n[TOURNAMENT] Ratings logged for new engine (id={engine_id}")
+    #print(f"\n[TOURNAMENT] Ratings logged for new engine (id={engine_id}"))
     #for cat, r in ratings.items():
     #    print(f"  {cat:12s}: Elo={r['elo']}, games={r['games']}")
 
