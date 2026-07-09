@@ -31,7 +31,7 @@ struct SearchParams {
     float R_LMR_CONST            = 0.99f;  // late move reductions 
     float R_LMR_DENOM            = 3.14f;  //   = const + [log(depth) * log(move_order)] / denom
     int   LMR_MOVE_ORDER_THRESHOLD = 3; // minimum move order # to start using LMR
-    int   LMR_DEPTH_THRESHOLD    = 2; // max search depth where LMR doesnt trigger
+    int   LMR_DEPTH_THRESHOLD    = 3; // max search depth where LMR doesnt trigger
 };
 
 // ---- move ordering priorities ----

@@ -37,7 +37,7 @@ RUNS_PER_POS = 1
 # (key, label, format, higher_is_better)
 STAT_DEFS = [
     ("time_ms",          "Time (ms)",            ",.0f", None),
-    ("depth",            "Completed Depth",      ".0f",  True),
+    ("depth",            "Completed Depth",      ".1f",  True),
     ("nps",              "NPS",                  ",.0f", True),
     ("nodes",            "Nodes",                ",.0f", True),
     ("qnodes",           "QNodes",               ",.0f", True),
@@ -296,7 +296,7 @@ if __name__ == "__main__":
 
     if "--game" in sys.argv:
         idx = sys.argv.index("--game")
-        game_path = sys.argv[idx+1]
+        game_path = "bin/test_positions/bench_game.txt"
 
     if "--side" in sys.argv:
         idx = sys.argv.index("--side")
