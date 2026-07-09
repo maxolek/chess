@@ -301,7 +301,7 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
 
     int _lmr_R = 0;
 
-    bool in_check, is_pawn_endgame, was_capture;
+    bool in_check, is_pawn_endgame, was_capture, is_capture;
     Move m; int score; PV childPV;
 
     // --- move loop ---
@@ -315,6 +315,7 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
         in_check = board.is_in_check;
         is_pawn_endgame = board.pawn_endgame;
         was_capture = board.currentGameState.capturedPieceType != -1;
+        is_capture = board.getCapturedPiece(m.TargetSquare()) != -1;
 
         // Apply NNUE/update & board
         nnue.on_make_move(board, m);
@@ -329,12 +330,10 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
         // if the reduced search returns > alpha then we can re-search it with full depth
         // integration with PVS: use PVS+LMR concurrently
         //    if the move returns > alpha then do full-search (depth+window)
-        /*
         if (
             // positional conditions apply
-            board.currentGameState.capturedPieceType == -1
+            !is_capture
             && !m.IsPromotion()
-            && !board.is_in_check
             && !in_check
         ) {
             // obsidian log formula
@@ -342,7 +341,6 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
         } else {
             _lmr_R = 0;
         }
-        */
 
         // -----------------------------
         // principal variation search 
@@ -353,7 +351,11 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
         // else it fails low and is not going to be a better move than what has been found
         // null window searches are cheap and so the re-searches are worth the speedup
         //if (!i) { // first move (full window)
-            score = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply + 1);
+        score = -negamax(depth - 1 - _lmr_R, -beta, -alpha, childPV, previousPV, limits, ply + 1);
+        if (_lmr_R > 0 && score > alpha) { // research at full depth if move raises alpha
+            childPV = {};   // don't let the reduced-search line leak into the full-depth result
+            score = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply+1);
+        }
             //if (limits.out_of_time()) break;   // score may be garbage, discard and stop this node
         //} else { // other moves (null window around alpha + full researches if suspected >alpha)
         //    {
@@ -531,5 +533,7 @@ int Searcher::R_lmr(int depth, int move_order) {
     float log_depth = std::log(static_cast<float>(depth));
     float log_order = std::log(static_cast<float>(move_order));
     // unlikely to exceed 4 without heavy parameter tuning (or very deep search)
-    return static_cast<int>(params.R_LMR_CONST + (log_depth * log_order) / params.R_LMR_DENOM);;
+    int reduction = static_cast<int>(params.R_LMR_CONST + (log_depth * log_order) / params.R_LMR_DENOM);
+    
+    return std::min(reduction, depth-2);
 }
