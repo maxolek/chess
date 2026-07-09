@@ -154,6 +154,7 @@ def init_raw_db(db_dir=None) -> None:
             -- pruning
             see_prunes                  INTEGER,
             delta_prunes                INTEGER,
+            pvs_researches              INTEGER,
             nmp                         INTEGER,
             nmp_fail                    INTEGER,
             tt_overwritten              INTEGER,

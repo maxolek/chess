@@ -18,7 +18,9 @@
 // Timer IDs
 enum TimerID {
     T_MOVEGEN, T_MAKEMOVE, T_UNMAKE_MOVE,
-    T_SEARCH, T_PVS_SEARCH, T_PVS_RESEARCH, T_NMP_SEARCH,
+    T_SEARCH, 
+    T_PVS_SEARCH, T_PVS_RESEARCH, T_PVS_ROOT_SEARCH, T_PVS_ROOT_RESEARCH,
+    T_NMP_SEARCH,
     T_SCORE_ORDER,
     T_TT_PROBE, T_TT_STORE, 
     T_EVAL, T_NNUE, 
@@ -30,7 +32,9 @@ enum TimerID {
 // inline variable avoids multiple definitions
 inline const char* TimerNames[T_COUNT] = {
     "MOVEGEN", "MAKEMOVE", "UNMAKE_MOVE",
-    "SEARCH", "PVS_SEARCH", "PVS_RESEARCH", "NMP_SEARCH",
+    "SEARCH", 
+    "PVS_SEARCH", "PVS_RESEARCH", "PVS_ROOT_SEARCH", "PVS_ROOT_SEARCH",
+    "NMP_SEARCH",
     "SCORE_ORDER",
     "TT_PROBE", "TT_STORE",
     "EVAL", "NNUE",

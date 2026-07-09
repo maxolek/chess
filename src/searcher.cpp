@@ -68,7 +68,7 @@ int Searcher::moveScore(const Move& move, const Board& boardRef,
         int captured = boardRef.getCapturedPiece(move.TargetSquare());
         seeScore = 0;
         if (captured != -1) {
-            int seeScore = eval.SEE(boardRef, move);
+            seeScore = eval.SEE(boardRef, move);
             return seeScore >= 0 ? move_scores.GOOD_CAP_BASE + seeScore + promoBonus
                                  : move_scores.BAD_CAP_BASE  + seeScore + promoBonus;
         }
@@ -254,8 +254,6 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
         if (ttEntry->flag == EXACT) return ttScore;
         else if (ttEntry->flag == UPPERBOUND && ttScore <= alpha) return ttScore;
         else if (ttEntry->flag == LOWERBOUND && ttScore >= beta)  return ttScore;
-
-        //if (alpha >= beta) return ttScore;
     }
 
     // -----------------------------
@@ -306,6 +304,8 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
     bool in_check, is_pawn_endgame, was_capture;
     Move m; int score; PV childPV;
 
+    // --- move loop ---
+
     for (int i = 0; i < count; i++) {
         if (limits.out_of_time()) break;
 
@@ -354,20 +354,22 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
         // null window searches are cheap and so the re-searches are worth the speedup
         //if (!i) { // first move (full window)
             score = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply + 1);
-        /*} else {
-            {
-            ScopedTimer timer(T_PVS_SEARCH);
-            score = -negamax(depth - 1 - _lmr_R, -(alpha+1), -alpha, childPV, previousPV, limits, ply + 1);
-            }
+            //if (limits.out_of_time()) break;   // score may be garbage, discard and stop this node
+        //} else { // other moves (null window around alpha + full researches if suspected >alpha)
+        //    {
+            //ScopedTimer timer(T_PVS_SEARCH);
+            //score = -negamax(depth - 1 - _lmr_R, -(alpha+1), -alpha, childPV, previousPV, limits, ply + 1);
+            //if (limits.out_of_time()) break;   // score may be garbage, discard and stop this node
+        //    }
             // fail-high --> re-search with full window (can raise alpha)
             // beta-alpha>1 is a redudancy check
-            if (score > alpha && beta-alpha > 1) {
-                ScopedTimer timer(T_PVS_RESEARCH)
-                STATS_PVS_RESEARCH(depth+ply, ply);
-                score = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply + 1);
-            }
-        }
-         */
+            //if (score > alpha && beta-alpha > 1) {
+                //ScopedTimer timer(T_PVS_RESEARCH);
+            //    STATS_PVS_RESEARCH(depth+ply, ply);
+            //    score = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply + 1);
+            //    if (limits.out_of_time()) break;   // score may be garbage, discard and stop this node
+            //}
+        //}
 
         nnue.on_unmake_move(board, m);
         board.UnmakeMove(m);
@@ -383,10 +385,10 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
             
             STATS_FAILHIGH(depth+ply, ply, i);
 
-            if (!Move::SameMove(killerMoves[depth][0], m) && !m.IsPromotion() &&
+            if (!Move::SameMove(killerMoves[ply][0], m) && !m.IsPromotion() &&
                 !(1ULL << m.TargetSquare() & board.colorBitboards[1 - board.move_color])) {
-                killerMoves[depth][1] = killerMoves[depth][0];
-                killerMoves[depth][0] = m;
+                killerMoves[ply][1] = killerMoves[ply][0];
+                killerMoves[ply][0] = m;
             }
             int piece = board.getMovedPiece(m.StartSquare());
             historyHeuristic[board.is_white_move ? piece : piece + 6][m.TargetSquare()] += depth * depth;
@@ -394,10 +396,11 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
         }
     }
 
+    // --- tt-store ---
+
     BoundType flag = EXACT;
     if (bestEval <= alphaOrig) { flag = UPPERBOUND; STATS_FAILLOW(depth+ply, ply); }
     else if (bestEval >= beta) { flag = LOWERBOUND; }
-
     engine.tt.store(board.zobrist_hash, depth, ply, bestEval, flag, bestMove);
     //STATS_TT_STORE(depth+ply, ply);
 
@@ -444,9 +447,26 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
             nnue.on_make_move(board, m);
             board.MakeMove(m);
 
-            STATS_NODE(depth, ply);       // change to result.eval for proper alpha propogation
+            STATS_NODE(depth, ply);       
             PV childPV; // must be declared per root_move
-            eval = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply+1);
+
+            // --- PVS ---
+            //if (!i) { // first move (full window)
+                eval = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply+1);
+            //} else {
+            //    {
+            //    ScopedTimer timer(T_PVS_ROOT_SEARCH);
+                //eval = -negamax(depth - 1, -(alpha+1), -alpha, childPV, previousPV, limits, ply+1);
+            //    }
+                // fail-high --> re-search with full window (can raise alpha)
+                // beta-alpha>1 is a redudancy check
+            //    if (eval > alpha && beta-alpha > 1) {
+            //        ScopedTimer timer(T_PVS_ROOT_RESEARCH);
+            //        STATS_PVS_RESEARCH(depth+ply, ply);
+            //        eval = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply+1);
+            //    }
+            //}
+
 
             nnue.on_unmake_move(board, m);
             board.UnmakeMove(m);
@@ -459,6 +479,7 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
                 iter_result.root_moves[i].nodes = move_nodes;
             }
 
+            // time out is propagated up the tree, so eval and move cannot be trusted
             if (limits.out_of_time() && i > 0) break;
 
             iter_result.root_moves[i].move = m;
