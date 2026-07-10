@@ -30,13 +30,17 @@ bool Searcher::shouldPrune(Move& move, int standPat, int alpha, int search_depth
         // see pruning (bad captures ... excl promo and checks)
         int seeGain = eval.SEE(board, move);
         if (seeGain < params.SEE_PRUNE_THRESHOLD) {
-            STATS_SEE_PRUNE(search_depth, ply);
+            #ifdef DEV
+                STATS_SEE_PRUNE(search_depth, ply);
+            #endif
             return true;
         }
 
         // delta purning (quiet moves that wont raise alpha anyway)
         if (standPat + params.DELTA_PRUNE_THRESHOLD < alpha) {
-            STATS_DELTA_PRUNE(search_depth, ply);
+            #ifdef DEV
+                STATS_DELTA_PRUNE(search_depth, ply);
+            #endif
             return true;
         }
     }
@@ -101,7 +105,9 @@ int Searcher::moveScore(const Move& move, const Board& boardRef,
 void Searcher::orderedMoves(Move moves[MAX_MOVES], size_t count,
                             const Board& boardRef, int ply, const std::vector<Move>& previousPV) {
     
-    ScopedTimer timer(T_SCORE_ORDER);
+    #ifdef DEV
+        ScopedTimer timer(T_SCORE_ORDER);
+    #endif
     U64 hash = boardRef.zobrist_hash;
 
     // TT move choice
@@ -171,7 +177,11 @@ int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int 
 
     //return standPat;
 
-    STATS_QNODE(search_depth, ply); // macro unchanged
+    #ifdef DEV
+        STATS_QNODE(search_depth, ply); 
+    #else 
+        g_stats.nodes++;
+    #endif
 
     // generate only captures/promotions 
     int count = engine.movegen->generateMoves(board, true);
@@ -203,7 +213,9 @@ int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int 
         board.UnmakeMove(m);
 
         if (score >= beta) { 
-            STATS_FAILHIGH(search_depth, ply, i);
+            #ifdef DEV
+                STATS_FAILHIGH(search_depth, ply, i);
+            #endif
             return score; 
         }
         if (score > bestEval) {
@@ -228,7 +240,11 @@ int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int 
 int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
                       std::vector<Move>& previousPV, SearchLimits& limits, int ply) {
 
-    STATS_NODE(depth+ply, ply); // track node per depth
+    #ifdef DEV
+        STATS_NODE(depth+ply, ply); // track node per depth
+    #else 
+        g_stats.nodes++;
+    #endif 
     if (limits.out_of_time()) return alpha;
 
     // --- end of search conditions ---
@@ -248,7 +264,9 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
     TTEntry* ttEntry = engine.tt.probe(board.zobrist_hash);
 
     if (ttEntry && ttEntry->key == board.zobrist_hash && ttEntry->depth >= depth) {
-        STATS_TT_HIT(depth+ply, ply);
+        #ifdef DEV
+            STATS_TT_HIT(depth+ply, ply);
+        #endif
         int ttScore = ttEntry->eval;
 
         if (ttEntry->flag == EXACT) return ttScore;
@@ -384,8 +402,9 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
 
         alpha = std::max(alpha, bestEval);
         if (alpha >= beta) {
-            
-            STATS_FAILHIGH(depth+ply, ply, i);
+            #ifdef DEV
+                STATS_FAILHIGH(depth+ply, ply, i);
+            #endif
 
             if (!Move::SameMove(killerMoves[ply][0], m) && !m.IsPromotion() &&
                 !(1ULL << m.TargetSquare() & board.colorBitboards[1 - board.move_color])) {
@@ -401,8 +420,15 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
     // --- tt-store ---
 
     BoundType flag = EXACT;
-    if (bestEval <= alphaOrig) { flag = UPPERBOUND; STATS_FAILLOW(depth+ply, ply); }
-    else if (bestEval >= beta) { flag = LOWERBOUND; }
+    if (bestEval <= alphaOrig) { 
+        flag = UPPERBOUND; 
+        #ifdef DEV
+            STATS_FAILLOW(depth+ply, ply); 
+        #endif
+    }
+    else if (bestEval >= beta) { 
+        flag = LOWERBOUND; 
+    }
     engine.tt.store(board.zobrist_hash, depth, ply, bestEval, flag, bestMove);
     //STATS_TT_STORE(depth+ply, ply);
 
@@ -414,6 +440,7 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
 // ============================================================================
 
 SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth, SearchLimits& limits, std::vector<Move>& previousPV, int previousEval) {
+    
     int eval;
     int ply = 0; // root moves are depth=0, ply+1 in arg call makes made moves depth=1
     SearchResult result;
@@ -443,13 +470,17 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
             if (Move::SameMove(m, Move::NullMove())) continue;
 
             // root move stat tracking
-            uint64_t nodes_before = g_stats.nodes;
-            auto move_start = std::chrono::steady_clock::now();
+            #ifdef DEV
+                uint64_t nodes_before = g_stats.nodes;
+                auto move_start = std::chrono::steady_clock::now();
+            #endif
 
             nnue.on_make_move(board, m);
             board.MakeMove(m);
 
-            STATS_NODE(depth, ply);       
+            #ifdef DEV
+                STATS_NODE(depth, ply);     
+            #endif  
             PV childPV; // must be declared per root_move
 
             // --- PVS ---
@@ -473,6 +504,7 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
             nnue.on_unmake_move(board, m);
             board.UnmakeMove(m);
 
+            #ifdef DEV
             if (Logging::track_timers) {
                 auto move_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                     std::chrono::steady_clock::now() - move_start).count();
@@ -480,6 +512,7 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
                 iter_result.root_moves[i].time_ms = move_ms;
                 iter_result.root_moves[i].nodes = move_nodes;
             }
+            #endif
 
             // time out is propagated up the tree, so eval and move cannot be trusted
             if (limits.out_of_time() && i > 0) break;
@@ -499,12 +532,16 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
         // aspiration check
         if (!limits.should_stop(depth) && (depth >= params.ASPIRATION_START_DEPTH)) {
             if (iter_result.eval <= alpha) {
-                if (Logging::track_search_stats) STATS_ASPIRATION_FAILLOW(depth);
+                #ifdef DEV
+                    if (Logging::track_search_stats) STATS_ASPIRATION_FAILLOW(depth);
+                #endif
                 alpha -= delta;
                 delta *= params.ASPIRATION_RESEARCH_SCALE;
                 continue;
             } else if (iter_result.eval >= beta) {
-                if (Logging::track_search_stats) STATS_ASPIRATION_FAILHIGH(depth);
+                #ifdef DEV
+                    if (Logging::track_search_stats) STATS_ASPIRATION_FAILHIGH(depth);
+                #endif
                 beta += delta;
                 delta *= params.ASPIRATION_RESEARCH_SCALE;
                 continue;

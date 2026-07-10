@@ -150,8 +150,8 @@ def main():
     parser = argparse.ArgumentParser("Release pipeline")
 
     parser.add_argument("--version", required=True)
-    parser.add_argument("--name")
-    parser.add_argument("--description")
+    parser.add_argument("--name", required=True)
+    parser.add_argument("--description", required=True)
     
     parser.add_argument("--cutechess-cli", default=r"C:\Program Files (x86)\Cute Chess\cutechess-cli.exe", help="Full path to cutechess-cli.exe\nUsed for game testing")
 

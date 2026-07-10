@@ -47,6 +47,7 @@ struct MoveScores {
 
 class Searcher {
 public:
+    // ------------------------------- VARS -------------------------------
 
     // Object-owned state
     Engine& engine;
@@ -64,6 +65,8 @@ public:
 
     std::vector<Move> best_line;
     std::vector<Move> best_quiescence_line;
+
+    // ------------------------------- FUNCS -------------------------------
 
     Searcher(Engine& e, Board& b, Evaluator& ev, NNUE& nn) 
         : engine(e), 

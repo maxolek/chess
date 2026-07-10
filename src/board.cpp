@@ -39,7 +39,9 @@ Board::Board(const Board& other) {
 // Move execution / undo
 // ------------------------------------------------------------
 void Board::MakeMove(Move move) {
-    ScopedTimer timer(T_MAKEMOVE);
+    #ifdef DEV
+        ScopedTimer timer(T_MAKEMOVE);
+    #endif
 
     //currentGameState.was_in_check = is_in_check;
 
@@ -139,7 +141,9 @@ void Board::MakeMove(Move move) {
 }
 
 void Board::UnmakeMove(Move move) {
-    ScopedTimer timer(T_UNMAKE_MOVE);
+    #ifdef DEV
+        ScopedTimer timer(T_UNMAKE_MOVE);
+    #endif
 
     auto it = hash_history.find(zobrist_hash);
     if (it != hash_history.end()) {

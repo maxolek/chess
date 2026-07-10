@@ -116,6 +116,16 @@ elseif (CMAKE_BUILD_TYPE STREQUAL "Profile")
         -fno-omit-frame-pointer
     )
 
+# analysis (full stats) config
+elseif (CMAKE_BUILD_TYPE STREQUAL "DEV")
+    target_compile_options(tomahawk PRIVATE 
+        -O3
+        -ffast-math
+        -march=native
+        -flto
+    )
+    target_compile_definitions(tomahawk PRIVATE DEV)
+
 # RELEASE
 else()
     target_compile_options(tomahawk PRIVATE

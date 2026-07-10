@@ -47,6 +47,7 @@ void Engine::clearState() {
     increment[0] = increment[1] = 0;
     //evaluator = Evaluator(&precomp);
     //stats = SearchStats();
+    g_stats = SearchStats();
     tt.clear();
     game_board.setFromFEN(STARTPOS_FEN);
     search_board = game_board;
@@ -186,6 +187,7 @@ void Engine::setOption(const std::string& name, const std::string& value) {
     }
 
     // -------- logging --------
+    #ifdef DEV
     else if (name == "log_dir") {
         Logging::setLogDir(value);
         std::cout << "info string log_dir loaded successfully: " << Logging::log_dir << std::endl;
@@ -212,6 +214,7 @@ void Engine::setOption(const std::string& name, const std::string& value) {
     else {
         std::cout << "info string ignoring unknown option: " << name << std::endl;
     }
+    #endif
 
     std::cout.flush();
 }
@@ -463,9 +466,7 @@ void Engine::iterativeDeepening() {
     g_run_context.search_uuid = generate_uuid();
 
     // reset global stats
-    if (Logging::track_search_stats) {
-        resetSearchStats();           // global-level
-    }
+    if (Logging::track_search_stats) resetSearchStats();           
 
     SearchResult last_result;
     SearchResult result;
@@ -517,6 +518,7 @@ void Engine::iterativeDeepening() {
         auto depth_end = std::chrono::steady_clock::now();
 
         // --- logging --- 
+        #ifdef DEV
         if (Logging::track_search_stats) {
             //g_stats.max_completed_depth = depth;
             g_stats.it_depth_eval[depth] = result.eval;
@@ -528,6 +530,7 @@ void Engine::iterativeDeepening() {
         if (Logging::track_timers && result.root_count > 0) {
             logRootMoves(result, depth);
         }
+        #endif
 
         prevBest = bestMove;
         if (std::abs(result.eval) >= MATE_SCORE - 10) break;
@@ -540,11 +543,11 @@ void Engine::iterativeDeepening() {
     }
 
     // --- finalize cumulative stats ---
+    #ifdef DEV
     if (Logging::track_search_stats || Logging::track_search_nodes) {
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
                         std::chrono::steady_clock::now() - start_time).count();
         g_stats.game_ply = ply;
-        g_stats.time_ms = elapsed;
         //g_stats.nps = elapsed > 0 ? (1000.0 * g_stats.nodes / elapsed) : 0.0;
         g_stats.eval = last_result.eval;
         g_stats.move = last_result.bestMove;
@@ -559,6 +562,9 @@ void Engine::iterativeDeepening() {
         logSearchStats(game_board.getBoardFEN());  // JSON written once at end
     }
     if (Logging::track_timers) {logTimingStats(game_board.getBoardFEN());}
+    #endif 
+    g_stats.time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now() - start_time).count();
 }
 
 
