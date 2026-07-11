@@ -271,6 +271,13 @@ void Engine::setPosition(const std::string& fen,
     // must interpret uci in context of the board state for ep
     for (const auto& moveStr : moveStrs) {
 
+        if (moveStr == "null" || moveStr == "NULL" || moveStr == "Null") {
+            Move m = Move::NullMove();
+            game_board.MakeMove();
+            ply++;
+            continue;
+        }
+
         int start  = algebraic_to_square(moveStr.substr(0, 2));
         int target = algebraic_to_square(moveStr.substr(2, 2));
         int flag   = Move::noFlag;
@@ -317,6 +324,8 @@ void Engine::setPosition(const std::string& fen,
         game_board.MakeMove(m);
         ply++;
     }
+
+    game_board.is_in_check = game_board.inCheck(true);
 
     // --- Sync search board ---
     search_board = game_board; //Board(game_board);

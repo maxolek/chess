@@ -238,7 +238,8 @@ int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int 
 // ============================================================================
 
 int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
-                      std::vector<Move>& previousPV, SearchLimits& limits, int ply) {
+                      std::vector<Move>& previousPV, SearchLimits& limits, int ply, 
+                      bool can_nmp) {
 
     #ifdef DEV
         STATS_NODE(depth+ply, ply); // track node per depth
@@ -281,32 +282,36 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
     // so we pass the move (null move) and perform a null-window search with reduced depth around beta
     // if the null move fails high then we can assume the best move will also fail high
     // certain position restrictions must be used for the assumptions to hold
-    /*/
     if ( // not in check, and not king-pawn endgame (zugzwang prevention)
         (depth - params.R_NMP > 0)
         &&
+        can_nmp
+        && 
         !(
             board.is_in_check 
             || board.pawn_endgame 
         )
     ) {
-        ScopedTimer timer(T_NMP_SEARCH);
-        STATS_NMP(depth+ply, ply);
+        #ifdef DEV
+            ScopedTimer timer(T_NMP_SEARCH);
+            STATS_NMP(depth+ply, ply);
+        #endif
         PV emptyPV;
 
         // null moves just change the side to move (and last-move cache)
         board.MakeNullMove();
-        int null_score = -negamax(depth - 1 - params.R_NMP, -beta, -(beta - 1), emptyPV, previousPV, limits, ply + 1, use_quiescence);
+        int null_score = -negamax(depth - 1 - params.R_NMP, -beta, -(beta - 1), emptyPV, previousPV, limits, ply + 1, false);
         board.UnmakeNullMove();
 
         // null window around beta so if if null move fails high 
         // then so should the real move with a full window search
         if (null_score >= beta) {
-            STATS_NMP_FAIL(depth+ply, ply);
-            return beta;
+            #ifdef DEV
+                STATS_NMP_FAIL(depth+ply, ply);
+            #endif
+            return null_score;
         }
     }
-    */
 
     // --- search ---
 
@@ -369,10 +374,10 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
         // else it fails low and is not going to be a better move than what has been found
         // null window searches are cheap and so the re-searches are worth the speedup
         //if (!i) { // first move (full window)
-        score = -negamax(depth - 1 - _lmr_R, -beta, -alpha, childPV, previousPV, limits, ply + 1);
+        score = -negamax(depth - 1 - _lmr_R, -beta, -alpha, childPV, previousPV, limits, ply + 1, true);
         if (_lmr_R > 0 && score > alpha) { // research at full depth if move raises alpha
             childPV = {};   // don't let the reduced-search line leak into the full-depth result
-            score = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply+1);
+            score = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply+1, true);
         }
             //if (limits.out_of_time()) break;   // score may be garbage, discard and stop this node
         //} else { // other moves (null window around alpha + full researches if suspected >alpha)
@@ -485,7 +490,7 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
 
             // --- PVS ---
             //if (!i) { // first move (full window)
-                eval = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply+1);
+                eval = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply+1, true);
             //} else {
             //    {
             //    ScopedTimer timer(T_PVS_ROOT_SEARCH);

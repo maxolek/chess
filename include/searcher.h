@@ -92,7 +92,8 @@ public:
         PV& pv,
         std::vector<Move>& previousPV,
         SearchLimits& limits,
-        int ply
+        int ply,
+        bool can_nmp
     );
 
     int quiescence(

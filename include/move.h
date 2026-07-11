@@ -82,7 +82,17 @@ public:
     void PrintMove() const { 
         int start = StartSquare();
         int target = TargetSquare();
-        std::cout << square_to_algebraic(start) << "->" << square_to_algebraic(target) << std::endl; 
+        int promo_int = PromotionPieceType(); 
+        char promo_char = (promo_int > 0) ? piece_label(promo_int) : '.';
+
+        std::cout
+            << square_to_algebraic(StartSquare())
+            << "->"
+            << square_to_algebraic(TargetSquare());
+        if (PromotionPieceType() > 0) {
+            std::cout << " == " << piece_label(PromotionPieceType());
+        }
+        std::cout << '\n';
     }
     std::string uci() const {
         int start = StartSquare(); int target = TargetSquare(); 
