@@ -213,43 +213,40 @@ def delta_str(base_val, cand_val, higher_is_better, fmt):
     return f"{diff:+{fmt}} ({pct:+.1f}%) {symbol}"
 
 
-def print_comparison(
-    results: dict,       # results[engine] = list of stat dicts
-    engines: list[str],
-    label: str,
-):
+def print_comparison(results: dict, engines: list[str], label: str):
     names = [e.split("/")[-1].replace(".exe", "") for e in engines]
-    baseline = engines[0]
-    candidate = engines[1] if len(engines) > 1 else None
 
     col = 20
+
     print(f"\n{'='*80}")
     print(f"  {label}")
     print(f"{'='*80}")
-    print(f"  {'Stat':<25} {names[0]:>{col}}", end="")
-    if candidate:
-        print(f"  {names[1]:>{col}}  {'Delta':>{col}}", end="")
+
+    print(f"  {'Stat':<25}", end="")
+    for name in names:
+        print(f"{name:>{col}}", end="")
     print()
-    print(f"  {'-'*25} {'-'*col}", end="")
-    if candidate:
-        print(f"  {'-'*col}  {'-'*col}", end="")
+
+    print(f"  {'-'*25}", end="")
+    for _ in engines:
+        print(f" {'-'*col}", end="")
     print()
+
+    baseline = engines[0]
 
     for key, label_str, fmt, hib in STAT_DEFS:
         base_val = avg(results[baseline], key)
         if base_val is None:
             continue
 
-        base_str = format(base_val, fmt)
-        row = f"  {label_str:<25} {base_str:>{col}}"
+        print(f"  {label_str:<25}", end="")
 
-        if candidate:
-            cand_val = avg(results[candidate], key)
-            cand_str = format(cand_val, fmt) if cand_val is not None else "--"
-            d_str = delta_str(base_val, cand_val, hib, fmt)
-            row += f"  {cand_str:>{col}}  {d_str:>{col}}"
+        for engine in engines:
+            val = avg(results[engine], key)
+            val_str = format(val, fmt) if val is not None else "--"
+            print(f"{val_str:>{col}}", end="")
 
-        print(row)
+        print()
 
 
 def load_game_moves(path: str) -> list[str]:

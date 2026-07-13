@@ -14,14 +14,13 @@ from .paths import (
 )
 from .utils import safe_val, safe, consolidate_instance_logs
 from .openings import get_opening_from_moves
-from .db import get_db, get_engine_id, probe_engine_metadata, extract_engine_id_from_search, clear_log_dir
+from .db import get_db, get_engine_id, register_engine, probe_engine_metadata, extract_engine_id_from_search, clear_log_dir
 from .ingest import (
     log_games_directory,
     ingest_log_dir,
     ingest_all_log_dirs,
     start_experiment,
     update_experiment,
-    register_engine,
     log_perft,
     log_engine_ratings,
     log_sprt,
