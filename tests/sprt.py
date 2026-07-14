@@ -158,7 +158,7 @@ class LivePlotter:
         self.elo0 = elo0 
         self.elo1 = elo1
         self.lbound = math.log(beta / (1 - alpha))
-        self.ubound = math.log(alpha / (1 - beta))
+        self.ubound = math.log((1 - beta) / alpha)
 
         # data series
         self.games = []
@@ -184,40 +184,68 @@ class LivePlotter:
         self.pair_wd = 0 # 1 W - 1 D
         self.pair_ld = 0 # 1 L - 1 D
         self.pending_pair_result = None # result of first game in pair (but dont have both yet)
-        
+        self.pair_results = {}
 
-        # setup figure
+        # setup figure: 2x2 grid (LLR, Elo, Score, Stats)
         self.plt.ion()
-        self.fig, (self.ax_llr, self.ax_elo) = self.plt.subplots(2, 1, figsize=(12,8), sharex=True)
-        self.fig.subplots_adjust(right=0.62)
-        self.fig.suptitle("SPRT Live Monitor", fontweight='bold')
+        self.fig = self.plt.figure(figsize=(14, 8))
+        gs = self.fig.add_gridspec(2, 2, hspace=0.35, wspace=0.3,
+                                   left=0.06, right=0.98, top=0.92, bottom=0.08)
+        self.ax_llr = self.fig.add_subplot(gs[0,0])
+        self.ax_elo = self.fig.add_subplot(gs[0,1])
+        self.ax_score = self.fig.add_subplot(gs[1,0])
+        self.ax_stats = self.fig.add_subplot(gs[1,1])
+        self.fig.suptitle("SPRT Live Monitor", fontweight='bold', fontsize=11)
 
-        # LLR plot
+        # LLR plot (top-left)
+        self.ax_llr.set_title('LLR')
         self.ax_llr.set_ylabel("LLR")
+        self.ax_llr.set_xlabel('Games')
         self.ax_llr.axhline(self.ubound, color='green', linestyle='--', alpha=0.7, label=f'H1 ({self.ubound:.2f})')
-        self.ax_llr.axhline(self.lbound, color='green', linestyle='--', alpha=0.7, label=f'H0 ({self.lbound:.2f})')
+        self.ax_llr.axhline(self.lbound, color='red', linestyle='--', alpha=0.7, label=f'H0 ({self.lbound:.2f})')
         self.ax_llr.axhline(0, color='grey', linestyle='-', alpha=0.3)
-        self.ax_llr.legend(loc='upper left')
-        self.line_llr, = self.ax_llr.plot([], [], 'b-', linewidth=1.5) 
+        self.ax_llr.legend(loc='upper left', fontsize=7)
+        self.line_llr, = self.ax_llr.plot([], [], 'b-', linewidth=1.5)
+        self.ax_llr.set_ylim(self.lbound * 1.2, self.ubound * 1.2)
 
-        # elo plot
+        # elo plot (top-right)
+        self.ax_elo.set_title('ELO')
         self.ax_elo.set_xlabel('Games')
         self.ax_elo.set_ylabel('Elo')
         self.ax_elo.axhline(0, color='grey', linestyle='-', alpha=0.3)
-        self.ax_elo.axhline(self.elo0, color='red', linestyle=':', alpha=0.5, label=f'elo0=({self.elo0})')
-        self.ax_elo.axhline(self.elo1, color='red', linestyle=':', alpha=0.5, label=f'elo1=({self.elo1})')
-        self.ax_elo.legend(loc='upper left')
+        self.ax_elo.axhline(self.elo0, color='red', linestyle=':', alpha=0.5, label=f'elo0={self.elo0}')
+        self.ax_elo.axhline(self.elo1, color='green', linestyle=':', alpha=0.5, label=f'elo1={self.elo1}')
+        self.ax_elo.legend(loc='upper left', fontsize=7)
         self.line_elo, = self.ax_elo.plot([], [], 'b-', linewidth=1.5)
         self.fill_elo = None
+        self.ax_elo.set_ylim(-100,100)
 
-        # stats text panel (right side)
-        self.stats_text = self.fig.text(
-            0.64, 0.5, '', fontsize=0, fontfamily='monospace',
-            verticalalignment='center', transform=self.fig.transFigure,
-            bbox=dict(boxstyle='round,pad=0.5', facecolor='#f0f0f0', edgecolor='#cccccc')
+        # score plot (bottom-left)
+        self.ax_score.set_title('SCORE')
+        self.ax_score.set_xlabel('Games')
+        self.ax_score.set_ylabel('Score')
+        self.ax_score.axhline(0.5,  color='grey', linestyle='-', alpha=0.3)
+        s0 = elo_to_score(elo0)
+        s1 = elo_to_score(elo1)
+        self.ax_score.axhline(s0, color='red', linestyle=':', alpha=0.5, label=f"s(elo0)={s0:.3f}")
+        self.ax_score.axhline(s1, color='green', linestyle=':', alpha=0.5, label=f"s(elo1)={s1:.3f}")
+        self.ax_score.legend(loc='upper left', fontsize=7)
+        self.line_score, = self.ax_score.plot([], [], 'b-', linewidth=1.5)
+        self.ax_score.set_ylim(.3, .7)
+
+        # stats text panel (bottom-right))
+        self.ax_stats.set_title('STATS')
+        self.ax_stats.set_xticks([])
+        self.ax_stats.set_yticks([])
+        self.ax_stats.set_facecolor("#f8f8f8")
+        for spine in self.ax_stats.spines.values():
+            spine.set_color("#cccccc")
+        self.stats_text = self.ax_stats.text(
+            0.05, 0.95, '', fontsize=8, fontfamily='monospace',
+            verticalalignment='top', transform=self.ax_stats.transAxes
         )
 
-        self.plt.tight_layout()
+        #self.plt.tight_layout(rect=[0, 0, 0.62, 0.95])
         self.plt.show(block=False)
         self.fig.canvas.draw()
         # grab the Tk root for direct event pumping (avoids TkAgg blocking issues)
@@ -277,8 +305,10 @@ class LivePlotter:
 
         # update LLR line
         self.line_llr.set_data(self.games, self.llr_series)
-        self.ax_llr.relim()
-        self.ax_llr.autoscale_view()
+        self.ax_llr.set_xlim(1, max(self.games) * 1.05)
+        llr_lo = min(min(self.llr_series), self.lbound) * 1.2
+        llr_hi = max(max(self.llr_series), self.ubound) * 1.2
+        self.ax_llr.set_ylim(llr_lo, llr_hi)
 
         # update elo line
         self.line_elo.set_data(self.games, self.elo_series)
@@ -289,15 +319,29 @@ class LivePlotter:
         )
         self.ax_elo.relim()
         self.ax_elo.autoscale_view()
+        # clamp elo y-axis to reasonable range
+        elo_min = max(-200, min(min(self.elo_lo_series), self.elo0, -10))
+        elo_max = min(200, max(max(self.elo_hi_series), self.elo1, 10))
+        elo_pad = max(5, (elo_max - elo_min) * 0.15)
+        self.ax_elo.set_ylim(elo_min - elo_pad, elo_max + elo_pad)
 
         # title with current stats
         score = (W + D/2.0) / N 
+        self.score_series.append(score)
         los = compute_los(W, L)
         self.fig.suptitle(
             f"SPRT Live | Games: {N} | Score: {score:.3f} | "
             f"Elo: {elo:+.1f} | LOS: {los:.1f}% | LLR: {llr:.2f}",
             fontweight='bold', fontsize=10
         )
+
+        #  update score line
+        self.line_score.set_data(self.games, self.score_series)
+        self.ax_score.set_xlim(1, max(self.games) * 1.05)
+        s_min = min(min(self.score_series), .3)
+        s_max = max(max(self.score_series), .7)
+        s_pad = max(0.02, (s_max - s_min) * 0.15)
+        self.ax_score.set_ylim(s_min - s_pad, s_max + s_pad)
 
         # stats text panel
         wt = self.white_w + self.white_l + self.white_d 
@@ -330,7 +374,7 @@ class LivePlotter:
         lines.append("-- Opening Pairs --")
         if pairs > 0:
             lines.append(f"  WW: {self.pair_ww}  DD: {self.pair_dd}  LL: {self.pair_ll}")
-            lines.append(f"  WD: {self.pair_wd}  WL: {self.pair_wl}  DL: {self.pair_dl}")
+            lines.append(f"  WD: {self.pair_wd}  WL: {self.pair_wl}  DL: {self.pair_ld}")
             pair_score = (2*self.pair_ww + 1.5*self.pair_wd + self.pair_wl + self.pair_dd + .5*self.pair_ld) / (2*pairs)
             lines.append(f"  Pair score: {pair_score:.3f}")
         else:
@@ -730,7 +774,7 @@ def main(args=None):
         
         # live parsing regexes
         score_re = re.compile(
-            r"Score of Candidate vs +?:\s*(\d+)\s*-\s*(\d+)\s*-\s*(\d+)\s*\[([0-9.]+)\]\s*(\d+)"
+            r"Score of Candidate vs .+?:\s*(\d+)\s*-\s*(\d+)\s*-\s*(\d+)\s*\[([0-9.]+)\]\s*(\d+)"
         )
         finished_re = re.compile(
             r"Finished game (\d+) \((.+?) vs (.+?)\):\s*(\S+)"
@@ -761,21 +805,21 @@ def main(args=None):
                 print(line, end="")
                 output_lines.append(line)
 
-            if plotter:
-                # parse finished game lines for per-color and opening-pair stats
-                m = finished_re.search(line)
-                if m:
-                    game_num = int(m.group(1))
-                    first_player = m.group(2) 
-                    result_str = m.group(4) 
-                    candidate_is_white = (first_player == "Candidate")
-                    plotter.add_game(game_num, candidate_is_white, result_str)
+                if plotter:
+                    # parse finished game lines for per-color and opening-pair stats
+                    m = finished_re.search(line)
+                    if m:
+                        game_num = int(m.group(1))
+                        first_player = m.group(2) 
+                        result_str = m.group(4) 
+                        candidate_is_white = (first_player == "Candidate")
+                        plotter.add_game(game_num, candidate_is_white, result_str)
 
-                # parse score updates for live plotting
-                m = score_re.search(line) 
-                if m:
-                    W, L, D = int(m.group(1)), int(m.group(2)), int(m.group(3))
-                    plotter.update(W, D, L)
+                    # parse score updates for live plotting
+                    m = score_re.search(line) 
+                    if m:
+                        W, L, D = int(m.group(1)), int(m.group(2)), int(m.group(3))
+                        plotter.update(W, D, L)
 
             # pump GUI events to keep window responsive
             if plotter:
