@@ -282,15 +282,21 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
     // so we pass the move (null move) and perform a null-window search with reduced depth around beta
     // if the null move fails high then we can assume the best move will also fail high
     // certain position restrictions must be used for the assumptions to hold
-    if ( // not in check, and not king-pawn endgame (zugzwang prevention)
+    if ( 
+        // depth condition
         (depth - params.R_NMP > 0)
         &&
+        // 2x null-moves not allowed
         can_nmp
         && 
+        // board conditions (not in-check .. not pawn-endgame)
         !(
             board.is_in_check 
             || board.pawn_endgame 
         )
+        && 
+        // static eval > beta
+        (nnue.evaluate(board.is_white_move) > beta)
     ) {
         #ifdef DEV
             ScopedTimer timer(T_NMP_SEARCH);
@@ -300,14 +306,14 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
 
         // null moves just change the side to move (and last-move cache)
         board.MakeNullMove();
-        int null_score = -negamax(depth - 1 - params.R_NMP, -beta, -(beta - 1), emptyPV, previousPV, limits, ply + 1, false);
+        int null_score = -negamax(depth - params.R_NMP, -beta, -(beta - 1), emptyPV, previousPV, limits, ply + 1, false);
         board.UnmakeNullMove();
 
         // null window around beta so if if null move fails high 
         // then so should the real move with a full window search
         if (null_score >= beta) {
             #ifdef DEV
-                STATS_NMP_FAIL(depth+ply, ply);
+                STATS_NMP_FAILHIGH(depth+ply, ply);
             #endif
             return null_score;
         }
@@ -351,6 +357,7 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
         // -----------------------------
         // if a move is late in the move ordering and non-tactical then we can reduce its search depth
         // if the reduced search returns > alpha then we can re-search it with full depth
+        // since we expect it not to raise alpha due to our good move ordering we expect these researches to be rare
         // integration with PVS: use PVS+LMR concurrently
         //    if the move returns > alpha then do full-search (depth+window)
         if (
@@ -373,28 +380,13 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
         // if a move fails high then we can re-search it with a full window 
         // else it fails low and is not going to be a better move than what has been found
         // null window searches are cheap and so the re-searches are worth the speedup
-        //if (!i) { // first move (full window)
+        
+        
         score = -negamax(depth - 1 - _lmr_R, -beta, -alpha, childPV, previousPV, limits, ply + 1, true);
-        if (_lmr_R > 0 && score > alpha) { // research at full depth if move raises alpha
-            childPV = {};   // don't let the reduced-search line leak into the full-depth result
+        if (_lmr_R > 0 && score > alpha) {
+            childPV = {}; // dont let teh reduced-search line leak into the full-depth result
             score = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply+1, true);
         }
-            //if (limits.out_of_time()) break;   // score may be garbage, discard and stop this node
-        //} else { // other moves (null window around alpha + full researches if suspected >alpha)
-        //    {
-            //ScopedTimer timer(T_PVS_SEARCH);
-            //score = -negamax(depth - 1 - _lmr_R, -(alpha+1), -alpha, childPV, previousPV, limits, ply + 1);
-            //if (limits.out_of_time()) break;   // score may be garbage, discard and stop this node
-        //    }
-            // fail-high --> re-search with full window (can raise alpha)
-            // beta-alpha>1 is a redudancy check
-            //if (score > alpha && beta-alpha > 1) {
-                //ScopedTimer timer(T_PVS_RESEARCH);
-            //    STATS_PVS_RESEARCH(depth+ply, ply);
-            //    score = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply + 1);
-            //    if (limits.out_of_time()) break;   // score may be garbage, discard and stop this node
-            //}
-        //}
 
         nnue.on_unmake_move(board, m);
         board.UnmakeMove(m);
@@ -489,21 +481,9 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
             PV childPV; // must be declared per root_move
 
             // --- PVS ---
-            //if (!i) { // first move (full window)
-                eval = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply+1, true);
-            //} else {
-            //    {
-            //    ScopedTimer timer(T_PVS_ROOT_SEARCH);
-                //eval = -negamax(depth - 1, -(alpha+1), -alpha, childPV, previousPV, limits, ply+1);
-            //    }
-                // fail-high --> re-search with full window (can raise alpha)
-                // beta-alpha>1 is a redudancy check
-            //    if (eval > alpha && beta-alpha > 1) {
-            //        ScopedTimer timer(T_PVS_ROOT_RESEARCH);
-            //        STATS_PVS_RESEARCH(depth+ply, ply);
-            //        eval = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply+1);
-            //    }
-            //}
+
+
+            eval = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply+1, true);
 
 
             nnue.on_unmake_move(board, m);
@@ -530,7 +510,7 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
                 iter_result.eval = eval;
                 iter_result.bestMove = m;
                 iter_result.best_line.set(m, childPV); // propagate raised alpha across root moves (in non-aspiration search)
-                //if (depth < params.ASPIRATION_START_DEPTH) alpha = std::max(alpha, eval); 
+            //    if (depth < params.ASPIRATION_START_DEPTH) alpha = std::max(alpha, eval); 
             }
         }
 

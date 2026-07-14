@@ -185,6 +185,11 @@ void Board::UnmakeMove(Move move) {
     int captured_piece = currentGameState.capturedPieceType;
     int promotion_piece = move.PromotionPieceType();
 
+    // restore pawn_endgame flag for NMP
+    if (pawn_endgame && (captured_piece > pawn && captured_piece < king)) {
+        pawn_endgame = false;
+    }
+
     // --- Remove old EP hash (set by move being undone) ---
     if (currentGameState.enPassantFile != -1) // note: opposite side
     {
@@ -303,15 +308,6 @@ void Board::UnmakeNullMove() {
     if (currentGameState.enPassantFile != -1)
         zobrist_hash ^= zobrist_enpassant[currentGameState.enPassantFile];
 
-    // undo pawn_endgame flag
-    if (!(pieceBitboards[knight] == 0
-        && pieceBitboards[bishop] == 0
-        && pieceBitboards[rook] == 0
-        && pieceBitboards[queen] == 0)
-    ) {
-        pawn_endgame = false;
-    }
-
     is_in_check = false;
     plyCount--;
 }
@@ -360,12 +356,10 @@ void Board::CapturePiece(int piece, int target_square, bool is_enpassant, bool c
 
     if (
         !pawn_endgame
-        && (
-            pieceBitboards[knight] == 0
-            && pieceBitboards[bishop] == 0
-            && pieceBitboards[rook] == 0
-            && pieceBitboards[queen] == 0
-        )
+        && !(pieceBitboards[knight]
+                | pieceBitboards[bishop]
+                | pieceBitboards[rook]
+                | pieceBitboards[queen])
     ) {
         pawn_endgame = true;
     }
