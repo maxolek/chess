@@ -24,7 +24,7 @@ EXPECTED_TABLES = {
         'id', 'engine_id', 'fen', 'ply', 'time_ms', 'eval',
         'completed_depth', 'depth', 'qdepth', 'move',
         'nodes', 'qnodes', 'tt_stores', 'tt_hits',
-        'fail_highs', 'fail_lows', 'nmp', 'nmp_fail',
+        'fail_highs', 'fail_lows', 'nmp', 'nmp_failhigh',
     ],
     'engines': ['id', 'name', 'version'],
     'game_stats': ['id', 'result', 'opening', 'run_time_s'],

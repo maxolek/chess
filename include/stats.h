@@ -21,6 +21,7 @@
 constexpr int STATS_MAX_PLY = 64;
 constexpr int STATS_MAX_ITER_DEPTH = 32;
 constexpr int STATS_FH_BUCKETS = 6; // move index buckets: 0, 1, 2, 3, 4-7, 8+
+constexpr int STATS_PVS_RESEARCH_TYPES = 3; // [lmr w/ full depth, full, root full]
 
 #define STATS_BOUNDS_CHECK(it_d, ply) \
     assert((it_d) >= 0 && (it_d) <= STATS_MAX_ITER_DEPTH && \
@@ -67,12 +68,11 @@ struct SearchStats {
     std::array<uint64_t, STATS_FH_BUCKETS> fail_high_index{};
     uint64_t aspiration_fail_low_researches = 0;
     uint64_t aspiration_fail_high_researches = 0;
-    uint64_t pvs_researches_depth = 0;
-    uint64_t pvs_researches_full = 0;
+    std::array<uint64_t, STATS_PVS_RESEARCH_TYPES> pvs_researches{};
     uint64_t see_prunes = 0;
     uint64_t delta_prunes = 0;
     uint64_t nmp = 0;
-    uint64_t nmp_fail = 0;
+    uint64_t nmp_failhigh = 0;
 
     // iterative depth (stats per depth of single search)
     // tracks performance improvements across depths
@@ -90,14 +90,13 @@ struct SearchStats {
     std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_fail_lows{};
     // per-iteration-depth fail-high index histogram
     std::array<std::array<uint64_t, STATS_FH_BUCKETS>, STATS_MAX_ITER_DEPTH> it_depth_fh_index{};
+    std::array<std::array<uint64_t, STATS_PVS_RESEARCH_TYPES>, STATS_MAX_ITER_DEPTH> it_depth_pvs_researches{};
     std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_aspiration_failhigh_researches{};
     std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_aspiration_faillow_researches{};
-    std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_pvs_researches_depth{};
-    std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_pvs_researches_full{};
     std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_see_prunes{};
     std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_delta_prunes{};
     std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_nmp{};
-    std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_nmp_fail{};
+    std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_nmp_failhigh{};
 
     // tree depth (stats per depth of search tree for single search)
     //  this leads to multi-counting as it_depth searches d=1..it_depth tree depths
@@ -111,12 +110,11 @@ struct SearchStats {
     std::array<uint64_t, STATS_MAX_PLY> tree_depth_fail_lows{};
     // per-tree-depth fail-high index histogram
     std::array<std::array<uint64_t, STATS_FH_BUCKETS>, STATS_MAX_PLY> tree_depth_fh_index{};
+    std::array<std::array<uint64_t, STATS_PVS_RESEARCH_TYPES>, STATS_MAX_PLY> tree_depth_pvs_researches{};
     std::array<uint64_t, STATS_MAX_PLY> tree_depth_see_prunes{};
     std::array<uint64_t, STATS_MAX_PLY> tree_depth_delta_prunes{};
-    std::array<uint64_t, STATS_MAX_PLY> tree_depth_pvs_researches_depth{};
-    std::array<uint64_t, STATS_MAX_PLY> tree_depth_pvs_researches_full{};
     std::array<uint64_t, STATS_MAX_PLY> tree_depth_nmp{};
-    std::array<uint64_t, STATS_MAX_PLY> tree_depth_nmp_fail{};
+    std::array<uint64_t, STATS_MAX_PLY> tree_depth_nmp_failhigh{};
 };
 
 // --- single header-only global instance ---
@@ -178,19 +176,13 @@ inline void resetSearchStats() {
         } \
     } while(0)
 
-#define STATS_PVS_RESEARCH(it_d, ply, full) \
+#define STATS_PVS_RESEARCH(it_d, ply, type) \
     do { \
         if (Logging::track_search_stats) { \
             /*STATS_BOUNDS_CHECK(it_d, ply);*/ \
-            if (full) { \
-                g_stats.pvs_researches_full++; \
-                g_stats.it_depth_pvs_researches_full[it_d]++; \
-                g_stats.tree_depth_pvs_researches_full[ply]++; \
-            } else { \
-                g_stats.pvs_researches_depth++; \
-                g_stats.it_depth_pvs_researches_depth[it_d]++; \
-                g_stats.tree_depth_pvs_researches_depth[ply]++; \
-            } \
+            g_stats.pvs_researches[type]++; \
+            g_stats.it_depth_pvs_researches[it_d][type]++; \
+            g_stats.tree_depth_pvs_researches[ply][type]++; \
         } \
     } while(0)
 
@@ -275,13 +267,13 @@ inline int fh_bucket(int move_idx) {
         } \
     } while(0)
 
-#define STATS_NMP_FAIL(it_d, ply) \
+#define STATS_NMP_FAILHIGH(it_d, ply) \
     do { \
         if (Logging::track_search_stats) { \
             /*STATS_BOUNDS_CHECK(it_d, ply);*/ \
-            g_stats.nmp_fail++; \
-            g_stats.it_depth_nmp_fail[it_d]++; \
-            g_stats.tree_depth_nmp_fail[ply]++; \
+            g_stats.nmp_failhigh++; \
+            g_stats.it_depth_nmp_failhigh[it_d]++; \
+            g_stats.tree_depth_nmp_failhigh[ply]++; \
         } \
     } while(0)
 
@@ -350,6 +342,22 @@ std::string depth_buckets_to_json(const std::array<std::array<uint64_t, B>, D>& 
     return oss.str();
 };
 
+// serialize one bucket from 2d array
+template <size_t D, size_t B>
+std::string depth_bucket_to_json(
+    const std::array<std::array<uint64_t, B>, D>& v,
+    size_t len,
+    size_t bucket)
+{
+    std::ostringstream oss;
+    oss << "[";
+    for (size_t i = 1; i < len; ++i) {
+        if (i > 1) oss << ",";
+        oss << v[i][bucket];
+    }
+    oss << "]";
+    return oss.str();
+}
 
 inline void logRootMoves(const SearchResult& result, int depth) {
     static std::ofstream root_log(Logging::log_file_name("root_moves.jsonl"), std::ios::app);
@@ -413,10 +421,11 @@ inline void logSearchStats(const std::string& fen = "") {
         << "\"aspiration_fail_low_researches\":" << g_stats.aspiration_fail_low_researches << ","
         << "\"aspiration_fail_high_researches\":" << g_stats.aspiration_fail_high_researches << ","
 
-        << "\"pvs_researches_depth\":" << g_stats.pvs_researches_depth << ","
-        << "\"pvs_researches_full\":" << g_stats.pvs_researches_full << ","
+        << "\"pvs_researches_depth\":" << g_stats.pvs_researches[0] << ","
+        << "\"pvs_researches_full\":" << g_stats.pvs_researches[1] << ","
+        << "\"pvs_researches_root\":" << g_stats.pvs_researches[2] << ","
         << "\"nmp\":" << g_stats.nmp << ","
-        << "\"nmp_fail\":" << g_stats.nmp_fail << ","
+        << "\"nmp_failhigh\":" << g_stats.nmp_failhigh << ","
 
         << "\"max_depth\":" << g_stats.max_depth << ","
         << "\"max_qdepth\":" << g_stats.max_qdepth << ","
@@ -442,10 +451,11 @@ inline void logSearchStats(const std::string& fen = "") {
         << "\"itdepth_aspiration_faillow_researches\":" << array_to_json(g_stats.it_depth_aspiration_faillow_researches, n) << ","
         << "\"itdepth_see_prunes\":" << array_to_json(g_stats.it_depth_see_prunes, n) << ","
         << "\"itdepth_delta_prunes\":" << array_to_json(g_stats.it_depth_delta_prunes, n) << ","
-        << "\"itdepth_pvs_researches_depth\":" << array_to_json(g_stats.it_depth_pvs_researches_depth, n) << ","
-        << "\"itdepth_pvs_researches_full\":" << array_to_json(g_stats.it_depth_pvs_researches_full, n) << ","
+        << "\"itdepth_pvs_researches_depth\":" << depth_bucket_to_json(g_stats.it_depth_pvs_researches, n, 0) << ","
+        << "\"itdepth_pvs_researches_full\":" << depth_bucket_to_json(g_stats.it_depth_pvs_researches, n, 1) << ","
+        << "\"itdepth_pvs_researches_root\":" << depth_bucket_to_json(g_stats.it_depth_pvs_researches, n, 2) << ","
         << "\"itdepth_nmp\":" << array_to_json(g_stats.it_depth_nmp, n) << ","
-        << "\"itdepth_nmp_fail\":" << array_to_json(g_stats.it_depth_nmp_fail, n) << ","
+        << "\"itdepth_nmp_failhigh\":" << array_to_json(g_stats.it_depth_nmp_failhigh, n) << ","
 
         // tree ply stats
         << "\"treedepth_nodes\":" << array_to_json(g_stats.tree_depth_nodes, q_n) << ","
@@ -457,10 +467,11 @@ inline void logSearchStats(const std::string& fen = "") {
         << "\"treedepth_fh_index\":" << depth_buckets_to_json(g_stats.tree_depth_fh_index, q_n) << ","
         << "\"treedepth_see_prunes\":" << array_to_json(g_stats.tree_depth_see_prunes, q_n) << ","
         << "\"treedepth_delta_prunes\":" << array_to_json(g_stats.tree_depth_delta_prunes, q_n) << ","
-        << "\"treedepth_pvs_researches_depth\":" << array_to_json(g_stats.tree_depth_pvs_researches_depth, q_n) << ","
-        << "\"treedepth_pvs_researches_full\":" << array_to_json(g_stats.tree_depth_pvs_researches_full, q_n) << ","
+        << "\"treedepth_pvs_researches_depth\":" << depth_bucket_to_json(g_stats.tree_depth_pvs_researches, n, 0) << ","
+        << "\"treedepth_pvs_researches_full\":" << depth_bucket_to_json(g_stats.tree_depth_pvs_researches, n, 1) << ","
+        << "\"treedepth_pvs_researches_root\":" << depth_bucket_to_json(g_stats.tree_depth_pvs_researches, n, 2) << ","
         << "\"treedepth_nmp\":" << array_to_json(g_stats.tree_depth_nmp, q_n) << ","
-        << "\"treedepth_nmp_fail\":" << array_to_json(g_stats.tree_depth_nmp_fail, q_n)
+        << "\"treedepth_nmp_failhigh\":" << array_to_json(g_stats.tree_depth_nmp_failhigh, q_n)
 
         << "}\n";
 
@@ -469,147 +480,238 @@ inline void logSearchStats(const std::string& fen = "") {
     //resetSearchStats();
 }
 
+
 inline void dumpSearchStats()
 {
+    using std::cout;
+    using std::setw;
+    using std::left;
+    using std::right;
+ 
     const uint64_t total_nodes = g_stats.nodes + g_stats.qnodes;
-
+ 
     const double nps =
         g_stats.time_ms > 0
-            ? (1000.0 * static_cast<double>(total_nodes)) /
-              static_cast<double>(g_stats.time_ms)
+            ? (1000.0 * static_cast<double>(total_nodes)) / static_cast<double>(g_stats.time_ms)
             : 0.0;
-
+ 
     const double tt_hit_pct =
         (g_stats.tt_hits + g_stats.tt_stores) > 0
             ? 100.0 * static_cast<double>(g_stats.tt_hits) /
               static_cast<double>(g_stats.tt_hits + g_stats.tt_stores)
             : 0.0;
-
-    // Compute fail-high index summary stats (mean, median, p75)
-    // Expand histogram to effective index values: 0,1,2,3,5.5(avg 4-7),10(avg 8+)
-    const double bucket_midpoints[] = {0.0, 1.0, 2.0, 3.0, 5.5, 10.0};
-    double fh_mean = 0.0;
-    double fh_median = 0.0;
-    double fh_p75 = 0.0;
-    double fh_first_pct = 0.0;
-    if (g_stats.fail_highs > 0) {
-        const double fh_total = static_cast<double>(g_stats.fail_highs);
-        // mean
-        for (int b = 0; b < STATS_FH_BUCKETS; ++b)
-            fh_mean += bucket_midpoints[b] * static_cast<double>(g_stats.fail_high_index[b]);
-        fh_mean /= fh_total;
-        // percentiles via cumulative distribution
-        uint64_t cum = 0;
-        bool found_median = false, found_p75 = false;
-        const uint64_t median_target = (g_stats.fail_highs + 1) / 2;
-        const uint64_t p75_target = (g_stats.fail_highs * 3 + 3) / 4;
-        for (int b = 0; b < STATS_FH_BUCKETS; ++b) {
-            cum += g_stats.fail_high_index[b];
-            if (!found_median && cum >= median_target) { fh_median = bucket_midpoints[b]; found_median = true; }
-            if (!found_p75 && cum >= p75_target) { fh_p75 = bucket_midpoints[b]; found_p75 = true; }
-        }
-        fh_first_pct = 100.0 * static_cast<double>(g_stats.fail_high_index[0]) / fh_total;
-    }
-
-    const double nmp_success_pct =
+ 
+    const double nmp_fh_pct =
         g_stats.nmp > 0
-            ? 100.0 * static_cast<double>(g_stats.nmp - g_stats.nmp_fail) /
-              static_cast<double>(g_stats.nmp)
+            ? 100.0 * static_cast<double>(g_stats.nmp_failhigh) / static_cast<double>(g_stats.nmp)
             : 0.0;
-
-    std::cout << std::fixed << std::setprecision(2);
-
-    // ===================== GLOBAL SUMMARY =====================
-    std::cout
-        << "\n============================================================\n"
-        << "SEARCH STATS\n"
-        << "============================================================\n\n"
-
-        << "--- Search ---\n"
-        << "Best Move        : " << g_stats.move.uci() << "\n"
-        << "Eval             : " << g_stats.eval << "\n"
-        << "Time (ms)        : " << g_stats.time_ms << "\n"
-        << "Depth            : " << g_stats.max_depth << "\n"
-        << "Completed Depth  : " << g_stats.max_completed_depth << "\n\n"
-
-        << "--- Nodes ---\n"
-        << "Nodes            : " << g_stats.nodes << "\n"
-        << "QNodes           : " << g_stats.qnodes << "\n"
-        << "Total            : " << total_nodes << "\n"
-        << "NPS              : " << (uint64_t)nps << "\n\n"
-
-        << "--- TT ---\n"
-        << "Hits             : " << g_stats.tt_hits << "\n"
-        << "Stores           : " << g_stats.tt_stores << "\n"
-        << "Overwritten      : " << g_stats.tt_overwritten << "\n"
-        << "Fill Ratio       : " << (g_stats.tt_fill_ratio * 100.0) << "%\n"
-        << "Hit Rate         : " << tt_hit_pct << "%\n\n"
-
-        << "--- Cutoffs ---\n"
-        << "Fail Highs       : " << g_stats.fail_highs << "\n"
-        << "Fail Lows        : " << g_stats.fail_lows << "\n"
-        << "FH Index [0]     : " << g_stats.fail_high_index[0] << "  (" << fh_first_pct << "%)\n"
-        << "FH Index [1]     : " << g_stats.fail_high_index[1] << "\n"
-        << "FH Index [2]     : " << g_stats.fail_high_index[2] << "\n"
-        << "FH Index [3]     : " << g_stats.fail_high_index[3] << "\n"
-        << "FH Index [4-7]   : " << g_stats.fail_high_index[4] << "\n"
-        << "FH Index [8+]    : " << g_stats.fail_high_index[5] << "\n"
-        << "FH Mean Index    : " << fh_mean << "\n"
-        << "FH Median Index  : " << fh_median << "\n"
-        << "FH p75 Index     : " << fh_p75 << "\n\n"
-
-        << "--- Researches ---\n"
-        << "PVS w/ LMR       : " << g_stats.pvs_researches_depth << "\n"
-        << "PVS full         : " << g_stats.pvs_researches_full << "\n"
-
-        << "--- Pruning ---\n"
-        << "SEE              : " << g_stats.see_prunes << "\n"
-        << "Delta            : " << g_stats.delta_prunes << "\n"
-        << "NMP              : " << g_stats.nmp << "\n"
-        << "NMP Fail High    : " << g_stats.nmp_fail << "\n\n"
-
-        << "--- Null Move ---\n"
-        << "Attempts         : " << g_stats.nmp << "\n"
-        << "Fails            : " << g_stats.nmp_fail << "\n"
-        << "Success %        : " << nmp_success_pct << "%\n\n"
-
-        << "--- Aspiration ---\n"
-        << "Fail High Re     : " << g_stats.aspiration_fail_high_researches << "\n"
-        << "Fail Low Re      : " << g_stats.aspiration_fail_low_researches << "\n\n"
-
-        << "--- PV ---\n";
-
+ 
+    // Effective index values for the FH histogram buckets: 0,1,2,3,5.5(avg 4-7),10(avg 8+)
+    static const double bucket_midpoints[STATS_FH_BUCKETS] = {0.0, 1.0, 2.0, 3.0, 5.5, 10.0};
+ 
+    // mean / median / 90 / %first, computed from a raw bucket-count array
+    auto fhStats = [](const auto& counts, uint64_t total) {
+        struct { double mean, median, p90, first_pct; } r{0.0, 0.0, 0.0, 0.0};
+        if (total == 0) return r;
+        const double ftotal = static_cast<double>(total);
+        for (int b = 0; b < STATS_FH_BUCKETS; ++b)
+            r.mean += bucket_midpoints[b] * static_cast<double>(counts[b]);
+        r.mean /= ftotal;
+ 
+        uint64_t cum = 0;
+        bool found_median = false, found_p90 = false;
+        const uint64_t median_target = (total + 1) / 2;
+        const uint64_t p90_target = (total * 9 + 9) / 10;
+        for (int b = 0; b < STATS_FH_BUCKETS; ++b) {
+            cum += counts[b];
+            if (!found_median && cum >= median_target) { r.median = bucket_midpoints[b]; found_median = true; }
+            if (!found_p90 && cum >= p90_target) { r.p90 = bucket_midpoints[b]; found_p90 = true; }
+        }
+        r.first_pct = 100.0 * static_cast<double>(counts[0]) / ftotal;
+        return r;
+    };
+ 
+    const auto fh = fhStats(g_stats.fail_high_index, g_stats.fail_highs);
+ 
+    const size_t n   = g_stats.max_depth + 1;   // iterative-deepening rows
+    const size_t q_n = g_stats.max_qdepth + 1;  // tree-ply rows
+ 
+    constexpr int W = 76; // total box width
+    auto rule = [&](char c) { cout << std::string(W, c) << "\n"; };
+    auto section = [&](const std::string& title) {
+        cout << "\n";
+        rule('-');
+        cout << " " << title << "\n";
+        rule('-');
+    };
+    auto row = [&](const std::string& label, auto value, const char* suffix = "") {
+        cout << "  " << left << setw(20) << label << right << setw(14) << value << suffix << "\n";
+    };
+ 
+    cout << std::fixed << std::setprecision(2);
+ 
+    // ===================== HEADER =====================
+    rule('=');
+    cout << "SEARCH STATS\n";
+    rule('=');
+ 
+    // ===================== SEARCH SUMMARY =====================
+    section("SEARCH");
+    row("Best Move", g_stats.move.uci());
+    row("Eval", g_stats.eval);
+    row("Time (ms)", g_stats.time_ms);
+    row("Depth", g_stats.max_depth);
+    row("Completed Depth", g_stats.max_completed_depth);
+    row("Max QDepth", g_stats.max_qdepth);
+ 
+    // ===================== NODES =====================
+    section("NODES");
+    row("Nodes", g_stats.nodes);
+    row("QNodes", g_stats.qnodes);
+    row("Total", total_nodes);
+    row("NPS", static_cast<uint64_t>(nps));
+ 
+    // ===================== TT =====================
+    section("TRANSPOSITION TABLE");
+    row("Hits", g_stats.tt_hits);
+    row("Stores", g_stats.tt_stores);
+    row("Overwritten", g_stats.tt_overwritten);
+    row("Fill Ratio", g_stats.tt_fill_ratio * 100.0, "%");
+    row("Hit Rate", tt_hit_pct, "%");
+ 
+    // ===================== CUTOFFS =====================
+    section("CUTOFFS");
+    row("Fail Highs", g_stats.fail_highs);
+    row("Fail Lows", g_stats.fail_lows);
+    row("FH Index [0]", g_stats.fail_high_index[0]);
+    row("FH Index [1]", g_stats.fail_high_index[1]);
+    row("FH Index [2]", g_stats.fail_high_index[2]);
+    row("FH Index [3]", g_stats.fail_high_index[3]);
+    row("FH Index [4-7]", g_stats.fail_high_index[4]);
+    row("FH Index [8+]", g_stats.fail_high_index[5]);
+    row("FH % at [0]", fh.first_pct, "%");
+    row("FH Mean Index", fh.mean);
+    row("FH Median Index", fh.median);
+    row("FH p90 Index", fh.p90);
+ 
+    // ===================== RESEARCHES / PRUNING / NULL MOVE / ASPIRATION ====
+    section("RESEARCHES & PRUNING");
+    row("PVS w/ LMR", g_stats.pvs_researches[0]);
+    row("PVS full", g_stats.pvs_researches[1]);
+    row("PVS @ root", g_stats.pvs_researches[2]);
+    row("SEE Prunes", g_stats.see_prunes);
+    row("Delta Prunes", g_stats.delta_prunes);
+    row("NMP Attempts", g_stats.nmp);
+    row("NMP Fails", g_stats.nmp_failhigh);
+    row("NMP FH %", nmp_fh_pct, "%");
+    row("Aspiration FH Re", g_stats.aspiration_fail_high_researches);
+    row("Aspiration FL Re", g_stats.aspiration_fail_low_researches);
+ 
+    // ===================== PV =====================
+    section("PRINCIPAL VARIATION");
+    cout << "  ";
     for (const Move& m : g_stats.principal_variation)
-        std::cout << m.uci() << " ";
-    std::cout << "\n\n";
-
+        cout << m.uci() << " ";
+    cout << "\n";
+ 
     // ===================== ITERATIVE DEEPENING =====================
-    std::cout
-        << "------------------------------------------------------------\n"
-        << "D  Eval  Move   Time  Nodes    FH   FL   NMP  SEE  PVS+LMR  PVS\n"
-        << "------------------------------------------------------------\n";
-
-    const size_t max_d = g_stats.max_depth; //g_stats.max_completed_depth;
-
-    for (size_t d = 0; d <= max_d; ++d)
-    {
-        std::cout
-            << std::setw(2) << d << " "
-            << std::setw(5) << g_stats.it_depth_eval[d] << " "
-            << std::setw(6) << g_stats.it_depth_move[d].uci() << " "
-            << std::setw(5) << g_stats.it_depth_time_ms[d] << " "
-            << std::setw(7) << g_stats.it_depth_nodes[d] << " "
-            << std::setw(4) << g_stats.it_depth_fail_highs[d] << " "
-            << std::setw(4) << g_stats.it_depth_fail_lows[d] << " "
-            << std::setw(4) << g_stats.it_depth_nmp[d] << " "
-            << std::setw(4) << g_stats.it_depth_see_prunes[d] << " "
-            << std::setw(4) << g_stats.it_depth_pvs_researches_depth[d] << " "
-            << std::setw(4) << g_stats.it_depth_pvs_researches_full[d] 
-            << "\n";
+    section("ITERATIVE DEEPENING (per completed depth)");
+    cout << left
+         << setw(3)  << "D"
+         << setw(7)  << "Eval"
+         << setw(7)  << "Move"
+         << setw(7)  << "Time"
+         << setw(9)  << "Nodes"
+         << setw(8)  << "QNodes"
+         << setw(5)  << "QD"
+         << setw(6)  << "TTHit"
+         << setw(6)  << "TTSt"
+         << setw(5)  << "FH"
+         << setw(5)  << "FL"
+         << setw(6)  << "FHavg"
+         << setw(5)  << "NMP"
+         << setw(6)  << "NMPf"
+         << setw(5)  << "SEE"
+         << setw(6)  << "Delta"
+         << setw(5)  << "PVSl"
+         << setw(5)  << "PVSf"
+         << setw(5)  << "PVSr"
+         << setw(6)  << "AspFH"
+         << setw(6)  << "AspFL"
+         << "\n";
+    rule('-');
+ 
+    for (size_t d = 0; d < n; ++d) {
+        const auto dfh = fhStats(g_stats.it_depth_fh_index[d], g_stats.it_depth_fail_highs[d]);
+        cout << left
+             << setw(3)  << d
+             << setw(7)  << g_stats.it_depth_eval[d]
+             << setw(7)  << g_stats.it_depth_move[d].uci()
+             << setw(7)  << g_stats.it_depth_time_ms[d]
+             << setw(9)  << g_stats.it_depth_nodes[d]
+             << setw(8)  << g_stats.it_depth_qnodes[d]
+             << setw(5)  << g_stats.it_depth_qdepth[d]
+             << setw(6)  << g_stats.it_depth_tthits[d]
+             << setw(6)  << g_stats.it_depth_ttstores[d]
+             << setw(5)  << g_stats.it_depth_fail_highs[d]
+             << setw(5)  << g_stats.it_depth_fail_lows[d]
+             << setw(6)  << dfh.mean
+             << setw(5)  << g_stats.it_depth_nmp[d]
+             << setw(6)  << g_stats.it_depth_nmp_failhigh[d]
+             << setw(5)  << g_stats.it_depth_see_prunes[d]
+             << setw(6)  << g_stats.it_depth_delta_prunes[d]
+             << setw(5)  << g_stats.it_depth_pvs_researches[d][0]
+             << setw(5)  << g_stats.it_depth_pvs_researches[d][1]
+             << setw(5)  << g_stats.it_depth_pvs_researches[d][2]
+             << setw(6)  << g_stats.it_depth_aspiration_failhigh_researches[d]
+             << setw(6)  << g_stats.it_depth_aspiration_faillow_researches[d]
+             << "\n";
     }
-
-    std::cout
-        << "------------------------------------------------------------\n\n";
+ 
+    // ===================== TREE DEPTH (BY PLY) =====================
+    section("TREE STATS (per ply, includes quiescence)");
+    cout << left
+         << setw(4)  << "Ply"
+         << setw(9)  << "Nodes"
+         << setw(8)  << "QNodes"
+         << setw(6)  << "TTHit"
+         << setw(6)  << "TTSt"
+         << setw(5)  << "FH"
+         << setw(5)  << "FL"
+         << setw(6)  << "FHavg"
+         << setw(5)  << "SEE"
+         << setw(6)  << "Delta"
+         << setw(5)  << "PVSl"
+         << setw(5)  << "PVSf"
+         << setw(5)  << "PVSr"
+         << setw(5)  << "NMP"
+         << setw(6)  << "NMPf"
+         << "\n";
+    rule('-');
+ 
+    for (size_t p = 0; p < q_n; ++p) {
+        const auto pfh = fhStats(g_stats.tree_depth_fh_index[p], g_stats.tree_depth_fail_highs[p]);
+        cout << left
+             << setw(4)  << p
+             << setw(9)  << g_stats.tree_depth_nodes[p]
+             << setw(8)  << g_stats.tree_depth_qnodes[p]
+             << setw(6)  << g_stats.tree_depth_tthits[p]
+             << setw(6)  << g_stats.tree_depth_ttstores[p]
+             << setw(5)  << g_stats.tree_depth_fail_highs[p]
+             << setw(5)  << g_stats.tree_depth_fail_lows[p]
+             << setw(6)  << pfh.mean
+             << setw(5)  << g_stats.tree_depth_see_prunes[p]
+             << setw(6)  << g_stats.tree_depth_delta_prunes[p]
+             << setw(5)  << g_stats.tree_depth_pvs_researches[p][0]
+             << setw(5)  << g_stats.tree_depth_pvs_researches[p][1]
+             << setw(5)  << g_stats.tree_depth_pvs_researches[p][2]
+             << setw(5)  << g_stats.tree_depth_nmp[p]
+             << setw(6)  << g_stats.tree_depth_nmp_failhigh[p]
+             << "\n";
+    }
+ 
+    rule('=');
+    cout << "\n";
 }
 
 

@@ -31,9 +31,9 @@ export async function renderPruning() {
       AVG(total_see_prunes) as avg_see,
       AVG(total_delta_prunes) as avg_delta,
       AVG(total_nmp) as avg_nmp,
-      AVG(total_nmp_fail) as avg_nmp_fail,
+      AVG(total_nmp_failhigh) as avg_nmp_failhigh,
       AVG(nmp_ratio) as avg_nmp_ratio,
-      AVG(CASE WHEN total_nmp > 0 THEN total_nmp_fail::DOUBLE / total_nmp ELSE NULL END) as avg_nmp_fail_rate
+      AVG(CASE WHEN total_nmp > 0 THEN total_nmp_failhigh::DOUBLE / total_nmp ELSE NULL END) as avg_nmp_failhigh_rate
     FROM ${searchTable}
   `);
   container.appendChild(summaryRow({
@@ -41,7 +41,7 @@ export async function renderPruning() {
     'Avg SEE Prunes': stats?.avg_see != null ? Number(stats.avg_see).toFixed(1) : null,
     'Avg Delta Prunes': stats?.avg_delta != null ? Number(stats.avg_delta).toFixed(1) : null,
     'Avg NMP': stats?.avg_nmp != null ? Number(stats.avg_nmp).toFixed(1) : null,
-    'NMP Fail Rate': stats?.avg_nmp_fail_rate != null ? (Number(stats.avg_nmp_fail_rate) * 100).toFixed(1) + '%' : null,
+    'NMP Fail Rate': stats?.avg_nmp_failhigh_rate != null ? (Number(stats.avg_nmp_failhigh_rate) * 100).toFixed(1) + '%' : null,
   }));
 
   // Metric selector
@@ -92,7 +92,7 @@ export async function renderPruning() {
       if (iterTable) {
         const plot = vg.plot(
           vg.lineY(vg.from(iterTable), { x: 'depth', y: vg.avg('nmp'), stroke: COLORS[1], marker: true }),
-          vg.lineY(vg.from(iterTable), { x: 'depth', y: vg.avg('nmp_fail'), stroke: COLORS[2], marker: true }),
+          vg.lineY(vg.from(iterTable), { x: 'depth', y: vg.avg('nmp_failhigh'), stroke: COLORS[2], marker: true }),
           vg.width(750), vg.height(300), vg.marginLeft(70),
           vg.xLabel('Iteration Depth'), vg.yLabel('Avg Count'),
         );
@@ -104,11 +104,11 @@ export async function renderPruning() {
         plotContainer.appendChild(plot);
       } else {
         // NMP fail ratio histogram
-        await coordinator().exec(`CREATE OR REPLACE TEMP VIEW nmp_fail_dist AS
-          SELECT total_nmp_fail::DOUBLE / NULLIF(total_nmp, 0) as fail_rate
+        await coordinator().exec(`CREATE OR REPLACE TEMP VIEW nmp_failhigh_dist AS
+          SELECT total_nmp_failhigh::DOUBLE / NULLIF(total_nmp, 0) as fail_rate
           FROM ${searchTable} WHERE total_nmp > 0`);
         const hist = vg.plot(
-          vg.rectY(vg.from('nmp_fail_dist'), { x: vg.bin('fail_rate'), y: vg.count(), fill: COLORS[2] }),
+          vg.rectY(vg.from('nmp_failhigh_dist'), { x: vg.bin('fail_rate'), y: vg.count(), fill: COLORS[2] }),
           vg.width(750), vg.height(280), vg.marginLeft(55),
           vg.xLabel('NMP Fail Rate'), vg.yLabel('Count'),
         );
@@ -146,7 +146,7 @@ export async function renderPruning() {
           AVG(s.total_see_prunes::DOUBLE / NULLIF(s.total_nodes, 0)) as see_ratio,
           AVG(s.total_delta_prunes::DOUBLE / NULLIF(s.total_nodes, 0)) as delta_ratio,
           AVG(s.total_nmp::DOUBLE / NULLIF(s.total_nodes, 0)) as nmp_ratio,
-          AVG(CASE WHEN s.total_nmp > 0 THEN s.total_nmp_fail::DOUBLE / s.total_nmp ELSE NULL END) as nmp_fail_rate
+          AVG(CASE WHEN s.total_nmp > 0 THEN s.total_nmp_failhigh::DOUBLE / s.total_nmp ELSE NULL END) as nmp_failhigh_rate
         FROM ${searchTable} s
         JOIN engines e ON s.engine_id = e.id
         GROUP BY e.id, e.name, e.version

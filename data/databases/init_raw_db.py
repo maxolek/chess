@@ -156,7 +156,7 @@ def init_raw_db(db_dir=None) -> None:
             delta_prunes                INTEGER,
             pvs_researches              INTEGER,
             nmp                         INTEGER,
-            nmp_fail                    INTEGER,
+            nmp_failhigh                    INTEGER,
             tt_overwritten              INTEGER,
 
             ingestion_timestamp_utc     DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -200,7 +200,7 @@ def init_raw_db(db_dir=None) -> None:
             delta_prunes                INTEGER,
             pvs_researches              INTEGER,
             nmp                         INTEGER,
-            nmp_fail                    INTEGER,
+            nmp_failhigh                    INTEGER,
 
             ingestion_timestamp_utc     DATETIME DEFAULT CURRENT_TIMESTAMP,
             
@@ -235,7 +235,7 @@ def init_raw_db(db_dir=None) -> None:
             delta_prunes                INTEGER,
             pvs_researches              INTEGER,
             nmp                         INTEGER,
-            nmp_fail                    INTEGER,
+            nmp_failhigh                    INTEGER,
 
             ingestion_timestamp_utc     DATETIME DEFAULT CURRENT_TIMESTAMP,
 

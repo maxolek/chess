@@ -5,6 +5,7 @@ import time
 import subprocess
 import platform
 import shutil
+from pathlib import Path
 import re
 import queue 
 import threading
@@ -229,11 +230,14 @@ def register_engine(cnxn, engine):
         lmr_depth_threshold = engine.get("lmr_depth_threshold")
 
     # Check if engine with this version already exists
+    # Check if engine with this version already exists
     if version:
-        existing_id = get_engine_id(cnxn, version=version)
-        if existing_id is not None:
-            print(f"[ETL] Engine {name} ({version}) already registered with ID {existing_id}")
-            return existing_id
+        existing = cnxn.execute(
+            "SELECT id FROM engines WHERE version=?", (version,)
+        ).fetchone()
+        if existing is not None:
+            print(f"[ETL] Engine {name} ({version}) already registered with ID {existing[0]}")
+            return existing[0]
 
     cur = cnxn.execute(
         """
