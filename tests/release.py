@@ -104,7 +104,8 @@ def run_sprt(args):
         book_depth=args.sprt_book_depth,
         logroot=SPRT_LOG_DIR,
         cutechess_cli=args.cutechess_cli,
-        log=True
+        log=True,
+        plot=True
     )
 
     sprt.main(sprt_args)
