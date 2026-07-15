@@ -152,9 +152,11 @@ def compute_los(W, L):
 ###############################
 
 class LivePlotter:
-    def __init__(self, elo0, elo1, alpha=0.05, beta=0.05):
+    def __init__(self, elo0, elo1, alpha=0.05, beta=0.05, engine_a_data=None, engine_b_data=None):
         import matplotlib.pyplot as plt
         self.plt = plt
+        self.candidate_data = engine_a_data
+        self.baseline_data = engine_b_data
         self.elo0 = elo0 
         self.elo1 = elo1
         self.lbound = math.log(beta / (1 - alpha))
@@ -241,7 +243,7 @@ class LivePlotter:
         for spine in self.ax_stats.spines.values():
             spine.set_color("#cccccc")
         self.stats_text = self.ax_stats.text(
-            0.05, 0.95, '', fontsize=8, fontfamily='monospace',
+            0.05, 0.95, '', fontsize=10, fontfamily='monospace',
             verticalalignment='top', transform=self.ax_stats.transAxes
         )
 
@@ -306,8 +308,8 @@ class LivePlotter:
         # update LLR line
         self.line_llr.set_data(self.games, self.llr_series)
         self.ax_llr.set_xlim(1, max(self.games) * 1.05)
-        llr_lo = min(min(self.llr_series), self.lbound) * 1.2
-        llr_hi = max(max(self.llr_series), self.ubound) * 1.2
+        llr_lo = min(self.llr_series) - 0.5
+        llr_hi = max(self.llr_series) + 0.5
         self.ax_llr.set_ylim(llr_lo, llr_hi)
 
         # update elo line
@@ -319,9 +321,15 @@ class LivePlotter:
         )
         self.ax_elo.relim()
         self.ax_elo.autoscale_view()
-        # clamp elo y-axis to reasonable range
-        elo_min = max(-200, min(min(self.elo_lo_series), self.elo0, -10))
-        elo_max = min(200, max(max(self.elo_hi_series), self.elo1, 10))
+        # clamp elo y-axis to reasonable range (extreme early, smoothes and converges later)
+        n = len(self.elo_lo_series)
+        if n < 30:
+            elo_min = min(self.elo_lo_series) - 20
+            elo_max = max(self.elo_hi_series) + 20
+        else:
+            cut = 2 * n // 3
+            elo_min = min(self.elo_lo_series[cut:]) - 20
+            elo_max = max(self.elo_hi_series[cut:]) + 20
         elo_pad = max(5, (elo_max - elo_min) * 0.15)
         self.ax_elo.set_ylim(elo_min - elo_pad, elo_max + elo_pad)
 
@@ -331,15 +339,21 @@ class LivePlotter:
         los = compute_los(W, L)
         self.fig.suptitle(
             f"SPRT Live | Games: {N} | Score: {score:.3f} | "
-            f"Elo: {elo:+.1f} | LOS: {los:.1f}% | LLR: {llr:.2f}",
+            f"Elo: {elo:+.1f} ({elo_lo:+.1f}, {elo_hi:+.1f}) | LOS: {los:.1f}% | LLR: {llr:.2f}",
             fontweight='bold', fontsize=10
         )
 
         #  update score line
         self.line_score.set_data(self.games, self.score_series)
         self.ax_score.set_xlim(1, max(self.games) * 1.05)
-        s_min = min(min(self.score_series), .3)
-        s_max = max(max(self.score_series), .7)
+        n = len(self.elo_lo_series)
+        if n < 30:
+            s_min = min(self.score_series) - 0.1
+            s_max = max(self.score_series) + 0.1
+        else:
+            cut = 2 * n // 3
+            s_min = min(self.score_series[cut:]) - 0.1
+            s_max = max(self.score_series[cut:]) + 0.1
         s_pad = max(0.02, (s_max - s_min) * 0.15)
         self.ax_score.set_ylim(s_min - s_pad, s_max + s_pad)
 
@@ -349,8 +363,8 @@ class LivePlotter:
         pairs = self.pair_ww + self.pair_ll + self.pair_dd + self.pair_wl + self.pair_wd + self.pair_ld
 
         lines = []
-        lines.append("-- Overall --")
-        lines.append(f"  W-D-L: {W}-{D}-{L}")
+        lines.append(f"-- Overall --             Candidate Version: {self.candidate_data['version']}")
+        lines.append(f"  W-D-L: {W}-{D}-{L}           Baseline Version: {self.baseline_data['version']}") #\t\t{self.candidate_data['description']}
         lines.append("")
 
         lines.append("-- As White --")
@@ -362,10 +376,10 @@ class LivePlotter:
             lines.append("  (no games)")
         lines.append("")
 
-        lines.append("-- As Black --")
+        lines.append(f"-- As Black --")
         if bt > 0:
             b_score = (self.black_w + self.black_d / 2.0) / bt 
-            lines.append(f"  W-D-L: {self.black_w}-{self.black_d}-{self.black_l}")
+            lines.append(f"  W-D-L: {self.black_w}-{self.black_d}-{self.black_l}") #\t\t{self.baseline_data['description']}
             lines.append(f"  Score: {b_score:.3f}")
         else:
             lines.append("  (no games)")
@@ -758,10 +772,14 @@ def main(args=None):
     #stdout_f = open(stdout_log_path, "w", encoding="utf-8")
     #stderr_f = open(stderr_log_path, "w", encoding="utf-8")
 
+    # probe engine data (for plotting)
+    candidate_engine_data = etl.probe_engine_metadata(args.engine_a)
+    baseline_engine_data = etl.probe_engine_metadata(args.engine_b)
+
     # Live plotter (init before Popen to its in scope after)
     plotter = None 
     if args.plot:
-        plotter = LivePlotter(args.elo0, args.elo1, args.alpha, args.beta)
+        plotter = LivePlotter(args.elo0, args.elo1, args.alpha, args.beta, candidate_engine_data, baseline_engine_data)
 
     with subprocess.Popen(
         cmd,
