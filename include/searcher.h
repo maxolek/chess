@@ -27,6 +27,8 @@ struct SearchParams {
     int   DRAW_EVAL              = 0;
     int   CONTEMPT               = 0;
     // reductions
+    int   R_IID                  = 0.5f;     // internal iterative deepening (float = divide, int = subtract)
+    int   IID_DEPTH_THRESHOLD    = 6;       // iid start depth (>=6  is standard)
     int   R_NMP                  = 3;      // null-move pruning
     float R_LMR_CONST            = 0.99f;  // late move reductions 
     float R_LMR_DENOM            = 3.14f;  //   = const + [log(depth) * log(move_order)] / denom
@@ -120,12 +122,14 @@ public:
         size_t count,
         const Board& board,
         int ply,
+        const Move ttMove,
         const std::vector<Move>& previousPV
     );
 
     int generateAndOrderMoves(
         Move moves[MAX_MOVES],
         int ply,
+        const Move ttMove,
         const std::vector<Move>& previousPV
     );
 

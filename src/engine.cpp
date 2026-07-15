@@ -499,8 +499,21 @@ void Engine::iterativeDeepening() {
         if (depth > 1) { // sort by prev iteration elos
             std::sort(first_moves, first_moves + count,
                       [&](Move a, Move b) { return get_prev_eval(a) > get_prev_eval(b); });
-        } else { // first search: order like typical mid-tree ordering
-            searcher->orderedMoves(first_moves, count, game_board, 0, {});
+        } else { // first search: order like typical mid-tree ordering   
+            // tt probe
+            TTEntry* ttEntry = tt.probe(game_board.zobrist_hash);
+            Move ttMove = Move::NullMove();
+
+            if (ttEntry && ttEntry->key == game_board.zobrist_hash) {
+                #ifdef DEV
+                    STATS_TT_HIT(depth+ply, ply);
+                #endif
+                // grab move for move ordering
+                // do not return from any scores cause then we would just
+                //      abort search a lot and thats not good
+                ttMove = ttEntry->bestMove;
+            }
+            searcher->orderedMoves(first_moves, count, game_board, 0, ttMove, {});
         }
 
         // --- search ---

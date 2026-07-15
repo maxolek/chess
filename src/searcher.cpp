@@ -103,20 +103,13 @@ int Searcher::moveScore(const Move& move, const Board& boardRef,
 }
 
 void Searcher::orderedMoves(Move moves[MAX_MOVES], size_t count,
-                            const Board& boardRef, int ply, const std::vector<Move>& previousPV) {
+                            const Board& boardRef, int ply, 
+                            const Move ttMove, const std::vector<Move>& previousPV) {
     
     #ifdef DEV
         ScopedTimer timer(T_SCORE_ORDER);
     #endif
     U64 hash = boardRef.zobrist_hash;
-
-    // TT move choice
-    Move ttMove = Move::NullMove();
-    TTEntry* entry = engine.tt.probe(hash);
-    if (entry && entry->key == hash && !Move::SameMove(Move::NullMove(), entry->bestMove)) {
-        for (size_t i = 0; i < count; ++i)
-            if (Move::SameMove(moves[i], entry->bestMove)) ttMove = entry->bestMove;
-    }
 
     // sorting
     std::pair<int, Move> scored[MAX_MOVES];
@@ -129,13 +122,13 @@ void Searcher::orderedMoves(Move moves[MAX_MOVES], size_t count,
     for (size_t i = 0; i < count; ++i) moves[i] = scored[i].second;
 }
 
-int Searcher::generateAndOrderMoves(Move moves[MAX_MOVES], int ply, const std::vector<Move>& previousPV) {
+int Searcher::generateAndOrderMoves(Move moves[MAX_MOVES], int ply, const Move ttMove, const std::vector<Move>& previousPV) {
    if (!engine.movegen) return 0;
 
     int count = engine.movegen->generateMoves(board, false); // the bool flag for captures-only or not — adapt if signature differs
     std::copy_n(engine.movegen->moves, count, moves);
 
-    orderedMoves(moves, static_cast<size_t>(count), board, ply, previousPV);
+    orderedMoves(moves, static_cast<size_t>(count), board, ply, ttMove, previousPV);
     
     return count;
 }
@@ -263,17 +256,48 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
 
     int alphaOrig = alpha;
     TTEntry* ttEntry = engine.tt.probe(board.zobrist_hash);
+    Move ttMove = Move::NullMove();
 
-    if (ttEntry && ttEntry->key == board.zobrist_hash && ttEntry->depth >= depth) {
+    if (ttEntry && ttEntry->key == board.zobrist_hash) {
         #ifdef DEV
             STATS_TT_HIT(depth+ply, ply);
         #endif
-        int ttScore = ttEntry->eval;
+        // grab move for move ordering
+        ttMove = ttEntry->bestMove;
 
-        if (ttEntry->flag == EXACT) return ttScore;
-        else if (ttEntry->flag == UPPERBOUND && ttScore <= alpha) return ttScore;
-        else if (ttEntry->flag == LOWERBOUND && ttScore >= beta)  return ttScore;
+        // return score if tt-move's search depth is >= than current search depth
+        if (ttEntry->depth >= depth) {
+            #ifdef DEV 
+                STATS_TT_RETURN(depth+ply, ply);
+            #endif 
+            
+            int ttScore = ttEntry->eval;
+            if (ttEntry->flag == EXACT) return ttScore;
+            else if (ttEntry->flag == UPPERBOUND && ttScore <= alpha) return ttScore;
+            else if (ttEntry->flag == LOWERBOUND && ttScore >= beta)  return ttScore;
+        }
+    } 
+    
+    // --- internal iterative deepening ---
+    // no usable TT move, PV node, enough depth to bother
+    // run reduced search to replace TT move
+    /*
+    if (ttMove.IsNull() && depth >= params.IID_DEPTH_THRESHOLD) {
+        #ifdef DEV
+            STATS_IID(depth+ply, ply);
+        #endif 
+        PV iidPV;
+
+        // no flip in negamax func call cause we are not making a move yet
+        // currently, scaled reduction
+        negamax(depth * params.R_IID, alpha, beta, iidPV, previousPV, limits, ply, can_nmp);
+        
+        ttEntry = engine.tt.probe(board.zobrist_hash);
+        if (ttEntry && ttEntry->key == board.zobrist_hash) {
+            ttMove = ttEntry->bestMove;
+        }
     }
+    */
 
     // -----------------------------
     // Null Move Pruning
@@ -322,7 +346,7 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
     // --- search ---
 
     Move moves[MAX_MOVES];
-    int count = generateAndOrderMoves(moves, ply, previousPV);
+    int count = generateAndOrderMoves(moves, ply, ttMove, previousPV);
     if (count == 0) return board.is_in_check ? -(MATE_SCORE - ply) : 0;
 
     int bestEval = -MATE_SCORE;
@@ -437,7 +461,6 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
 // ============================================================================
 
 SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth, SearchLimits& limits, std::vector<Move>& previousPV, int previousEval) {
-    
     int eval;
     int ply = 0; // root moves are depth=0, ply+1 in arg call makes made moves depth=1
     SearchResult result;
@@ -452,6 +475,12 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
         alpha = previousEval - delta;
         beta  = previousEval + delta;
     }
+
+    #ifdef DEV
+        STATS_NODE(depth, ply);  
+    #else 
+        g_stats.nodes++;
+    #endif   
 
     // root move loop for both aspiration + regular search
     while (true) {
@@ -474,10 +503,7 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
 
             nnue.on_make_move(board, m);
             board.MakeMove(m);
-
-            #ifdef DEV
-                STATS_NODE(depth, ply);     
-            #endif  
+  
             PV childPV; // must be declared per root_move
 
             // --- PVS ---

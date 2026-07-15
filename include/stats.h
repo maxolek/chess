@@ -59,9 +59,11 @@ struct SearchStats {
     uint64_t nodes = 0;
     uint64_t qnodes = 0;
     uint64_t tt_hits = 0;
+    uint64_t tt_returns = 0;                              
     uint64_t tt_stores = 0;
     double tt_fill_ratio = 0.0; // snapshot
     uint64_t tt_overwritten = 0;
+    //uint64_t iid = 0; // internal iterative deepening
     uint64_t fail_highs = 0;
     uint64_t fail_lows = 0;
     // fail-high move index histogram: buckets [0, 1, 2, 3, 4-7, 8+]
@@ -85,7 +87,9 @@ struct SearchStats {
     std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_qnodes{};
     std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_ttstores{};
     std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_tthits{};
+    std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_tt_returns{};
     std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_ttfill{};
+    //std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_iid{};
     std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_fail_highs{};
     std::array<uint64_t, STATS_MAX_ITER_DEPTH> it_depth_fail_lows{};
     // per-iteration-depth fail-high index histogram
@@ -106,6 +110,8 @@ struct SearchStats {
     std::array<uint64_t, STATS_MAX_PLY> tree_depth_qnodes{};
     std::array<uint64_t, STATS_MAX_PLY> tree_depth_ttstores{};
     std::array<uint64_t, STATS_MAX_PLY> tree_depth_tthits{};
+    std::array<uint64_t, STATS_MAX_PLY> tree_depth_tt_returns{};
+    //std::array<uint64_t, STATS_MAX_PLY> tree_depth_iid{};
     std::array<uint64_t, STATS_MAX_PLY> tree_depth_fail_highs{};
     std::array<uint64_t, STATS_MAX_PLY> tree_depth_fail_lows{};
     // per-tree-depth fail-high index histogram
@@ -227,6 +233,16 @@ inline int fh_bucket(int move_idx) {
         }                                                   \
     } while (0)
 
+#define STATS_TT_RETURN(it_d, ply)                              \
+    do {                                                    \
+        if (Logging::track_search_stats) {                  \
+            /*STATS_BOUNDS_CHECK(it_d, ply);     */               \
+            g_stats.tt_returns++;                              \
+            g_stats.it_depth_tt_returns[it_d]++;                \
+            g_stats.tree_depth_tt_returns[ply]++;               \
+        }                                                   \
+    } while (0)
+
 #define STATS_TT_STORE(it_d, ply)                            \
     do {                                                    \
         if (Logging::track_search_stats) {                  \
@@ -276,6 +292,15 @@ inline int fh_bucket(int move_idx) {
             g_stats.tree_depth_nmp_failhigh[ply]++; \
         } \
     } while(0)
+
+    /*
+#define STATS_IID(it_d, ply) \
+    do { \
+        if (Logging::track_search_stats) { \
+
+        }
+    } while(0)
+     */
 
 // -------------------------
 //      Logging Functions
@@ -408,6 +433,7 @@ inline void logSearchStats(const std::string& fen = "") {
         << "\"nodes\":" << g_stats.nodes << ","
         << "\"qnodes\":" << g_stats.qnodes << ","
         << "\"tt_hits\":" << g_stats.tt_hits << ","
+        << "\"tt_returns\":" << g_stats.tt_returns << ","
         << "\"tt_stores\":" << g_stats.tt_stores << ","
         << "\"tt_fill\":" << g_stats.tt_fill_ratio << ","
         << "\"tt_overwritten\":" << g_stats.tt_overwritten << ","
@@ -443,6 +469,7 @@ inline void logSearchStats(const std::string& fen = "") {
         << "\"itdepth_qnodes\":" << array_to_json(g_stats.it_depth_qnodes, n) << ","
         << "\"itdepth_qdepth\":" << array_to_json(g_stats.it_depth_qdepth, n) << ","
         << "\"itdepth_tthits\":" << array_to_json(g_stats.it_depth_tthits, n) << ","
+        << "\"itdepth_tt_returns\":" << array_to_json(g_stats.it_depth_tt_returns, n) << ","
         << "\"itdepth_ttstores\":" << array_to_json(g_stats.it_depth_ttstores, n) << ","
         << "\"itdepth_fail_highs\":" << array_to_json(g_stats.it_depth_fail_highs, n) << ","
         << "\"itdepth_fail_lows\":" << array_to_json(g_stats.it_depth_fail_lows, n) << ","
@@ -461,6 +488,7 @@ inline void logSearchStats(const std::string& fen = "") {
         << "\"treedepth_nodes\":" << array_to_json(g_stats.tree_depth_nodes, q_n) << ","
         << "\"treedepth_qnodes\":" << array_to_json(g_stats.tree_depth_qnodes, q_n) << ","
         << "\"treedepth_tt_hits\":" << array_to_json(g_stats.tree_depth_tthits, q_n) << ","
+        << "\"treedepth_tt_returns\":" << array_to_json(g_stats.tree_depth_tt_returns, q_n) << ","
         << "\"treedepth_tt_stores\":" << array_to_json(g_stats.tree_depth_ttstores, q_n) << ","
         << "\"treedepth_fail_highs\":" << array_to_json(g_stats.tree_depth_fail_highs, q_n) << ","
         << "\"treedepth_fail_lows\":" << array_to_json(g_stats.tree_depth_fail_lows, q_n) << ","
@@ -493,6 +521,12 @@ inline void dumpSearchStats()
     const double nps =
         g_stats.time_ms > 0
             ? (1000.0 * static_cast<double>(total_nodes)) / static_cast<double>(g_stats.time_ms)
+            : 0.0;
+
+    const double tt_return_pct =
+        (g_stats.tt_returns + g_stats.tt_stores) > 0
+            ? 100.0 * static_cast<double>(g_stats.tt_returns) /
+              static_cast<double>(g_stats.tt_returns + g_stats.tt_stores)
             : 0.0;
  
     const double tt_hit_pct =
@@ -551,9 +585,11 @@ inline void dumpSearchStats()
     cout << std::fixed << std::setprecision(2);
  
     // ===================== HEADER =====================
-    rule('=');
+    rule('-');
+    rule('-');
     cout << "SEARCH STATS\n";
-    rule('=');
+    rule('-');
+    rule('-');
  
     // ===================== SEARCH SUMMARY =====================
     section("SEARCH");
@@ -573,10 +609,12 @@ inline void dumpSearchStats()
  
     // ===================== TT =====================
     section("TRANSPOSITION TABLE");
+    row("Returns", g_stats.tt_returns);
     row("Hits", g_stats.tt_hits);
     row("Stores", g_stats.tt_stores);
     row("Overwritten", g_stats.tt_overwritten);
     row("Fill Ratio", g_stats.tt_fill_ratio * 100.0, "%");
+    row("Return Rate", tt_return_pct, "%");
     row("Hit Rate", tt_hit_pct, "%");
  
     // ===================== CUTOFFS =====================
@@ -624,6 +662,7 @@ inline void dumpSearchStats()
          << setw(9)  << "Nodes"
          << setw(8)  << "QNodes"
          << setw(5)  << "QD"
+         << setw(6)  << "TTRet"
          << setw(6)  << "TTHit"
          << setw(6)  << "TTSt"
          << setw(5)  << "FH"
@@ -651,6 +690,7 @@ inline void dumpSearchStats()
              << setw(9)  << g_stats.it_depth_nodes[d]
              << setw(8)  << g_stats.it_depth_qnodes[d]
              << setw(5)  << g_stats.it_depth_qdepth[d]
+             << setw(6)  << g_stats.it_depth_tt_returns[d]
              << setw(6)  << g_stats.it_depth_tthits[d]
              << setw(6)  << g_stats.it_depth_ttstores[d]
              << setw(5)  << g_stats.it_depth_fail_highs[d]
@@ -674,6 +714,7 @@ inline void dumpSearchStats()
          << setw(4)  << "Ply"
          << setw(9)  << "Nodes"
          << setw(8)  << "QNodes"
+         << setw(6)  << "TTRet"
          << setw(6)  << "TTHit"
          << setw(6)  << "TTSt"
          << setw(5)  << "FH"
@@ -695,6 +736,7 @@ inline void dumpSearchStats()
              << setw(4)  << p
              << setw(9)  << g_stats.tree_depth_nodes[p]
              << setw(8)  << g_stats.tree_depth_qnodes[p]
+             << setw(6)  << g_stats.tree_depth_tt_returns[p]
              << setw(6)  << g_stats.tree_depth_tthits[p]
              << setw(6)  << g_stats.tree_depth_ttstores[p]
              << setw(5)  << g_stats.tree_depth_fail_highs[p]
