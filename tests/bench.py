@@ -389,7 +389,7 @@ def print_game_sim_results(results: dict, engines: list[str]):
         pct = ((enps / base_nps) - 1) * 100 if base_nps and engine != baseline else None
         pct_str = f"{pct:+.1f}%" if pct is not None else "baseline"
         print(f"  {name:<20} {enps:>10,.0f} {avg(s,'nodes'):>10,.0f} {avg(s,'qnodes'):>10,.0f}"
-              f"{avg(s,'depth'):>6.1f} {avg(s, 'tt_return_rate'):>6.1f} {avg(s,'tt_hit_rate'):>6.1f} "
+              f"{avg(s,'depth'):>6.1f} {avg(s,'tt_hit_rate'):>6.1f} "
               f"{avg(s,'fh_first_pct'):>6.1f}  {pct_str:>11}")
 
     # --- Per-ply table: depth and NPS per engine ---
