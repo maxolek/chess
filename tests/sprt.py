@@ -311,7 +311,6 @@ class LivePlotter:
         self.ax_elo.axhline(0, color='grey', linestyle='-', alpha=0.3)
         self.ax_elo.axhline(self.elo0, color='red', linestyle=':', alpha=0.5, label=f'elo0={self.elo0}')
         self.ax_elo.axhline(self.elo1, color='green', linestyle=':', alpha=0.5, label=f'elo1={self.elo1}')
-        self.ax_elo.legend(loc='upper left', fontsize=7)
         # BayesElo 
         self.line_bayes_elo, = self.ax_elo.plot([], [], color='blue', linewidth=2.0, label='BayesElo')
         self.fill_bayes_elo = None
@@ -320,6 +319,7 @@ class LivePlotter:
         # naive
         self.line_elo, = self.ax_elo.plot([], [], color='green', linewidth=1.0, linestyle=':', alpha=.7, label='Logistic (Elo)')
         self.fill_elo = None
+        self.ax_elo.legend(loc='upper left', fontsize=7)
         self.ax_elo.set_ylim(-100,100)
 
         # score plot (bottom-left)
@@ -444,7 +444,7 @@ class LivePlotter:
             lo_tail = self.elo_lo_series
             hi_tail = self.elo_hi_series
             n = len(lo_tail)
-        if n < 30:
+        if n < 20:
             elo_min = min(lo_tail)
             elo_max = max(hi_tail)
         else:
