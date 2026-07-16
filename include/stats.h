@@ -570,7 +570,7 @@ inline void dumpSearchStats()
     const size_t n   = g_stats.max_depth + 1;   // iterative-deepening rows
     const size_t q_n = g_stats.max_qdepth + 1;  // tree-ply rows
  
-    constexpr int W = 76; // total box width
+    constexpr int W = 160; // total box width
     auto rule = [&](char c) { cout << std::string(W, c) << "\n"; };
     auto section = [&](const std::string& title) {
         cout << "\n";
@@ -655,56 +655,56 @@ inline void dumpSearchStats()
     // ===================== ITERATIVE DEEPENING =====================
     section("ITERATIVE DEEPENING (per completed depth)");
     cout << left
-         << setw(3)  << "D"
+         << setw(4)  << "D"
          << setw(7)  << "Eval"
          << setw(7)  << "Move"
-         << setw(7)  << "Time"
-         << setw(9)  << "Nodes"
-         << setw(8)  << "QNodes"
+         << setw(9)  << "Time"
+         << setw(11)  << "Nodes"
+         << setw(11)  << "QNodes"
          << setw(5)  << "QD"
-         << setw(6)  << "TTRet"
-         << setw(6)  << "TTHit"
-         << setw(6)  << "TTSt"
-         << setw(5)  << "FH"
-         << setw(5)  << "FL"
-         << setw(6)  << "FHavg"
-         << setw(5)  << "NMP"
-         << setw(6)  << "NMPf"
-         << setw(5)  << "SEE"
-         << setw(6)  << "Delta"
-         << setw(5)  << "PVSl"
-         << setw(5)  << "PVSf"
-         << setw(5)  << "PVSr"
-         << setw(6)  << "AspFH"
-         << setw(6)  << "AspFL"
+         << setw(9)  << "TTRet"
+         << setw(9)  << "TTHit"
+         << setw(9)  << "TTSt"
+         << setw(8)  << "FH"
+         << setw(8)  << "FL"
+         << setw(7)  << "FHavg"
+         << setw(7)  << "NMP"
+         << setw(7)  << "NMPf"
+         << setw(8)  << "SEE"
+         << setw(8)  << "Delta"
+         << setw(7)  << "PVSl"
+         << setw(7)  << "PVSf"
+         << setw(7)  << "PVSr"
+         << setw(7)  << "AspFH"
+         << setw(7)  << "AspFL"
          << "\n";
     rule('-');
  
     for (size_t d = 0; d < n; ++d) {
         const auto dfh = fhStats(g_stats.it_depth_fh_index[d], g_stats.it_depth_fail_highs[d]);
         cout << left
-             << setw(3)  << d
+             << setw(4)  << d
              << setw(7)  << g_stats.it_depth_eval[d]
              << setw(7)  << g_stats.it_depth_move[d].uci()
-             << setw(7)  << g_stats.it_depth_time_ms[d]
-             << setw(9)  << g_stats.it_depth_nodes[d]
-             << setw(8)  << g_stats.it_depth_qnodes[d]
+             << setw(9)  << g_stats.it_depth_time_ms[d]
+             << setw(11)  << g_stats.it_depth_nodes[d]
+             << setw(11)  << g_stats.it_depth_qnodes[d]
              << setw(5)  << g_stats.it_depth_qdepth[d]
-             << setw(6)  << g_stats.it_depth_tt_returns[d]
-             << setw(6)  << g_stats.it_depth_tthits[d]
-             << setw(6)  << g_stats.it_depth_ttstores[d]
-             << setw(5)  << g_stats.it_depth_fail_highs[d]
-             << setw(5)  << g_stats.it_depth_fail_lows[d]
-             << setw(6)  << dfh.mean
-             << setw(5)  << g_stats.it_depth_nmp[d]
-             << setw(6)  << g_stats.it_depth_nmp_failhigh[d]
-             << setw(5)  << g_stats.it_depth_see_prunes[d]
-             << setw(6)  << g_stats.it_depth_delta_prunes[d]
-             << setw(5)  << g_stats.it_depth_pvs_researches[d][0]
-             << setw(5)  << g_stats.it_depth_pvs_researches[d][1]
-             << setw(5)  << g_stats.it_depth_pvs_researches[d][2]
-             << setw(6)  << g_stats.it_depth_aspiration_failhigh_researches[d]
-             << setw(6)  << g_stats.it_depth_aspiration_faillow_researches[d]
+             << setw(9)  << g_stats.it_depth_tt_returns[d]
+             << setw(9)  << g_stats.it_depth_tthits[d]
+             << setw(9)  << g_stats.it_depth_ttstores[d]
+             << setw(8)  << g_stats.it_depth_fail_highs[d]
+             << setw(8)  << g_stats.it_depth_fail_lows[d]
+             << setw(7)  << dfh.mean
+             << setw(7)  << g_stats.it_depth_nmp[d]
+             << setw(7)  << g_stats.it_depth_nmp_failhigh[d]
+             << setw(8)  << g_stats.it_depth_see_prunes[d]
+             << setw(8)  << g_stats.it_depth_delta_prunes[d]
+             << setw(7)  << g_stats.it_depth_pvs_researches[d][0]
+             << setw(7)  << g_stats.it_depth_pvs_researches[d][1]
+             << setw(7)  << g_stats.it_depth_pvs_researches[d][2]
+             << setw(7)  << g_stats.it_depth_aspiration_failhigh_researches[d]
+             << setw(7)  << g_stats.it_depth_aspiration_faillow_researches[d]
              << "\n";
     }
  
@@ -712,43 +712,43 @@ inline void dumpSearchStats()
     section("TREE STATS (per ply, includes quiescence)");
     cout << left
          << setw(4)  << "Ply"
-         << setw(9)  << "Nodes"
-         << setw(8)  << "QNodes"
-         << setw(6)  << "TTRet"
-         << setw(6)  << "TTHit"
-         << setw(6)  << "TTSt"
-         << setw(5)  << "FH"
-         << setw(5)  << "FL"
-         << setw(6)  << "FHavg"
-         << setw(5)  << "SEE"
-         << setw(6)  << "Delta"
-         << setw(5)  << "PVSl"
-         << setw(5)  << "PVSf"
-         << setw(5)  << "PVSr"
-         << setw(5)  << "NMP"
-         << setw(6)  << "NMPf"
+         << setw(11) << "Nodes"
+         << setw(10) << "QNodes"
+         << setw(9)  << "TTRet"
+         << setw(9)  << "TTHit"
+         << setw(9)  << "TTSt"
+         << setw(8)  << "FH"
+         << setw(8)  << "FL"
+         << setw(7)  << "FHavg"
+         << setw(8)  << "SEE"
+         << setw(8)  << "Delta"
+         << setw(7)  << "PVSl"
+         << setw(7)  << "PVSf"
+         << setw(7)  << "PVSr"
+         << setw(7)  << "NMP"
+         << setw(7)  << "NMPf"
          << "\n";
     rule('-');
- 
+
     for (size_t p = 0; p < q_n; ++p) {
         const auto pfh = fhStats(g_stats.tree_depth_fh_index[p], g_stats.tree_depth_fail_highs[p]);
         cout << left
              << setw(4)  << p
-             << setw(9)  << g_stats.tree_depth_nodes[p]
-             << setw(8)  << g_stats.tree_depth_qnodes[p]
-             << setw(6)  << g_stats.tree_depth_tt_returns[p]
-             << setw(6)  << g_stats.tree_depth_tthits[p]
-             << setw(6)  << g_stats.tree_depth_ttstores[p]
-             << setw(5)  << g_stats.tree_depth_fail_highs[p]
-             << setw(5)  << g_stats.tree_depth_fail_lows[p]
-             << setw(6)  << pfh.mean
-             << setw(5)  << g_stats.tree_depth_see_prunes[p]
-             << setw(6)  << g_stats.tree_depth_delta_prunes[p]
-             << setw(5)  << g_stats.tree_depth_pvs_researches[p][0]
-             << setw(5)  << g_stats.tree_depth_pvs_researches[p][1]
-             << setw(5)  << g_stats.tree_depth_pvs_researches[p][2]
-             << setw(5)  << g_stats.tree_depth_nmp[p]
-             << setw(6)  << g_stats.tree_depth_nmp_failhigh[p]
+             << setw(11) << g_stats.tree_depth_nodes[p]
+             << setw(10) << g_stats.tree_depth_qnodes[p]
+             << setw(9)  << g_stats.tree_depth_tt_returns[p]
+             << setw(9)  << g_stats.tree_depth_tthits[p]
+             << setw(9)  << g_stats.tree_depth_ttstores[p]
+             << setw(8)  << g_stats.tree_depth_fail_highs[p]
+             << setw(8)  << g_stats.tree_depth_fail_lows[p]
+             << setw(7)  << pfh.mean
+             << setw(8)  << g_stats.tree_depth_see_prunes[p]
+             << setw(8)  << g_stats.tree_depth_delta_prunes[p]
+             << setw(7)  << g_stats.tree_depth_pvs_researches[p][0]
+             << setw(7)  << g_stats.tree_depth_pvs_researches[p][1]
+             << setw(7)  << g_stats.tree_depth_pvs_researches[p][2]
+             << setw(7)  << g_stats.tree_depth_nmp[p]
+             << setw(7)  << g_stats.tree_depth_nmp_failhigh[p]
              << "\n";
     }
  

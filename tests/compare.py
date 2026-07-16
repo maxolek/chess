@@ -36,44 +36,50 @@ RUNS_PER_POS = 1
 # All stats from dumpstats and their display config
 # (key, label, format, higher_is_better)
 STAT_DEFS = [
-    ("time_ms",          "Time (ms)",            ",.0f", None),
-    ("depth",            "Completed Depth",      ".1f",  True),
-    ("nps",              "NPS",                  ",.0f", True),
-    ("nodes",            "Nodes",                ",.0f", True),
-    ("qnodes",           "QNodes",               ",.0f", True),
-    ("q_ratio",          "Q Ratio %",            ".1f",  False),
-    ("tt_hit_rate",      "TT Hit Rate %",        ".1f",  True),
-    ("tt_fill",          "TT Fill %",            ".2f",  False),
-    ("fh_first_pct",     "FH First %",           ".1f",  True),
-    ("fail_highs",       "Fail Highs",           ",.0f", True),
-    ("fail_lows",        "Fail Lows",            ",.0f", True),
-    ("see_pruned",       "SEE Pruned",           ",.0f", True),
-    ("delta_pruned",     "Delta Pruned",         ",.0f", True),
-    ("nmp_attempts",     "NMP Attempts",         ",.0f", True),
-    ("nmp_success_pct",  "NMP Success %",        ".1f",  True),
-    ("pvs_researches",   "PVS Re-searches",      ",.1f", False),
-    ("asp_failhigh",     "Asp Fail High",        ",.1f", False),
-    ("asp_faillow",      "Asp Fail Low",         ",.1f", False),
+    ("time_ms",                 "Time (ms)",                ",.0f", None),
+    ("depth",                   "Completed Depth",          ".1f",  True),
+    ("nps",                     "NPS",                      ",.0f", True),
+    ("nodes",                   "Nodes",                    ",.0f", True),
+    ("qnodes",                  "QNodes",                   ",.0f", True),
+    ("q_ratio",                 "Q Ratio %",                ".1f",  False),
+    ("tt_hit_rate",             "TT Hit Rate %",            ".1f",  True),
+    ("tt_return_rate",          "TT Return Rate %",         ".1f",  True),
+    ("tt_fill",                 "TT Fill %",                ".2f",  False),
+    ("fh_first_pct",            "FH First %",               ".1f",  True),
+    ("fail_highs",              "Fail Highs",               ",.0f", True),
+    ("fail_lows",               "Fail Lows",                ",.0f", True),
+    ("see_pruned",              "SEE Pruned",               ",.0f", True),
+    ("delta_pruned",            "Delta Pruned",             ",.0f", True),
+    ("nmp_attempts",            "NMP Attempts",             ",.0f", True),
+    ("nmp_success_pct",         "NMP Success %",            ".1f",  True),
+    ("pvs_researches_full",     "PVS Re-searches (FULL)",   ",.1f", False),
+    ("pvs_researches_lmr",      "PVS Re-searches (LMR)",    ",.1f", False),
+    ("pvs_researches_root",     "PVS Re-searches (ROOT)",   ",.1f", False),
+    ("asp_failhigh",            "Asp Fail High",            ",.1f", False),
+    ("asp_faillow",             "Asp Fail Low",             ",.1f", False),
 ]
 
 STAT_PATTERNS = {
-    "depth":           r"Completed Depth\s*:\s*(\d+)",
-    "nps":             r"NPS\s*:\s*(\d+)",
-    "nodes":           r"Total\s*:\s*(\d+)",
-    "qnodes":          r"QNodes\s*:\s*(\d+)",
-    "time_ms":         r"Time \(ms\)\s*:\s*(\d+)",
-    "tt_hit_rate":     r"Hit Rate\s*:\s*([\d.]+)%",
-    "tt_fill":         r"Fill Ratio\s*:\s*([\d.]+)%",
-    "fh_first_pct":    r"FH First %\s*:\s*([\d.]+)%",
-    "fail_highs":      r"Fail Highs\s*:\s*(\d+)",
-    "fail_lows":       r"Fail Lows\s*:\s*(\d+)",
-    "see_pruned":      r"SEE\s*:\s*(\d+)",
-    "delta_pruned":    r"Delta\s*:\s*(\d+)",
-    "nmp_attempts":    r"Attempts\s*:\s*(\d+)",
-    "nmp_success_pct": r"Success %\s*:\s*([\d.]+)%",
-    "pvs_researches":  r"PVS\s*:\s*(\d+)",
-    "asp_failhigh":    r"Fail High Re\s*:\s*(\d+)",
-    "asp_faillow":     r"Fail Low Re\s*:\s*(\d+)",
+    "depth":                r"Completed Depth\s+(\d+)",
+    "nps":                  r"NPS\s+(\d+)",
+    "nodes":                r"Total\s+(\d+)",
+    "qnodes":               r"QNodes\s+(\d+)",
+    "time_ms":              r"Time \(ms\)\s+(\d+)",
+    "tt_return_rate":       r"Return Rate\s+([\d.]+)%",
+    "tt_hit_rate":          r"Hit Rate\s+([\d.]+)%",
+    "tt_fill":              r"Fill Ratio\s+([\d.]+)%",
+    "fh_first_pct":         r"FH % at \[0\]\s+([\d.]+)%",
+    "fail_highs":           r"Fail Highs\s+(\d+)",
+    "fail_lows":            r"Fail Lows\s+(\d+)",
+    "see_pruned":           r"SEE Prunes\s+(\d+)",
+    "delta_pruned":         r"Delta Prunes\s+(\d+)",
+    "nmp_attempts":         r"NMP Attempts\s+(\d+)",
+    "nmp_success_pct":      r"NMP FH %\s+([\d.]+)%",
+    "pvs_researches_full":  r"PVS full\s+(\d+)",
+    "pvs_researches_lmr":   r"PVS w/ LMR\s+(\d+)",
+    "pvs_researches_root":  r"PVS @ root\s+(\d+)",
+    "asp_failhigh":         r"Aspiration FH Re\s+(\d+)",
+    "asp_faillow":          r"Aspiration FL Re\s+(\d+)",
 }
 
 
@@ -97,7 +103,7 @@ def collect_dumpstats(proc, movetime: int) -> dict:
         if line.startswith("bestmove"):
             break
 
-    proc.stdin.write("dumpstats\n")
+    proc.stdin.write("dumpstats\nisready\n")
     proc.stdin.flush()
 
     dump_output = []
@@ -106,9 +112,9 @@ def collect_dumpstats(proc, movetime: int) -> dict:
         line = proc.stdout.readline()
         if not line:
             break
-        dump_output.append(line)
-        if "----" in line and len(dump_output) > 10:
+        if line.strip() == "readyok":
             break
+        dump_output.append(line)
 
     return parse_dumpstats("".join(dump_output))
 

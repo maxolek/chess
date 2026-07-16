@@ -24,38 +24,43 @@ GAME_SIM_PATH = "bin/test_positions/bench_game.txt"
 MOVETIME_MS  = 2000
 RUNS_PER_POS = 1  # average over multiple runs
 
+
 STAT_PATTERNS = {
-    "depth":           r"Completed Depth\s*:\s*(\d+)",
-    "nps":             r"NPS\s*:\s*(\d+)",
-    "nodes":           r"Total\s*:\s*(\d+)",
-    "qnodes":          r"QNodes\s*:\s*(\d+)",
-    "time_ms":         r"Time \(ms\)\s*:\s*(\d+)",
-    "tt_hit_rate":     r"Hit Rate\s*:\s*([\d.]+)%",
-    "tt_fill":         r"Fill Ratio\s*:\s*([\d.]+)%",
-    "fh_first_pct":    r"FH First %\s*:\s*([\d.]+)%",
-    "fail_highs":      r"Fail Highs\s*:\s*(\d+)",
-    "fail_lows":       r"Fail Lows\s*:\s*(\d+)",
-    "see_pruned":      r"SEE\s*:\s*(\d+)",
-    "delta_pruned":    r"Delta\s*:\s*(\d+)",
-    "nmp_attempts":    r"Attempts\s*:\s*(\d+)",
-    "nmp_success_pct": r"Success %\s*:\s*([\d.]+)%",
-    "pvs_researches":  r"PVS\s*:\s*(\d+)",
-    "asp_failhigh":    r"Fail High Re\s*:\s*(\d+)",
-    "asp_faillow":     r"Fail Low Re\s*:\s*(\d+)",
+    "depth":                r"Completed Depth\s+(\d+)",
+    "nps":                  r"NPS\s+(\d+)",
+    "nodes":                r"Total\s+(\d+)",
+    "qnodes":               r"QNodes\s+(\d+)",
+    "time_ms":              r"Time \(ms\)\s+(\d+)",
+    "tt_return_rate":       r"Return Rate\s+([\d.]+)%",
+    "tt_hit_rate":          r"Hit Rate\s+([\d.]+)%",
+    "tt_fill":              r"Fill Ratio\s+([\d.]+)%",
+    "fh_first_pct":         r"FH % at \[0\]\s+([\d.]+)%",
+    "fail_highs":           r"Fail Highs\s+(\d+)",
+    "fail_lows":            r"Fail Lows\s+(\d+)",
+    "see_pruned":           r"SEE Prunes\s+(\d+)",
+    "delta_pruned":         r"Delta Prunes\s+(\d+)",
+    "nmp_attempts":         r"NMP Attempts\s+(\d+)",
+    "nmp_success_pct":      r"NMP FH %\s+([\d.]+)%",
+    "pvs_researches_full":  r"PVS full\s+(\d+)",
+    "pvs_researches_lmr":   r"PVS w/ LMR\s+(\d+)",
+    "pvs_researches_root":  r"PVS @ root\s+(\d+)",
+    "asp_failhigh":         r"Aspiration FH Re\s+(\d+)",
+    "asp_faillow":          r"Aspiration FL Re\s+(\d+)",
 }
 
 
 @dataclass
 class SearchStats:
-    nps:          list[float] = field(default_factory=list)
-    nodes:        list[float] = field(default_factory=list)
-    qnodes:       list[float] = field(default_factory=list)
-    depth:        list[float] = field(default_factory=list)
-    eval:         list[float] = field(default_factory=list)
-    tt_hit_rate:  list[float] = field(default_factory=list)
-    fh_first_pct: list[float] = field(default_factory=list)
-    see_pruned:   list[float] = field(default_factory=list)
-    nmp_success:  list[float] = field(default_factory=list)
+    nps:            list[float] = field(default_factory=list)
+    nodes:          list[float] = field(default_factory=list)
+    qnodes:         list[float] = field(default_factory=list)
+    depth:          list[float] = field(default_factory=list)
+    eval:           list[float] = field(default_factory=list)
+    tt_return_rate: list[float] = field(default_factory=list)
+    tt_hit_rate:    list[float] = field(default_factory=list)
+    fh_first_pct:   list[float] = field(default_factory=list)
+    see_pruned:     list[float] = field(default_factory=list)
+    nmp_success:    list[float] = field(default_factory=list)
 
     def avg(self, key):
         vals = getattr(self, key)
@@ -202,17 +207,17 @@ def run_search(engine_path: str, position: str, movetime: int) -> Optional[dict]
         proc.stdin.flush()
 
         dump_output = []
-        dash_count = 0
         start = time.time()
         while time.time() - start < 3:
             line = proc.stdout.readline()
             if not line:
                 break
             dump_output.append(line)
-            if "----" in line:
-                dash_count += 1
-                if dash_count >= 3:
-                    break
+
+            W = 76
+            rule = lambda c: c * W  # Returns the string instead of printing it
+            if rule('=') in line:
+                break
 
         proc.stdin.write("quit\n")
         proc.stdin.flush()
@@ -247,6 +252,7 @@ def benchmark(engines: list[str], positions: list[tuple], movetime: int, runs: i
                     if "qnodes"       in stats: s.qnodes.append(stats["qnodes"])
                     if "depth"        in stats: s.depth.append(stats["depth"])
                     if "eval"         in stats: s.eval.append(stats["eval"])
+                    if "tt_return_rate" in stats: s.tt_return_rate.append(stats['tt_return_rate'])
                     if "tt_hit_rate"  in stats: s.tt_hit_rate.append(stats["tt_hit_rate"])
                     if "fh_first_pct" in stats: s.fh_first_pct.append(stats["fh_first_pct"])
                     if "see_pruned"   in stats: s.see_pruned.append(stats["see_pruned"])
@@ -334,16 +340,16 @@ def run_game_sim(engine_path: str, moves: list[str], movetime: int, side: int = 
                         break
 
                 # get stats
-                send("dumpstats")
+                send("dumpstats\nisready\n")
                 dump_output = []
                 start = time.time()
                 while time.time() - start < 3:
                     line = proc.stdout.readline()
                     if not line:
                         break
-                    dump_output.append(line)
-                    if "----" in line and len(dump_output) > 10:
+                    if line.strip() == "readyok":
                         break
+                    dump_output.append(line)
 
                 stats = parse_dumpstats("".join(dump_output))
                 stats["move_num"] = len(played)
@@ -383,7 +389,7 @@ def print_game_sim_results(results: dict, engines: list[str]):
         pct = ((enps / base_nps) - 1) * 100 if base_nps and engine != baseline else None
         pct_str = f"{pct:+.1f}%" if pct is not None else "baseline"
         print(f"  {name:<20} {enps:>10,.0f} {avg(s,'nodes'):>10,.0f} {avg(s,'qnodes'):>10,.0f}"
-              f"{avg(s,'depth'):>6.1f} {avg(s,'tt_hit_rate'):>6.1f} "
+              f"{avg(s,'depth'):>6.1f} {avg(s, 'tt_return_rate'):>6.1f} {avg(s,'tt_hit_rate'):>6.1f} "
               f"{avg(s,'fh_first_pct'):>6.1f}  {pct_str:>11}")
 
     # --- Per-ply table: depth and NPS per engine ---

@@ -53,6 +53,12 @@ def calculate_ci(variance, condifence_level=0.95):
     ci_margin = z_score * math.sqrt(variance)
     return ci_margin
 
+def compute_naive_elo(W, L):
+    """naive elo ignoring draws entirely -- reference only, not decision-relevant"""
+    if W == 0 or L == 0:
+        return 0.0
+    return 400.0 * math.log10(W / L)
+
 
 def _bayes_elo_from_probs(p_win, p_loss):
     """compute BayesElo and drawElo from observed W/L probabilities."""
@@ -140,6 +146,88 @@ def compute_elo_with_ci(W, D, L, CI=.95):
 
     return elo, score_to_elo(s_lo), score_to_elo(s_hi)
 
+def compute_bayes_elo_with_ci(W, D, L, CI=0.95):
+    """
+    BayesElo estimate + CI, using the same draw-adjusted scale as compute_llr.
+    This is the number your SPRT pass/fail is actually computed against.
+    """
+    N = W + D + L
+    if N == 0:
+        return 0.0, 0.0, 0.0
+
+    # jeffreys prior regularization (same as compute_llr, for consistency at low N)
+    wins = W + 0.5
+    losses = L + 0.5
+    draws = D + 0.5
+    total = wins + losses + draws
+
+    p_win = wins / total
+    p_loss = losses / total
+
+    bayes_elo, draw_elo = _bayes_elo_from_probs(p_win, p_loss)
+    s = _scale(draw_elo)
+
+    # convert BayesElo back to "normalized" 400-scale elo for display
+    elo = bayes_elo * s
+
+    # CI via score variance, then map through the same scale
+    score = p_win + draws / (2 * total)
+    m2 = p_win + draws / (4 * total)
+    var = (m2 - score ** 2) / total
+    if var <= 0:
+        return elo, elo, elo
+
+    ci = calculate_ci(var, CI)
+    s_lo = max(0.001, score - ci)
+    s_hi = min(0.999, score + ci)
+
+    elo_lo = score_to_elo(s_lo) * s
+    elo_hi = score_to_elo(s_hi) * s
+
+    return elo, elo_lo, elo_hi
+
+def compute_normalized_elo_with_ci(W, D, L, CI=0.95):
+    """
+    Normalized Elo (nElo): rescales the naive logistic elo estimate by the
+    ratio of a reference variance (0.25, i.e. no-draw 50/50 match) to the
+    actual observed per-game score variance. Draws shrink variance, so nElo
+    values run larger than regular Elo at high draw rates -- this is expected.
+    """
+    N = W + D + L
+    if N == 0:
+        return 0.0, 0.0, 0.0
+
+    p_win, p_draw, p_loss = W / N, D / N, L / N
+    mu = p_win + 0.5 * p_draw
+    if mu <= 0.0 or mu >= 1.0:
+        return 0.0, 0.0, 0.0
+
+    elo = score_to_elo(mu)
+
+    # empirical per-game variance of the score outcome (0 / 0.5 / 1)
+    var = p_win * (1 - mu) ** 2 + p_draw * (0.5 - mu) ** 2 + p_loss * (0 - mu) ** 2
+    if var <= 0:
+        return elo, elo, elo
+
+    ref_var = 0.25
+    scale = math.sqrt(ref_var / var)
+    nelo = elo * scale
+
+    # CI on mu (score), same approach as compute_elo_with_ci, then rescaled
+    m2 = p_win + p_draw / 4.0
+    var_of_mean = (m2 - mu ** 2) / N
+    if var_of_mean <= 0:
+        return nelo, nelo, nelo
+
+    ci = calculate_ci(var_of_mean, CI)
+    mu_lo = max(0.001, mu - ci)
+    mu_hi = min(0.999, mu + ci)
+
+    nelo_lo = score_to_elo(mu_lo) * scale
+    nelo_hi = score_to_elo(mu_hi) * scale
+
+    return nelo, nelo_lo, nelo_hi
+
 def compute_los(W, L):
     """likelihood of superiority"""
     if W + L == 0: return 50.0 
@@ -168,6 +256,12 @@ class LivePlotter:
         self.elo_series = []
         self.elo_lo_series = []
         self.elo_hi_series = []
+        self.bayes_elo_series = []
+        self.bayes_elo_lo_series = []
+        self.bayes_elo_hi_series = []
+        self.normalized_elo_series = []
+        self.normalized_elo_lo_series = []
+        self.normalized_elo_hi_series = []
         self.score_series = []
 
         # per color tracking (candidate perspective)
@@ -218,7 +312,13 @@ class LivePlotter:
         self.ax_elo.axhline(self.elo0, color='red', linestyle=':', alpha=0.5, label=f'elo0={self.elo0}')
         self.ax_elo.axhline(self.elo1, color='green', linestyle=':', alpha=0.5, label=f'elo1={self.elo1}')
         self.ax_elo.legend(loc='upper left', fontsize=7)
-        self.line_elo, = self.ax_elo.plot([], [], 'b-', linewidth=1.5)
+        # BayesElo 
+        self.line_bayes_elo, = self.ax_elo.plot([], [], color='blue', linewidth=2.0, label='BayesElo')
+        self.fill_bayes_elo = None
+        # normalized
+        self.line_nelo, = self.ax_elo.plot([], [], color='purple', linewidth=1.0, linestyle='--', alpha=.7,label='Normalized (nElo)')
+        # naive
+        self.line_elo, = self.ax_elo.plot([], [], color='green', linewidth=1.0, linestyle=':', alpha=.7, label='Logistic (Elo)')
         self.fill_elo = None
         self.ax_elo.set_ylim(-100,100)
 
@@ -301,36 +401,57 @@ class LivePlotter:
 
         # elo + ci
         elo, elo_lo, elo_hi = compute_elo_with_ci(W, D, L)
-        self.elo_series.append(elo)
+        b_elo, b_elo_lo, b_elo_hi = compute_bayes_elo_with_ci(W, D, L)
+        n_elo, n_elo_lo, n_elo_hi = compute_normalized_elo_with_ci(W, D, L)
+
+        self.normalized_elo_series.append(n_elo)
+        self.bayes_elo_series.append(b_elo)
+        self.elo_series.append(n_elo)
+
+        self.normalized_elo_lo_series.append(n_elo_lo)
+        self.bayes_elo_lo_series.append(b_elo_lo)
         self.elo_lo_series.append(elo_lo)
+
+        self.normalized_elo_hi_series.append(n_elo_hi)
+        self.bayes_elo_hi_series.append(b_elo_hi)
         self.elo_hi_series.append(elo_hi)
 
         # update LLR line
         self.line_llr.set_data(self.games, self.llr_series)
         self.ax_llr.set_xlim(1, max(self.games) * 1.05)
-        llr_lo = min(self.llr_series) - 0.5
-        llr_hi = max(self.llr_series) + 0.5
+        llr_lo = min(self.llr_series) - 0.2
+        llr_hi = max(self.llr_series) + 0.2
         self.ax_llr.set_ylim(llr_lo, llr_hi)
 
         # update elo line
         self.line_elo.set_data(self.games, self.elo_series)
+        self.line_bayes_elo.set_data(self.games, self.bayes_elo_series)
+        self.line_nelo.set_data(self.games, self.normalized_elo_series)
         if self.fill_elo:
             self.fill_elo.remove()
         self.fill_elo = self.ax_elo.fill_between(
-            self.games, self.elo_lo_series, self.elo_hi_series, alpha=0.2, color='blue'
+            self.games, self.bayes_elo_lo_series, self.bayes_elo_hi_series, alpha=0.2, color='blue'
         )
         self.ax_elo.relim()
         self.ax_elo.autoscale_view()
         # clamp elo y-axis to reasonable range (extreme early, smoothes and converges later)
-        n = len(self.elo_lo_series)
+        # skip games 1+2 -- elo estimate starts at 0 or +/-800 and isn't representative
+        lo_tail = self.elo_lo_series[2:]
+        hi_tail = self.elo_hi_series[2:]
+        n = len(lo_tail)
+        if n == 0:
+            # only game 1+2 exists -- fall back to full series so we don't crash
+            lo_tail = self.elo_lo_series
+            hi_tail = self.elo_hi_series
+            n = len(lo_tail)
         if n < 30:
-            elo_min = min(self.elo_lo_series) - 20
-            elo_max = max(self.elo_hi_series) + 20
+            elo_min = min(lo_tail)
+            elo_max = max(hi_tail)
         else:
             cut = 2 * n // 3
-            elo_min = min(self.elo_lo_series[cut:]) - 20
-            elo_max = max(self.elo_hi_series[cut:]) + 20
-        elo_pad = max(5, (elo_max - elo_min) * 0.15)
+            elo_min = min(lo_tail[cut:])
+            elo_max = max(hi_tail[cut:])
+        elo_pad = max(5, (elo_max - elo_min) * 0.5)
         self.ax_elo.set_ylim(elo_min - elo_pad, elo_max + elo_pad)
 
         # title with current stats
@@ -346,15 +467,21 @@ class LivePlotter:
         #  update score line
         self.line_score.set_data(self.games, self.score_series)
         self.ax_score.set_xlim(1, max(self.games) * 1.05)
-        n = len(self.elo_lo_series)
+        # skip games 1+2 -- score estimate is noisy/unrepresentative this early
+        score_tail = self.score_series[2:]
+        n = len(score_tail)
+        if n == 0:
+            # only games 1-2 exist -- fall back to full series so we don't crash
+            score_tail = self.score_series
+            n = len(score_tail)
         if n < 30:
-            s_min = min(self.score_series) - 0.1
-            s_max = max(self.score_series) + 0.1
+            s_min = min(score_tail)
+            s_max = max(score_tail)
         else:
             cut = 2 * n // 3
-            s_min = min(self.score_series[cut:]) - 0.1
-            s_max = max(self.score_series[cut:]) + 0.1
-        s_pad = max(0.02, (s_max - s_min) * 0.15)
+            s_min = min(score_tail[cut:])
+            s_max = max(score_tail[cut:])
+        s_pad = max(0.02, (s_max - s_min) * 0.5)
         self.ax_score.set_ylim(s_min - s_pad, s_max + s_pad)
 
         # stats text panel
@@ -364,7 +491,7 @@ class LivePlotter:
 
         lines = []
         lines.append(f"-- Overall --             Candidate Version: {self.candidate_data['version']}")
-        lines.append(f"  W-D-L: {W}-{D}-{L}           Baseline Version: {self.baseline_data['version']}") #\t\t{self.candidate_data['description']}
+        lines.append(f"  W-D-L: {W}-{D}-{L}         Baseline Version: {self.baseline_data['version']}") #\t\t{self.candidate_data['description']}
         lines.append("")
 
         lines.append("-- As White --")
@@ -376,11 +503,11 @@ class LivePlotter:
             lines.append("  (no games)")
         lines.append("")
 
-        lines.append(f"-- As Black --")
+        lines.append(f"-- As Black --            Elo: {elo:+.1f} ({elo_lo:+.1f}, {elo_hi:+.1f})")
         if bt > 0:
             b_score = (self.black_w + self.black_d / 2.0) / bt 
-            lines.append(f"  W-D-L: {self.black_w}-{self.black_d}-{self.black_l}") #\t\t{self.baseline_data['description']}
-            lines.append(f"  Score: {b_score:.3f}")
+            lines.append(f"  W-D-L: {self.black_w}-{self.black_d}-{self.black_l}            nElo: {n_elo:+.1f} ({n_elo_lo:+.1f}, {n_elo_hi:+.1f})") #\t\t{self.baseline_data['description']}
+            lines.append(f"  Score: {b_score:.3f}         BayesElo: {b_elo:+.1f} ({b_elo_lo:+.1f}, {b_elo_hi:+.1f})")
         else:
             lines.append("  (no games)")
         lines.append("")
