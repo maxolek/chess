@@ -451,7 +451,7 @@ class LivePlotter:
             cut = 2 * n // 3
             elo_min = min(lo_tail[cut:])
             elo_max = max(hi_tail[cut:])
-        elo_pad = max(5, (elo_max - elo_min) * 0.5)
+        elo_pad = max(5, (elo_max - elo_min) * 0.15)
         self.ax_elo.set_ylim(elo_min - elo_pad, elo_max + elo_pad)
 
         # title with current stats
