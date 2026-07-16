@@ -31,6 +31,7 @@ POSITIONS = [
 ]
 
 MOVETIME_MS  = 1000
+DEPTH = None
 RUNS_PER_POS = 1
 
 # All stats from dumpstats and their display config
@@ -98,7 +99,8 @@ def parse_dumpstats(output: str) -> dict:
 def collect_dumpstats(proc, movetime: int) -> dict:
     """Wait for bestmove then send dumpstats and collect output."""
     start = time.time()
-    while time.time() - start < (movetime / 1000) + 5:
+    wait_time = movetime if movetime else 5000 # 5s
+    while time.time() - start < (wait_time / 1000) + 5:
         line = proc.stdout.readline().strip()
         if line.startswith("bestmove"):
             break
@@ -119,7 +121,7 @@ def collect_dumpstats(proc, movetime: int) -> dict:
     return parse_dumpstats("".join(dump_output))
 
 
-def run_cold(engine_path: str, position: str, movetime: int, runs: int) -> list[dict]:
+def run_cold(engine_path: str, position: str, movetime: int, depth: int, runs: int) -> list[dict]:
     """Fresh engine per search — cold TT."""
     results = []
     for _ in range(runs):
@@ -138,7 +140,7 @@ def run_cold(engine_path: str, position: str, movetime: int, runs: int) -> list[
                     break
 
             pos_cmd = "position startpos" if position == "startpos" else f"position fen {position}"
-            proc.stdin.write(f"{pos_cmd}\ngo movetime {movetime}\n")
+            proc.stdin.write(f"{pos_cmd}\ngo {"movetime" if movetime else "depth"} {movetime if movetime else depth}\n")
             proc.stdin.flush()
 
             stats = collect_dumpstats(proc, movetime)
@@ -152,7 +154,7 @@ def run_cold(engine_path: str, position: str, movetime: int, runs: int) -> list[
     return results
 
 
-def run_warm(engine_path: str, moves: list[str], movetime: int, side: int) -> list[dict]:
+def run_warm(engine_path: str, moves: list[str], movetime: int, depth: int, side: int) -> list[dict]:
     """Single engine process, TT persists across positions."""
     results = []
     try:
@@ -180,7 +182,7 @@ def run_warm(engine_path: str, moves: list[str], movetime: int, side: int) -> li
             if current_side == side:
                 pos_cmd = f"position startpos moves {' '.join(played)}" if played else "position startpos"
                 send(pos_cmd)
-                send(f"go movetime {movetime}")
+                send(f"go {"movetime" if movetime else "depth"} {movetime if movetime else depth}")
                 stats = collect_dumpstats(proc, movetime)
                 stats["ply"] = i
                 stats["move_num"] = len(played)
@@ -277,6 +279,7 @@ def load_game_moves(path: str) -> list[str]:
 if __name__ == "__main__":
     engines     = ENGINES
     movetime_ms = MOVETIME_MS
+    depth = DEPTH
     runs        = RUNS_PER_POS
     game_path   = None
     side        = 0
@@ -292,6 +295,11 @@ if __name__ == "__main__":
     if "--time" in sys.argv:
         idx = sys.argv.index("--time")
         movetime_ms = int(float(sys.argv[idx+1]) * 1000)
+
+    if "--depth" in sys.argv:
+        idx = sys.argv.index("--depth")
+        depth = int(sys.argv[idx+1])
+        movetime_ms = None
 
     if "--runs" in sys.argv:
         idx = sys.argv.index("--runs")
@@ -319,7 +327,7 @@ if __name__ == "__main__":
                 else:
                     positions.append((line, line[:40]))
 
-    print(f"Engines: {[e.split('/')[-1] for e in engines]} | Time: {movetime_ms}ms")
+    print(f"Engines: {[e.split('/')[-1] for e in engines]} | Time: {movetime_ms}{"ms" if movetime_ms else ""} | Depth: {depth}")
 
     if game_path: # warm TT
         moves = load_game_moves(game_path)
@@ -329,7 +337,7 @@ if __name__ == "__main__":
         for engine in engines:
             name = engine.split("/")[-1].replace(".exe", "")
             print(f"Running {name}...")
-            all_results[engine] = run_warm(engine, moves, movetime_ms, side)
+            all_results[engine] = run_warm(engine, moves, movetime_ms, depth, side)
 
         print_comparison(all_results, engines, f"Warm TT — avg over {len(all_results[engines[0]])} positions")
 
@@ -339,7 +347,7 @@ if __name__ == "__main__":
             for engine in engines:
                 name = engine.split("/")[-1].replace(".exe", "")
                 print(f"  {name} | {pos_name}...", end="\r")
-                all_results[engine] = run_cold(engine, pos_fen, movetime_ms, runs)
+                all_results[engine] = run_cold(engine, pos_fen, movetime_ms, depth, runs)
             print_comparison(all_results, engines, f"Cold TT — {pos_name}")
 
         # aggregate cold summary
