@@ -47,6 +47,18 @@ struct MoveScores {
     int BAD_CAP_BASE  =  -1'000'000;
 };
 
+struct RootMoveScores {
+    // Previous iteration information dominates
+    int PV_BASE        = 10'000'000;
+    int TT_BASE        =  9'000'000;
+    // Tactical tiebreakers (else return eval)
+    int PROMO_BASE     = 200;
+    int GOOD_CAP_BASE  = 100;
+    int BAD_CAP_BASE   = -100;
+    // Quiet moves use previous scores/history as tiebreakers
+    int QUIET_BASE     = 0;
+};
+
 class Searcher {
 public:
     // ------------------------------- VARS -------------------------------
@@ -56,9 +68,18 @@ public:
     Board& board; //= engine.search_board;
     Evaluator& eval; // = engine.evaluator;
     NNUE& nnue; // = engine.nnue;
+    TranspositionTable& tt; // = engine.tt
 
     SearchParams params;
+    RootMoveScores root_scores;
     MoveScores move_scores;
+
+    // iteration-local eval table
+    static constexpr int INVALID = MATE_SCORE + 10000;
+    int last_eval_table[1 << 16];   // keyed by Move.Value()
+    // book keeping
+    void store_last_result(const SearchResult& res);
+    int get_prev_eval(Move m) const;
 
     bool stop = false;
 
@@ -70,13 +91,20 @@ public:
 
     // ------------------------------- FUNCS -------------------------------
 
-    Searcher(Engine& e, Board& b, Evaluator& ev, NNUE& nn) 
+    Searcher(Engine& e, Board& b, Evaluator& ev, NNUE& nn, TranspositionTable& _tt) 
         : engine(e), 
           board(b), 
           eval(ev), 
-          nnue(nn) {}
+          nnue(nn),
+          tt(_tt) {}
 
     // ------------------------------- Main Search -------------------------------
+    SearchResult iterativeDeepening(
+        Move first_moves[MAX_MOVES],
+        int move_count,
+        SearchLimits limits
+    );
+    
     SearchResult search(
         Move potential_moves[MAX_MOVES],
         int move_count,
@@ -109,6 +137,12 @@ public:
     );
 
     // ------------------------------- Ordering & Scoring -------------------------------
+    int rootMoveScore(
+        const Move& move, 
+        const Move& ttMove, 
+        const Move& pvMove
+    );
+    
     int moveScore(
         const Move& move,
         const Board& board,
@@ -134,7 +168,11 @@ public:
     );
 
     // ------------------------------- PV / pruning / helpers -------------------------------
-    void updatePV(std::vector<Move>& pv, const Move& move, const std::vector<Move>& childPV);
+    void updatePV(
+        std::vector<Move>& pv, 
+        const Move& move, 
+        const std::vector<Move>& childPV
+    );
 
     bool shouldPrune(
         Move& move,

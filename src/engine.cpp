@@ -340,25 +340,6 @@ void Engine::setPosition(const std::string& fen,
 }
 
 
-// ------------------------
-// -- Local Eval Storage --
-// ------------------------
-
-void Engine::store_last_result(const SearchResult& res) {
-    // clear table
-    std::fill(std::begin(last_eval_table), std::end(last_eval_table), INVALID);
-
-    // write moves/evals from last depth
-    for (int i = 0; i < res.root_count; ++i) {
-        last_eval_table[res.root_moves[i].move.Value()] = res.root_moves[i].eval;
-    }
-}
-
-inline int Engine::get_prev_eval(Move m) const {
-    int v = last_eval_table[m.Value()];
-    return (v == INVALID) ? -MATE_SCORE : v;
-}
-
 // --------------------
 // -- Search Control --
 // --------------------
@@ -406,6 +387,7 @@ void Engine::computeSearchTime(const SearchSettings& settings) {
 
 
 void Engine::startSearch() {
+    // set nnue
     nnue.build_accumulators(search_board);
 
     // book probe
@@ -431,12 +413,12 @@ void Engine::startSearch() {
                 bestBookMove = "e8c8"; 
             }
 
-            sendBestMove(bestBookMove); // ponder move empty
+            bestMove = bestBookMove;
             return; // skip search entirely
         }
     }
 
-    // normal search
+    // search time / params
     search_depth = settings.depth;
     time_left[0] = settings.wtime;
     time_left[1] = settings.btime;
@@ -444,136 +426,34 @@ void Engine::startSearch() {
     increment[1] = settings.binc;
     pondering = settings.infinite;
 
-    computeSearchTime(settings);
-    iterativeDeepening();
-    sendBestMove(bestMove);
-}
-
-void Engine::stopSearch() {
-    limits.stopped = true;
-    tracker.result = GameResult::ABORTED;
-    tracker.reason = GameEndReason::NONE;
-}
-
-void Engine::ponderHit() {
-    pondering = false;
-}
-
-
-// --------------------------------
-// -- Iterative Deepening Search --
-// --------------------------------
-
-// -- accounts for time / depth requirements
-// -- uses previous search information
-// ------ transposition table
-// ------ principle move ordering
-
-void Engine::iterativeDeepening() {
-    //ScopedTimer timer(T_ROOT);
+    // stats tracking
     auto start_time = std::chrono::steady_clock::now();
     g_run_context.search_uuid = generate_uuid();
-
-    // reset global stats
-    if (Logging::track_search_stats) resetSearchStats();           
-
-    SearchResult last_result;
-    SearchResult result;
-
-    // generate first moves once
+    if (Logging::track_search_stats) resetSearchStats();  
+    
+    // --- generate first moves once ---
     Move first_moves[MAX_MOVES];
     int count = movegen->generateMoves(game_board, false);
     std::copy_n(movegen->moves, count, first_moves);
 
-    std::fill(std::begin(last_eval_table), std::end(last_eval_table), INVALID);
+    // --- run search ---
+    computeSearchTime(settings);
+    result = searcher->iterativeDeepening(first_moves, count, limits);
+    bestMove = result.bestMove;
+    bestEval = result.eval; 
+    pv_line = result.best_line.line;
+    //sendBestMove(bestMove);
 
-    int depth = 1;
-    Move prevBest = Move::NullMove();
-
-    // --- iterative deepening loop ---
-    while (!limits.should_stop(depth)) {
-        auto depth_start = std::chrono::steady_clock::now();
-        g_stats.max_depth = depth;
-
-        // --- move ordering ---
-        if (depth > 1) { // sort by prev iteration elos
-            std::sort(first_moves, first_moves + count,
-                      [&](Move a, Move b) { return get_prev_eval(a) > get_prev_eval(b); });
-        } else { // first search: order like typical mid-tree ordering   
-            // tt probe
-            TTEntry* ttEntry = tt.probe(game_board.zobrist_hash);
-            Move ttMove = Move::NullMove();
-
-            if (ttEntry && ttEntry->key == game_board.zobrist_hash) {
-                #ifdef DEV
-                    STATS_TT_HIT(depth+ply, ply);
-                #endif
-                // grab move for move ordering
-                // do not return from any scores cause then we would just
-                //      abort search a lot and thats not good
-                ttMove = ttEntry->bestMove;
-            }
-            searcher->orderedMoves(first_moves, count, game_board, 0, ttMove, {});
-        }
-
-        // --- search ---
-        result = searcher->search(first_moves, count, depth, limits,
-                                     last_result.best_line.line, last_result.eval);
-
-
-        // --- store results ---
-        if (!Move::SameMove(result.bestMove, Move::NullMove())) {
-            last_result = result;
-            store_last_result(result);
-        }
-
-        // --- determine best move and eval ---
-        bestMove = last_result.bestMove;
-        bestEval  = last_result.eval;
-
-        // --- update PV line if current result has one ---
-        if (!result.best_line.line.empty()) {
-            pv_line = result.best_line.line;
-        }
-
-        // --- update per-depth stats ---
-        auto depth_end = std::chrono::steady_clock::now();
-
-        // --- logging --- 
-        #ifdef DEV
-        if (Logging::track_search_stats) {
-            //g_stats.max_completed_depth = depth;
-            g_stats.it_depth_eval[depth] = result.eval;
-            g_stats.it_depth_move[depth] = result.bestMove;
-            g_stats.it_depth_time_ms[depth] = std::chrono::duration<double, std::milli>(depth_end - depth_start).count();
-            //if (Move::SameMove(bestMove, prevBest)) g_stats.bestmoveStable++;
-        }
-        // log per-root-move timing data
-        if (Logging::track_timers && result.root_count > 0) {
-            logRootMoves(result, depth);
-        }
-        #endif
-
-        prevBest = bestMove;
-        if (std::abs(result.eval) >= MATE_SCORE - 10) break;
-        depth++;
-        // if only 1 legal move, perform depth 2 search then play move
-        // depth 2 to get fair eval with recaptures, etc. (very fast)
-        // but quit early since we know what were going to play anyway
-        // still want fair eval for continuation metrics, etc.
-        if ((count == 1) && (depth == 3)) break;
-    }
-
-    // --- finalize cumulative stats ---
+    // finalize cumulative stats
     #ifdef DEV
     if (Logging::track_search_stats || Logging::track_search_nodes) {
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
                         std::chrono::steady_clock::now() - start_time).count();
         g_stats.game_ply = ply;
         //g_stats.nps = elapsed > 0 ? (1000.0 * g_stats.nodes / elapsed) : 0.0;
-        g_stats.eval = last_result.eval;
-        g_stats.move = last_result.bestMove;
-        g_stats.principal_variation = last_result.best_line.line;
+        g_stats.eval = result.eval;
+        g_stats.move = result.bestMove;
+        g_stats.principal_variation = result.best_line.line;
 
         //g_stats.ebf = pow(double(g_stats.nodes) / 1.0, 1.0 / g_stats.maxDepth); // rough estimate
         //g_stats.qratio = double(g_stats.qnodes) / g_stats.nodes;
@@ -590,33 +470,25 @@ void Engine::iterativeDeepening() {
 }
 
 
-void Engine::evaluate_position() {
-    search_board = game_board;
-    //nnue.refresh(search_board);
-
-    search_depth = settings.depth;
-    time_left[0] = settings.wtime;
-    time_left[1] = settings.btime;
-    increment[0] = settings.winc;
-    increment[1] = settings.binc;
-    pondering = settings.infinite;
-
-    computeSearchTime(settings);
-    iterativeDeepening();
-
-    Logging::logUCIout(bestMove.uci());
-    std::cout << "eval " << bestEval << " bestmove " << bestMove.uci() << std::endl;
+void Engine::stopSearch() {
+    limits.stopped = true;
+    tracker.result = GameResult::ABORTED;
+    tracker.reason = GameEndReason::NONE;
 }
+
+void Engine::ponderHit() {
+    pondering = false;
+}
+
 
 // -------------------
 // -- Communication --
 // -------------------
 
-void Engine::sendBestMove(Move best, Move ponder) {
+void Engine::sendBestMove(Move best, bool eval, bool ponder) {
+    if (eval) std::cout << "eval " << bestEval << " ";
     std::cout << "bestmove " << best.uci();
-    if (!ponder.IsNull()) {
-        std::cout << " ponder " << ponder.uci();
-    }
+    if (ponder) std::cout << " ponder";
     std::cout << std::endl;
 
     game_board.MakeMove(best);

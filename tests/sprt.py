@@ -240,7 +240,11 @@ def compute_los(W, L):
 ###############################
 
 class LivePlotter:
-    def __init__(self, elo0, elo1, alpha=0.05, beta=0.05, engine_a_data=None, engine_b_data=None):
+    def __init__(self, 
+                 elo0, elo1, alpha=0.05, beta=0.05, 
+                 engine_a_data=None, engine_b_data=None, 
+                 time=None, depth=None, tc=None
+    ):
         import matplotlib.pyplot as plt
         self.plt = plt
         self.candidate_data = engine_a_data
@@ -249,6 +253,17 @@ class LivePlotter:
         self.elo1 = elo1
         self.lbound = math.log(beta / (1 - alpha))
         self.ubound = math.log((1 - beta) / alpha)
+
+        # time control
+        if time: 
+            self.tc = time * 1000 # time is given in seconds, want milliseconds
+            self.tc_label = ' ms'
+        elif depth: 
+            self.tc = depth
+            self.tc_label = ' depth' 
+        elif tc: 
+            self.tc = tc
+            self.tc_label = ' ' # TC is explicit enough
 
         # data series
         self.games = []
@@ -291,7 +306,7 @@ class LivePlotter:
         self.ax_elo = self.fig.add_subplot(gs[0,1])
         self.ax_score = self.fig.add_subplot(gs[1,0])
         self.ax_stats = self.fig.add_subplot(gs[1,1])
-        self.fig.suptitle("SPRT Live Monitor", fontweight='bold', fontsize=11)
+        self.fig.suptitle(f"SPRT Live Monitor    {self.tc}{self.tc_label}", fontweight='bold', fontsize=11)
 
         # LLR plot (top-left)
         self.ax_llr.set_title('LLR')
@@ -459,9 +474,9 @@ class LivePlotter:
         self.score_series.append(score)
         los = compute_los(W, L)
         self.fig.suptitle(
-            f"SPRT Live | Games: {N} | Score: {score:.3f} | "
+            f"SPRT Live | {self.tc}{self.tc_label} | Games: {N} | Score: {score:.3f} | "
             f"Elo: {elo:+.1f} ({elo_lo:+.1f}, {elo_hi:+.1f}) | LOS: {los:.1f}% | LLR: {llr:.2f}",
-            fontweight='bold', fontsize=10
+            fontweight='bold', fontsize=12
         )
 
         #  update score line
@@ -906,7 +921,7 @@ def main(args=None):
     # Live plotter (init before Popen to its in scope after)
     plotter = None 
     if args.plot:
-        plotter = LivePlotter(args.elo0, args.elo1, args.alpha, args.beta, candidate_engine_data, baseline_engine_data)
+        plotter = LivePlotter(args.elo0, args.elo1, args.alpha, args.beta, candidate_engine_data, baseline_engine_data, args.time, args.depth, args.tc)
 
     with subprocess.Popen(
         cmd,

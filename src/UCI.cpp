@@ -351,13 +351,9 @@ void UCI::handleGo(std::istringstream& iss) {
     engine->settings.movetime = movetime;
     engine->settings.infinite = infinite;
 
-    if (sendEval) {
-        engine->evaluate_position();   // just evaluate the current position
-        return;
-    }
-
     // Otherwise start a normal search
     engine->trackGame();
     engine->startSearch();
+    engine->sendBestMove(engine->bestMove, sendEval);
 }
 
