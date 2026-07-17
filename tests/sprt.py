@@ -228,8 +228,6 @@ def compute_normalized_elo_with_ci(W, D, L, CI=0.95):
 
     return nelo, nelo_lo, nelo_hi
 
-import math
-
 def compute_los_with_bounds(W, L, confidence=0.95):
     """
     CPW-style LOS with approximate confidence bounds.
@@ -445,7 +443,7 @@ class LivePlotter:
 
         self.normalized_elo_series.append(n_elo)
         self.bayes_elo_series.append(b_elo)
-        self.elo_series.append(n_elo)
+        self.elo_series.append(elo)
 
         self.normalized_elo_lo_series.append(n_elo_lo)
         self.bayes_elo_lo_series.append(b_elo_lo)
@@ -471,13 +469,13 @@ class LivePlotter:
             self.fill_bayes_elo.remove()
             self.fill_nelo.remove()
         self.fill_elo = self.ax_elo.fill_between(
-            self.games, self.bayes_elo_lo_series, self.bayes_elo_hi_series, alpha=0.4, color='blue'
+            self.games, self.elo_lo_series, self.elo_hi_series, alpha=0.4, color='blue'
         )
         self.fill_nelo = self.ax_elo.fill_between(
             self.games, self.normalized_elo_lo_series, self.normalized_elo_hi_series, alpha=0.2, color='purple'
         )
         self.fill_bayes_elo = self.ax_elo.fill_between(
-            self.games, self.elo_lo_series, self.elo_hi_series, alpha=0.2, color='orange'
+            self.games, self.bayes_elo_lo_series, self.bayes_elo_hi_series, alpha=0.2, color='orange'
         )
         self.ax_elo.relim()
         self.ax_elo.autoscale_view()
@@ -529,7 +527,8 @@ class LivePlotter:
             s_min = min(score_tail[cut:])
             s_max = max(score_tail[cut:])
         s_pad = max(0.02, (s_max - s_min) * 0.5)
-        self.ax_score.set_ylim(s_min - s_pad, s_max + s_pad)
+        s_lo, s_hi = min(0.495, s_min), max(0.505, s_max)
+        self.ax_score.set_ylim(s_lo, s_hi)
 
         # stats text panel
         wt = self.white_w + self.white_l + self.white_d 
