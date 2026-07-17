@@ -532,12 +532,13 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
     int eval;
     int ply = 0; // root moves are depth=0, ply+1 in arg call makes made moves depth=1
     SearchResult result;
+
+    // --- aspiration search ---
     
     int delta = params.ASPIRATION_WINDOW;
     int alpha = -MATE_SCORE;
     int beta = MATE_SCORE;
     
-    // aspiration search .. window generation
     if (depth >= params.ASPIRATION_START_DEPTH) {
         delta = std::max(delta, params.ASPIRATION_WINDOW + depth * params.ASPIRATION_DEPTH_SCALE);
         alpha = previousEval - delta;
@@ -594,13 +595,11 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
             board.UnmakeMove(m);
 
             #ifdef DEV
-            if (Logging::track_timers) {
                 auto move_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                     std::chrono::steady_clock::now() - move_start).count();
                 int64_t move_nodes = g_stats.nodes - nodes_before;
                 iter_result.root_moves[i].time_ms = move_ms;
                 iter_result.root_moves[i].nodes = move_nodes;
-            }
             #endif
 
             // time out is propagated up the tree, so eval and move cannot be trusted
@@ -622,14 +621,14 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
         if (!limits.should_stop(depth) && (depth >= params.ASPIRATION_START_DEPTH)) {
             if (iter_result.eval <= alpha) {
                 #ifdef DEV
-                    if (Logging::track_search_stats) STATS_ASPIRATION_FAILLOW(depth);
+                    STATS_ASPIRATION_FAILLOW(depth);
                 #endif
                 alpha -= delta;
                 delta *= params.ASPIRATION_RESEARCH_SCALE;
                 continue;
             } else if (iter_result.eval >= beta) {
                 #ifdef DEV
-                    if (Logging::track_search_stats) STATS_ASPIRATION_FAILHIGH(depth);
+                    STATS_ASPIRATION_FAILHIGH(depth);
                 #endif
                 beta += delta;
                 delta *= params.ASPIRATION_RESEARCH_SCALE;
@@ -696,18 +695,15 @@ SearchResult Searcher::iterativeDeepening(Move first_moves[MAX_MOVES], int move_
 
         // --- logging --- 
         #ifdef DEV
-        auto depth_end = std::chrono::steady_clock::now();
-        if (Logging::track_search_stats) {
+            auto depth_end = std::chrono::steady_clock::now();
             //g_stats.max_completed_depth = depth;
             g_stats.it_depth_eval[depth] = result.eval;
             g_stats.it_depth_move[depth] = result.bestMove;
             g_stats.it_depth_time_ms[depth] = std::chrono::duration<double, std::milli>(depth_end - depth_start).count();
             //if (Move::SameMove(bestMove, prevBest)) g_stats.bestmoveStable++;
-        }
-        // log per-root-move timing data
-        if (Logging::track_timers && result.root_count > 0) {
+
+            // log per-root-move timing data
             logRootMoves(result, depth);
-        }
         #endif
 
         if (std::abs(result.eval) >= MATE_SCORE - 10) break;

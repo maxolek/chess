@@ -86,10 +86,6 @@ void Engine::setOption(const std::string& name, const std::string& value) {
         engine_options.UCI_SHOW_WDL = boolFromString(value);
         std::cout << "info string set UCI_ShowWDL = " << (engine_options.UCI_SHOW_WDL ? "true" : "false") << std::endl;
     } 
-    else if (name == "ShowStats") {
-        Logging::track_search_stats = boolFromString(value);
-        std::cout << "info string set ShowStats = " << (Logging::track_search_stats ? "true" : "false") << std::endl;
-    }
 
     // -------- search params --------
     else if (name == "delta_prune_threshold") {
@@ -192,22 +188,6 @@ void Engine::setOption(const std::string& name, const std::string& value) {
         Logging::setLogDir(value);
         std::cout << "info string log_dir loaded successfully: " << Logging::log_dir << std::endl;
     }
-    else if (name == "timer_logging") {
-        if (Logging::track_timers != boolFromString(value)) {Logging::setTrackTimers(boolFromString(value));}
-    }
-    else if (name == "root_moves_logging") {
-        if (Logging::track_root_moves != boolFromString(value)) {Logging::setTrackRootMoves(boolFromString(value));}
-    }
-    else if (name == "stats_logging") {
-        if (Logging::track_search_stats != boolFromString(value)) {Logging::setTrackSearchStats(boolFromString(value));}
-    }
-    else if (name == "stats_nodes_only") {
-        if (Logging::track_search_nodes != boolFromString(value)) {Logging::setTrackSearchNodes(boolFromString(value));}
-        if (Logging::track_search_stats == true && Logging::track_search_nodes == true) {Logging::setTrackSearchStats(false);}
-    }
-    else if (name == "game_logging") {
-        if (Logging::track_game_log != boolFromString(value)) {Logging::setTrackGameLog(boolFromString(value));}
-    }
     else if (name == "uci_logging") {
          if (Logging::track_uci != boolFromString(value)) {Logging::setTrackUCI(boolFromString(value));}
     }
@@ -219,40 +199,6 @@ void Engine::setOption(const std::string& name, const std::string& value) {
     std::cout.flush();
 }
 
-
-void Engine::print_info() {
-    // UCI options
-    std::cout << "option name Hash type spin value "
-              << engine_options.HASH_SIZE_MB << " min 1 max 8192\n";
-    std::cout << "option name Threads type spin value "
-              << engine_options.MAX_THREADS << " min 1 max 64\n";
-    std::cout << "option name Move Overhead type spin value "
-              << engine_options.MOVE_OVERHEAD_MS << " min 0 max 5000\n";
-    std::cout << "option name Ponder type check value "
-              << (engine_options.PONDERING ? "true" : "false") << "\n";
-    std::cout << "option name UCI_ShowWDL type check value "
-              << (engine_options.UCI_SHOW_WDL ? "true" : "false") << "\n";
-    std::cout << "option name ShowStats type check value "
-              << (Logging::track_search_stats ? "true" : "false") << "\n";
-    // paths
-    std::cout << "option name OpeningPST type string value "
-              << engine_options.opening_pst_path << "\n";
-
-    std::cout << "option name EndgamePST type string value "
-              << engine_options.endgame_pst_path << "\n";
-
-    std::cout << "option name NNUEWeights type string value "
-              << engine_options.nnue_weight_path << "\n";
-
-    std::cout << "option name OpeningBook type string value "
-              << engine_options.opening_book_path << "\n";
-
-    std::cout << "option name SyzygyPath type string value "
-              << engine_options.syzygy_path << "\n";
-
-    std::cout << "option name LogsDir type string value "
-              << Logging::log_dir << "\n";
-}
 
 void Engine::setPosition(const std::string& fen,
                          const std::vector<std::string>& moveStrs)
@@ -429,7 +375,9 @@ void Engine::startSearch() {
     // stats tracking
     auto start_time = std::chrono::steady_clock::now();
     g_run_context.search_uuid = generate_uuid();
-    if (Logging::track_search_stats) resetSearchStats();  
+    #ifdef DEV 
+        resetSearchStats();  
+    #endif
     
     // --- generate first moves once ---
     Move first_moves[MAX_MOVES];
@@ -445,8 +393,9 @@ void Engine::startSearch() {
     //sendBestMove(bestMove);
 
     // finalize cumulative stats
+    g_stats.time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now() - start_time).count();
     #ifdef DEV
-    if (Logging::track_search_stats || Logging::track_search_nodes) {
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
                         std::chrono::steady_clock::now() - start_time).count();
         g_stats.game_ply = ply;
@@ -462,11 +411,8 @@ void Engine::startSearch() {
         tracker.evals.push_back(bestEval);
 
         logSearchStats(game_board.getBoardFEN());  // JSON written once at end
-    }
-    if (Logging::track_timers) {logTimingStats(game_board.getBoardFEN());}
+        logTimingStats(game_board.getBoardFEN());
     #endif 
-    g_stats.time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                    std::chrono::steady_clock::now() - start_time).count();
 }
 
 
