@@ -855,10 +855,11 @@ def main(args=None):
     else:  # args.tc must exist
         base_sec = 60*int(re.split(":", args.tc)[0]) + int(re.split(":", args.tc)[1][:2])
         fast_tc = base_sec <= 30
-    should_log = (args.log and fast_tc) 
+    should_log = args.log #(args.log and fast_tc) 
 
     if (should_log):
-        print("[SPRT] Logging enabled for candidate engine (low time control ... logging can affect performance at these search speeds)")
+        log_reason = f"(low time control ... logging can affect performance at these search speeds)" if fast_tc else "Candidate logging on: baseline logging on for reduced change variables"
+        print(f"[SPRT] Logging enabled for candidate engine {log_reason}")
 
     each_block = [
         "-each",
