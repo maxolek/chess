@@ -537,8 +537,8 @@ class LivePlotter:
             s_min = min(score_tail[cut:])
             s_max = max(score_tail[cut:])
         s_pad = max(0.02, (s_max - s_min) * 0.5)
-        s_lo, s_hi = min(min(self.s0,self.s1)-.005, s_min), max(max(self.s0,self.s1)+.005, s_max)
-        self.ax_score.set_ylim(s_lo, s_hi)
+        s_lo, s_hi = min(min(self.s0,self.s1), s_min), max(max(self.s0,self.s1), s_max)
+        self.ax_score.set_ylim(s_lo - s_pad, s_hi + s_pad)
 
         # stats text panel
         wt = self.white_w + self.white_l + self.white_d 
