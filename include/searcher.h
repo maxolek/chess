@@ -7,7 +7,7 @@
 #include "stats.h"
 #include "timer.h"
 #include "NNUE.h"
-
+#include "tt.h"
 
 class Engine;
 class Evaluator;

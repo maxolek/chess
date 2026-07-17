@@ -298,7 +298,7 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
     // --- TT probe ---
 
     int alphaOrig = alpha;
-    TTEntry* ttEntry = engine.tt.probe(board.zobrist_hash);
+    TTEntry* ttEntry = tt.probe(board.zobrist_hash);
     Move ttMove = Move::NullMove();
 
     if (ttEntry && ttEntry->key == board.zobrist_hash) {
@@ -521,7 +521,7 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
     else if (bestEval >= beta) { 
         flag = LOWERBOUND; 
     }
-    engine.tt.store(board.zobrist_hash, depth, ply, bestEval, flag, bestMove);
+    tt.store(board.zobrist_hash, depth, ply, bestEval, flag, bestMove);
     //STATS_TT_STORE(depth+ply, ply);
 
     return bestEval;
@@ -671,7 +671,7 @@ SearchResult Searcher::iterativeDeepening(Move first_moves[MAX_MOVES], int move_
                       [&](Move a, Move b) { return get_prev_eval(a) > get_prev_eval(b); });
         } else { // first search: order like typical mid-tree ordering   
             // tt probe
-            TTEntry* ttEntry = engine.tt.probe(board.zobrist_hash);
+            TTEntry* ttEntry = tt.probe(board.zobrist_hash);
             Move ttMove = Move::NullMove();
 
             if (ttEntry && ttEntry->key == board.zobrist_hash) {

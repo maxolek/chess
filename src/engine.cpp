@@ -20,13 +20,13 @@ Engine::Engine() {
     search_board = game_board; //Board(game_board);
 
     movegen = std::make_unique<MoveGenerator>(search_board);
+    tt.clear();
 
     nnue.load(engine_options.nnue_weight_path);
     evaluator.loadOpeningPST(engine_options.opening_pst_path);
     evaluator.loadEndgamePST(engine_options.endgame_pst_path);
 
-    searcher = std::make_unique<Searcher>(*this, search_board, evaluator, nnue);
-    tt.clear();
+    searcher = std::make_unique<Searcher>(*this, search_board, evaluator, nnue, tt);
 
     book.load(engine_options.opening_book_path);
 
