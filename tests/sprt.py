@@ -364,8 +364,8 @@ class LivePlotter:
         self.ax_score.set_xlabel('Games')
         self.ax_score.set_ylabel('Score')
         self.ax_score.axhline(0.5,  color='grey', linestyle='-', alpha=0.3)
-        s0 = elo_to_score(elo0)
-        s1 = elo_to_score(elo1)
+        self.s0 = elo_to_score(elo0)
+        self.s1 = elo_to_score(elo1)
         self.ax_score.axhline(s0, color='red', linestyle=':', alpha=0.5, label=f"s(elo0)={s0:.3f}")
         self.ax_score.axhline(s1, color='green', linestyle=':', alpha=0.5, label=f"s(elo1)={s1:.3f}")
         self.ax_score.legend(loc='upper left', fontsize=7)
@@ -537,7 +537,7 @@ class LivePlotter:
             s_min = min(score_tail[cut:])
             s_max = max(score_tail[cut:])
         s_pad = max(0.02, (s_max - s_min) * 0.5)
-        s_lo, s_hi = min(0.495, s_min), max(0.505, s_max)
+        s_lo, s_hi = min(min(self.s0,self.s1)-.005, s_min), max(max(self.s0,self.s1)+.005, s_max)
         self.ax_score.set_ylim(s_lo, s_hi)
 
         # stats text panel
@@ -889,6 +889,11 @@ def main(args=None):
     engine_a = os.path.abspath(args.engine_a)
     engine_b = os.path.abspath(args.engine_b)
 
+    """
+    these logging controls are now moot with with dual dev/prod binary release
+    + dev is always log (only exception is toggle of uci) and prod is never log
+    """
+
     if args.time is not None:
         fast_tc = args.time <= 0.5
     else:  # args.tc must exist
@@ -906,18 +911,10 @@ def main(args=None):
     ]
     log_a_block = [
         f"option.log_dir={args.logroot}",
-        f"option.timer_logging={'true' if args.log else 'false'}",
-        f"option.stats_logging={"true" if args.log else "false"}",
-        f"option.game_logging={"true" if args.log else "false"}",
-        f"option.root_moves_logging={"true" if args.log else "false"}",
         f"option.uci_logging=true",
     ]
     log_b_block = [
         f"option.log_dir={args.logroot}",
-        f"option.timer_logging={"true" if should_log else "false"}",
-        f"option.stats_logging={"true" if should_log else "false"}",
-        f"option.game_logging={"true" if should_log else "false"}",
-        f"option.root_moves_logging={"true" if should_log else "false"}",
         f"option.uci_logging={"true" if should_log else "false"}",
     ]
 
