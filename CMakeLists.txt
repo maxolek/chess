@@ -28,24 +28,26 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(SRC_DIR ${CMAKE_SOURCE_DIR}/src)
 set(INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
 set(ENGINES_DIR ${CMAKE_SOURCE_DIR}/engines)
+set(DEV_ENGINES_DIR ${ENGINES_DIR}/dev)
+set(PROD_ENGINES_DIR ${ENGINES_DIR}/prod)
 
 # -------------------
 # Source files
 # -------------------
 set(SOURCES
     ${SRC_DIR}/board.cpp
+    ${SRC_DIR}/book.cpp
+    ${SRC_DIR}/engine.cpp
+    ${SRC_DIR}/evaluator.cpp
     ${SRC_DIR}/gamestate.cpp
     ${SRC_DIR}/helpers.cpp
-    ${SRC_DIR}/moveGenerator.cpp
     ${SRC_DIR}/magics.cpp
-    ${SRC_DIR}/PrecomputedMoveData.cpp
-    ${SRC_DIR}/UCI.cpp
-    ${SRC_DIR}/book.cpp
-    ${SRC_DIR}/searcher.cpp
+    ${SRC_DIR}/moveGenerator.cpp
     ${SRC_DIR}/NNUE.cpp
-    ${SRC_DIR}/evaluator.cpp
-    ${SRC_DIR}/engine.cpp
+    ${SRC_DIR}/PrecomputedMoveData.cpp
+    ${SRC_DIR}/searcher.cpp
     ${SRC_DIR}/tomahawk.cpp
+    ${SRC_DIR}/UCI.cpp
 )
 
 add_executable(tomahawk ${SOURCES})
@@ -152,9 +154,15 @@ endif()
 # -------------------
 # Output name & location
 # -------------------
-set_target_properties(tomahawk PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${ENGINES_DIR}
-)
+if ((CMAKE_BUILD_TYPE STREQUAL "Release") OR (CMAKE_BUILD_TYPE STREQUAL "Prod") OR (CMAKE_BUILD_TYPE STREQUAL "PROD") OR (CMAKE_BUILD_TYPE STREQUAL "RELEASE"))
+    set_target_properties(tomahawk PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${PROD_ENGINES_DIR}
+    )
+else() 
+    set_target_properties(tomahawk PROPERTIES 
+        RUNTIME_OUTPUT_DIRECTORY ${DEV_ENGINES_DIR}
+    )
+endif()
 
 # Handle VERSION-based executable naming
 if (VERSION AND NOT VERSION STREQUAL "dev")

@@ -17,10 +17,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 # --- Config ---
-ENGINES = [
-    "engines/0.1.0.exe",
-    "engines/0.2.2.exe",
-]
+ENGINES = []
 
 POSITIONS = [
     ("startpos",                                                                  "Starting position"),

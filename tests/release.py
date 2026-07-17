@@ -24,12 +24,16 @@ TESTS_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = TESTS_DIR.parent
 
 ENGINES_DIR = os.path.join(PROJECT_ROOT, "engines")
+
 LOGS_DIR    = os.path.join(PROJECT_ROOT, "logs")
 TESTS_DIR   = os.path.join(PROJECT_ROOT, "tests")
 BIN_DIR     = os.path.join(PROJECT_ROOT, "bin")
+
 if system == "Windows": DB_PATH = 'F:/databases/chess.db'
 elif system == "Darwin": DB_PATH = str(Path.home() / "Documents/databases/chess.db")
 
+DEV_DIR     = os.path.join(ENGINES_DIR, "dev")
+PROD_DIR    = os.path.join(ENGINES_DIR, "prod")
 
 SPRT_LOG_DIR  = os.path.join(LOGS_DIR, "sprt_logs")
 STS_LOG_DIR   = os.path.join(LOGS_DIR, "sts_logs")
@@ -45,10 +49,12 @@ STOCKFISH = os.path.join(
 # Build
 # ============================================================
 
-def run_make(args):
+def run_make(args, build_type):
+    """configure + build with the given cmake_build_type ('DEV' or 'Release')"""
+
     print(f"[BUILD] Compiling engine VERSION={args.version}")
 
-    build_dir = "build"
+    build_dir = f"build_{build_type.lower()}"
 
     clear_cmd = [
         "rm", "-rf", build_dir
@@ -62,7 +68,7 @@ def run_make(args):
         "-DCMAKE_C_COMPILER=g++",
         "-DCMAKE_CXX_COMPILER=g++",
         f"-DVERSION={args.version}", # version
-        "-DCMAKE_BUILD_TYPE=Release", # release build type
+        f"-DCMAKE_BUILD_TYPE={build_type}", # release build type
     ]
 
     build_cmd = [
@@ -79,7 +85,13 @@ def run_make(args):
     except subprocess.CalledProcessError:
         sys.exit("[BUILD] ❌ build failed")
 
-    print("[BUILD] ✅ done")
+    dest_dir = DEV_DIR if build_type == "DEV" else PROD_DIR
+    dest_exe = os.path.join(dest_dir, f"{args.version}.exe")
+    if not os.path.exists(dest_exe):
+        sys.exit(f"[BUILD] ❌ expected binary not found at {dest_exe} after {build_type} build")
+ 
+    print(f"[BUILD] ✅ {build_type} build -> {dest_exe}")
+    return dest_exe
 
 # ============================================================
 # SPRT
@@ -89,7 +101,7 @@ def run_sprt(args):
     print("[SPRT] Running SPRT")
 
     sprt_args = argparse.Namespace(
-        engine_a=args.engine,
+        engine_a=args.prod_engine,
         engine_b=args.base_engine, 
         concurrency=args.concurrency,
         depth=args.sprt_depth,
@@ -111,6 +123,26 @@ def run_sprt(args):
     sprt.main(sprt_args)
 
 # ============================================================
+# SPRT
+# ============================================================
+
+def run_tournament(args):
+    print("[TOURNAMENT] Running tournament")
+
+    tournament_args = argparse.Namespace(
+        engine=args.dev_engine,
+        cutechess_cli=args.cutechess_cli,
+        opening_book=args.opening_book,
+        tournament_games=args.tournament_games,
+        tournament_tc=args.tournament_tc,
+        tournament_engines=args.tournament_engines,
+        first_engine=False,
+        concurrency=args.concurrency,
+    )
+
+    tournament.main(tournament_args)
+
+# ============================================================
 # STS
 # ============================================================
 
@@ -118,7 +150,7 @@ def run_sts(args):
     print("[STS] Running STS")
 
     sts_args = argparse.Namespace(
-        engine=args.engine,
+        engine=args.dev_engine,
         time=args.sts_time,
         depth=args.sts_depth,
         sts=args.sts_files,
@@ -135,7 +167,7 @@ def run_perft(args):
     print("[PERFT] Running PERFT")
 
     perft_args = argparse.Namespace(
-        engine=args.engine, 
+        engine=args.prod_engine, 
         stockfish=STOCKFISH, 
         positions=args.perft_positions,
         depth=args.perft_depth
@@ -158,7 +190,7 @@ def main():
 
     # SPRT
     parser.add_argument("--sprt", action="store_true", help="Run SPRT")
-    parser.add_argument("--base_engine", default=os.path.join(ENGINES_DIR, "0.0.0.exe"))
+    parser.add_argument("--base_engine", default=os.path.join(PROD_DIR, "0.0.0.exe"))
     parser.add_argument("--concurrency", type=int, default=2, help="Number of concurrent games for SPRT")
     parser.add_argument("--elo0", type=int, default=0)
     parser.add_argument("--elo1", type=float, default=10)
@@ -186,21 +218,27 @@ def main():
     parser.add_argument("--tournament_tc", nargs="+", default=["blitz"],
                         choices=["ultra_fast", "bullet", "blitz", "rapid", "classical"],
                         help="Time control categories for rating tournament")
-    parser.add_argument("--tournament_games", type=int, default=10,
+    parser.add_argument("--tournament_games", type=int, default=100,
                         help="Games per opponent per time control")
-    parser.add_argument("--tournament_engines", type=int, default=3,
+    parser.add_argument("--tournament_engines", type=int, default=1,
                         help="# Engines (1st version + n-1 latest version) to play against")
 
     args = parser.parse_args()
 
-    args.engine = os.path.join(ENGINES_DIR, f"{args.version}.exe")
+    #args.engine = os.path.join(ENGINES_DIR, f"{args.version}.exe")
 
     cnxn = sqlite3.connect(DB_PATH)
 
-    run_make(args)
+    dev_exe = run_make(args, "DEV")
+    prod_exe = run_make(args, "Prod")
+
+    args.dev_engine = dev_exe 
+    args.prod_engine = prod_exe
+    args.engine = args.dev_engine # tournament.py expects args.engine as the candidate
+                                  # all other aspects of this run are explicit
 
     # Probe engine options and search params via UCI
-    engine_meta = etl.probe_engine_metadata(args.engine)
+    engine_meta = etl.probe_engine_metadata(args.dev_engine)
     opts = engine_meta.get("options", {})
 
     def opt_int(name):
@@ -264,9 +302,11 @@ def main():
     if (args.perft):        run_perft(args)
     if (args.sprt):         run_sprt(args)
     if (args.sts_files):    run_sts(args)
-    if (args.tournament):   tournament.run_tournament(args, cnxn, engine_id)
+    if (args.tournament):   run_tournament(args)
 
-    print("[PIPELINE] ✅ release complete")
+    print(f"[PIPELINE] ✅ release complete")
+    print(f"[PIPELINE]     dev:   {dev_exe}")
+    print(f"[PIPELINE]     prod:  {prod_exe}")
 
 if __name__ == "__main__":
     main()
