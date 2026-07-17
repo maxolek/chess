@@ -471,7 +471,7 @@ class LivePlotter:
             self.fill_bayes_elo.remove()
             self.fill_nelo.remove()
         self.fill_elo = self.ax_elo.fill_between(
-            self.games, self.bayes_elo_lo_series, self.bayes_elo_hi_series, alpha=0.2, color='blue'
+            self.games, self.bayes_elo_lo_series, self.bayes_elo_hi_series, alpha=0.3, color='blue'
         )
         self.fill_nelo = self.ax_elo.fill_between(
             self.games, self.normalized_elo_lo_series, self.normalized_elo_hi_series, alpha=0.1, color='purple'
