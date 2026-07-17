@@ -585,6 +585,36 @@ class LivePlotter:
     def finalize(self, result):
         color = {'pass': 'green', 'fail': 'red'}.get(result, 'yellow')
         self.ax_llr.set_title(f"Result: {result.upper()}", color=color, fontweight='bold')
+        
+        # --- expand all axes to show the full history, not just the last tail ---
+        # x-axis: full game range on both time-series plots
+        self.ax_llr.set_xlim(1, max(self.games) * 1.05)
+        self.ax_score.set_xlim(1, max(self.games) * 1.05)
+
+        # LLR: full min/max over the whole series (same logic as update(), just untailed)
+        llr_lo = min(self.llr_series) - 0.2
+        llr_hi = max(self.llr_series) + 0.2
+        self.ax_llr.set_ylim(min(self.lbound * 1.1, llr_lo), max(self.ubound * 1.1, llr_hi))
+
+        # Elo: use full lo/hi series (skip games 1+2 as before, but no tail cut)
+        lo_tail = self.elo_lo_series[2:] or self.elo_lo_series
+        hi_tail = self.elo_hi_series[2:] or self.elo_hi_series
+        elo_min = min(lo_tail)
+        elo_max = max(hi_tail)
+        elo_pad = max(5, (elo_max - elo_min) * 0.05)
+        plot_elo_lo = min(min(self.elo0, self.elo1) - 5, -5, elo_min - elo_pad)
+        plot_elo_hi = max(max(self.elo0, self.elo1) + 5, 5, elo_max + elo_pad)
+        self.ax_elo.set_ylim(plot_elo_lo, plot_elo_hi)
+
+        # Score: use full series (skip games 1+2 as before, but no tail cut)
+        score_tail = self.score_series[2:] or self.score_series
+        s_min = min(score_tail)
+        s_max = max(score_tail)
+        s_lo, s_hi = min(0.495, s_min), max(0.505, s_max)
+        s_pad = max(0.005, (s_max - s_min) * 0.05)
+        self.ax_score.set_ylim(s_lo - s_pad, s_hi + s_pad)
+
+        self.fig.canvas.draw_idle()
         self.plt.ioff()
         self.plt.show()
 
