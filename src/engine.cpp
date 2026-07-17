@@ -26,7 +26,7 @@ Engine::Engine() {
     evaluator.loadOpeningPST(engine_options.opening_pst_path);
     evaluator.loadEndgamePST(engine_options.endgame_pst_path);
 
-    searcher = std::make_unique<Searcher>(*this, search_board, evaluator, nnue, tt);
+    searcher = std::make_unique<Searcher>(*this, search_board, movegen, evaluator, nnue, tt);
 
     book.load(engine_options.opening_book_path);
 

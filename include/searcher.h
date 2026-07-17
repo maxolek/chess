@@ -8,10 +8,12 @@
 #include "timer.h"
 #include "NNUE.h"
 #include "tt.h"
+#include "moveGenerator.h"
 
 class Engine;
 class Evaluator;
 class NNUE;
+class MoveGenerator;
 
 // ---- search constants ----
 struct SearchParams {
@@ -65,6 +67,7 @@ public:
 
     // Object-owned state
     Engine& engine;
+    MoveGenerator& movegen; // = engine.movegen
     Board& board; //= engine.search_board;
     Evaluator& eval; // = engine.evaluator;
     NNUE& nnue; // = engine.nnue;
@@ -91,9 +94,10 @@ public:
 
     // ------------------------------- FUNCS -------------------------------
 
-    Searcher(Engine& e, Board& b, Evaluator& ev, NNUE& nn, TranspositionTable& _tt) 
+    Searcher(Engine& e, Board& b, std::unique_ptr<MoveGenerator>& mg, Evaluator& ev, NNUE& nn, TranspositionTable& _tt) 
         : engine(e), 
           board(b), 
+          movegen(*mg),
           eval(ev), 
           nnue(nn),
           tt(_tt) {}

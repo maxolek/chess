@@ -166,10 +166,8 @@ void Searcher::orderedMoves(Move moves[MAX_MOVES], size_t count,
 }
 
 int Searcher::generateAndOrderMoves(Move moves[MAX_MOVES], int ply, const Move ttMove, const std::vector<Move>& previousPV) {
-   if (!engine.movegen) return 0;
-
-    int count = engine.movegen->generateMoves(board, false); // the bool flag for captures-only or not — adapt if signature differs
-    std::copy_n(engine.movegen->moves, count, moves);
+    int count = movegen.generateMoves(board, false); // the bool flag for captures-only or not — adapt if signature differs
+    std::copy_n(movegen.moves, count, moves);
 
     orderedMoves(moves, static_cast<size_t>(count), board, ply, ttMove, previousPV);
     
@@ -185,14 +183,14 @@ int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int 
 
     // draw detection
     if (board.isThreefold() || board.currentGameState.fiftyMoveCounter >= 50) {
-        //engine.tt.store(board.zobrist_hash, depth, ply, 0, EXACT, Move::NullMove());
+        //tt.store(board.zobrist_hash, depth, ply, 0, EXACT, Move::NullMove());
         return params.DRAW_EVAL;
     }
 
 
     // --- TT probe ---
     /*
-    TTEntry* ttEntry = engine.tt.probe(board.zobrist_hash);
+    TTEntry* ttEntry = tt.probe(board.zobrist_hash);
     if (ttEntry && ttEntry->key == board.zobrist_hash) {
         STATS_TT_HIT(search_depth, ply);
         int ttScore = ttEntry->eval;
@@ -220,13 +218,13 @@ int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int 
     #endif
 
     // generate only captures/promotions 
-    int count = engine.movegen->generateMoves(board, true);
+    int count = movegen.generateMoves(board, true);
     Move moves[MAX_MOVES];
     if (count == 0) {
         if (board.is_in_check) { return -MATE_SCORE + ply; }
         return standPat;
     }
-    std::copy_n(engine.movegen->moves, count, moves);
+    std::copy_n(movegen.moves, count, moves);
 
     int bestEval = standPat;
     Move bestMove = Move::NullMove();
@@ -263,7 +261,7 @@ int Searcher::quiescence(int alpha, int beta, PV& pv, SearchLimits& limits, int 
     }
 
     // store best capture or draw
-    //engine.tt.store(board.zobrist_hash, depth, ply, bestEval, EXACT, bestMove);
+    //tt.store(board.zobrist_hash, depth, ply, bestEval, EXACT, bestMove);
     //STATS_TT_STORE(search_depth, search_depth);
 
     return bestEval;
@@ -287,7 +285,7 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
     // --- end of search conditions ---
 
     if (board.isThreefold() || board.currentGameState.fiftyMoveCounter >= 50) {
-        //engine.tt.store(board.zobrist_hash, depth, ply, 0, EXACT, Move::NullMove());
+        //tt.store(board.zobrist_hash, depth, ply, 0, EXACT, Move::NullMove());
         return params.DRAW_EVAL;
     }
 
@@ -335,7 +333,7 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
         // currently, scaled reduction
         negamax(depth * params.R_IID, alpha, beta, iidPV, previousPV, limits, ply, can_nmp);
         
-        ttEntry = engine.tt.probe(board.zobrist_hash);
+        ttEntry = tt.probe(board.zobrist_hash);
         if (ttEntry && ttEntry->key == board.zobrist_hash) {
             ttMove = ttEntry->bestMove;
         }

@@ -332,7 +332,7 @@ class LivePlotter:
         # normalized
         self.line_nelo, = self.ax_elo.plot([], [], color='purple', linewidth=1.0, linestyle='--', alpha=1.0,label='Normalized (nElo)')
         # naive
-        self.line_elo, = self.ax_elo.plot([], [], color='orange', linewidth=1.0, linestyle='.', alpha=1.0, label='Logistic (Elo)')
+        self.line_elo, = self.ax_elo.plot([], [], color='orange', linewidth=1.0, linestyle='-.', alpha=1.0, label='Logistic (Elo)')
         self.fill_elo = None
         self.ax_elo.legend(loc='upper left', fontsize=7)
         self.ax_elo.set_ylim(-100,100)
