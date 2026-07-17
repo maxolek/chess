@@ -66,7 +66,7 @@ public:
     // ------------------------------- VARS -------------------------------
 
     // Object-owned state
-    Engine& engine;
+    //Engine& engine;
     MoveGenerator& movegen; // = engine.movegen
     Board& board; //= engine.search_board;
     Evaluator& eval; // = engine.evaluator;
@@ -94,10 +94,9 @@ public:
 
     // ------------------------------- FUNCS -------------------------------
 
-    Searcher(Engine& e, Board& b, std::unique_ptr<MoveGenerator>& mg, Evaluator& ev, NNUE& nn, TranspositionTable& _tt) 
-        : engine(e), 
-          board(b), 
-          movegen(*mg),
+    Searcher(Board& b, MoveGenerator& mg, Evaluator& ev, NNUE& nn, TranspositionTable& _tt) 
+        : board(b), 
+          movegen(mg),
           eval(ev), 
           nnue(nn),
           tt(_tt) {}

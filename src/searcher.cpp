@@ -1,5 +1,4 @@
 #include <searcher.h>
-#include <engine.h>
 #include <limits>
 #include <cstring>
 #include <cassert>
