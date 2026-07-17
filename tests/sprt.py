@@ -331,6 +331,7 @@ class LivePlotter:
         self.fill_bayes_elo = None
         # normalized
         self.line_nelo, = self.ax_elo.plot([], [], color='purple', linewidth=1.0, linestyle='--', alpha=1.0,label='Normalized (nElo)')
+        self.fill_nelo = None
         # naive
         self.line_elo, = self.ax_elo.plot([], [], color='orange', linewidth=1.0, linestyle=':', alpha=1.0, label='Logistic (Elo)')
         self.fill_elo = None
@@ -433,10 +434,10 @@ class LivePlotter:
 
         # update LLR line
         self.line_llr.set_data(self.games, self.llr_series)
-        self.ax_llr.set_xlim(1, max(self.games) * 1.05)
+        self.ax_llr.set_xlim(1, max(self.games) * 1.1)
         llr_lo = min(self.llr_series) - 0.2
         llr_hi = max(self.llr_series) + 0.2
-        self.ax_llr.set_ylim(min(self.lbound * 1.02, llr_lo), max(self.ubound * 1.02, llr_hi))
+        self.ax_llr.set_ylim(min(self.lbound * 1.1, llr_lo), max(self.ubound * 1.1, llr_hi))
 
         # update elo line
         self.line_elo.set_data(self.games, self.elo_series)
@@ -444,8 +445,16 @@ class LivePlotter:
         self.line_nelo.set_data(self.games, self.normalized_elo_series)
         if self.fill_elo:
             self.fill_elo.remove()
+            self.fill_bayes_elo.remove()
+            self.fill_nelo.remove()
         self.fill_elo = self.ax_elo.fill_between(
             self.games, self.bayes_elo_lo_series, self.bayes_elo_hi_series, alpha=0.2, color='blue'
+        )
+        self.fill_nelo = self.ax_elo.fill_between(
+            self.games, self.normalized_elo_lo_series, self.normalized_elo_hi_series, alpha=0.2, color='purple'
+        )
+        self.fill_bayes_elo = self.ax_elo.fill_between(
+            self.games, self.elo_lo_series, self.elo_hi_series, alpha=0.2, color='orange'
         )
         self.ax_elo.relim()
         self.ax_elo.autoscale_view()
