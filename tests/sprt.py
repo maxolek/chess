@@ -228,12 +228,35 @@ def compute_normalized_elo_with_ci(W, D, L, CI=0.95):
 
     return nelo, nelo_lo, nelo_hi
 
-def compute_los(W, L):
-    """likelihood of superiority"""
-    if W + L == 0: return 50.0 
-    z = (W - L) / math.sqrt(2.0 * (W + L))
-    los = 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
-    return los * 100.0
+import math
+
+def compute_los_with_bounds(W, L, confidence=0.95):
+    """
+    CPW-style LOS with approximate confidence bounds.
+    Uses decisive games only.
+    """
+
+    N = W + L
+    if N == 0:
+        return 50.0, 0.0, 100.0
+
+    # CPW LOS
+    z = (W - L) / math.sqrt(2.0 * N)
+    los = 0.5 * (1 + math.erf(z / math.sqrt(2))) * 100
+
+    # uncertainty in z
+    # approximate variance of (W-L) is 2N
+    # SE of numerator is sqrt(2N)
+    # add/subtract one normal unit
+    zc = 1.96
+
+    z_low = z - zc
+    z_high = z + zc
+
+    def z_to_los(z):
+        return 0.5 * (1 + math.erf(z / math.sqrt(2))) * 100
+
+    return los, z_to_los(z_low), z_to_los(z_high)
 
 ###############################
 #     LIVE PLOTTING
@@ -481,10 +504,10 @@ class LivePlotter:
         # title with current stats
         score = (W + D/2.0) / N 
         self.score_series.append(score)
-        los = compute_los(W, L)
+        los, los_lo, los_hi = compute_los_with_bounds(W, L)
         self.fig.suptitle(
             f"SPRT Live | {self.tc}{self.tc_label} | Games: {N} | Score: {score:.3f} | "
-            f"Elo: {elo:+.1f} ({elo_lo:+.1f}, {elo_hi:+.1f}) | LOS: {los:.1f}% | LLR: {llr:.2f}",
+            f"Elo: {elo:+.1f} ({elo_lo:+.1f}, {elo_hi:+.1f}) | LOS: {los:.1f}% ({los_lo:.1f}, {los_hi:.1f}) | LLR: {llr:.2f}",
             fontweight='bold', fontsize=12
         )
 
