@@ -317,7 +317,7 @@ class LivePlotter:
         self.ax_llr.axhline(0, color='grey', linestyle='-', alpha=0.3)
         self.ax_llr.legend(loc='upper left', fontsize=7)
         self.line_llr, = self.ax_llr.plot([], [], 'b-', linewidth=1.5)
-        self.ax_llr.set_ylim(self.lbound * 1.02, self.ubound * 1.02)
+        self.ax_llr.set_ylim(self.lbound * 1.05, self.ubound * 1.05)
 
         # elo plot (top-right)
         self.ax_elo.set_title('ELO')
@@ -434,9 +434,9 @@ class LivePlotter:
         # update LLR line
         self.line_llr.set_data(self.games, self.llr_series)
         self.ax_llr.set_xlim(1, max(self.games) * 1.05)
-        #llr_lo = min(self.llr_series) - 0.2
-        #llr_hi = max(self.llr_series) + 0.2
-        #self.ax_llr.set_ylim(llr_lo, llr_hi)
+        llr_lo = min(self.llr_series) - 0.2
+        llr_hi = max(self.llr_series) + 0.2
+        self.ax_llr.set_ylim(min(self.lbound * 1.02, llr_lo), max(self.ubound * 1.02, llr_hi))
 
         # update elo line
         self.line_elo.set_data(self.games, self.elo_series)
@@ -466,7 +466,7 @@ class LivePlotter:
             cut = 2 * n // 3
             elo_min = min(lo_tail[cut:])
             elo_max = max(hi_tail[cut:])
-        elo_pad = max(5, (elo_max - elo_min) * 0.15)
+        elo_pad = max(5, (elo_max - elo_min) * 0.05)
         self.ax_elo.set_ylim(elo_min - elo_pad, elo_max + elo_pad)
 
         # title with current stats
