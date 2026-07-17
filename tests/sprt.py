@@ -497,7 +497,17 @@ class LivePlotter:
             elo_min = min(lo_tail[cut:])
             elo_max = max(hi_tail[cut:])
         elo_pad = max(5, (elo_max - elo_min) * 0.05)
-        self.ax_elo.set_ylim(elo_min - elo_pad, elo_max + elo_pad)
+        plot_elo_lo = min(
+            min(self.elo0, self.elo1) - 5,
+            -5, 
+            elo_min - elo_pad
+        )
+        plot_elo_hi = max(
+            max(self.elo0, self.elo1) + 5,
+            5, 
+            elo_max + elo_pad
+        )
+        self.ax_elo.set_ylim(plot_elo_lo, plot_elo_hi)
 
         # title with current stats
         score = (W + D/2.0) / N 
