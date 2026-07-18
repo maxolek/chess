@@ -348,7 +348,7 @@ class LivePlotter:
         self.ax_elo.axhline(self.elo0, color='red', linestyle=':', alpha=0.5, label=f'elo0={self.elo0}')
         self.ax_elo.axhline(self.elo1, color='green', linestyle=':', alpha=0.5, label=f'elo1={self.elo1}')
         # BayesElo 
-        self.line_bayes_elo, = self.ax_elo.plot([], [], color='blue', linewidth=1.5, label='BayesElo')
+        self.line_bayes_elo, = self.ax_elo.plot([], [], color='black', linewidth=1.0, label='BayesElo')
         self.fill_bayes_elo = None
         # normalized
         self.line_nelo, = self.ax_elo.plot([], [], color='purple', linewidth=1.0, alpha=1.0,label='Normalized (nElo)')
