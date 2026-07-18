@@ -129,7 +129,9 @@ int Evaluator::gamePhase(const Board& board) {
 
 // =================== Tapered Eval ===================
 int Evaluator::taperedEval(const Board& board) {
-    ScopedTimer timer(T_EVAL);
+    #ifdef DEV
+        ScopedTimer timer(T_EVAL);
+    #endif
 
     // Compute opening and endgame reports
     TaperedEvalReport openingReport = openingEval(board);
@@ -584,7 +586,9 @@ int Evaluator::attackerMaterial(const Board& board, int opp_side) {
 // Returns net material gain for the side that STARTS with 'move' (capture).
 // If non-capture, return 0 (neutral).
 int Evaluator::SEE(const Board& board, const Move& move) {
-    ScopedTimer timer(T_SEE);
+    #ifdef DEV
+        ScopedTimer timer(T_SEE);
+    #endif
 
     int sq = move.TargetSquare();
     int from = move.StartSquare();

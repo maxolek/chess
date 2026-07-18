@@ -60,7 +60,7 @@ void PrecomputedMoveData::generateFullPawnAttacks() {
     U64 attacks = 0ULL;
 
     for (int side = 0; side < 2; side++) {
-        for (int square = a2; square <= h7; square++) {
+        for (int square = a1; square <= h8; square++) { // originally a2->h7 since pawns arent on 1st/8th rank, but since these are used to see if a king is in check they must cover all squares
             set_bit(bitboard,square);
 
             // white pawns

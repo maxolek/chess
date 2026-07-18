@@ -46,8 +46,6 @@ void UCI::handleCommand(const std::string& line) {
             std::cout << "option name Hash type spin default " << engine->engine_options.HASH_SIZE_MB<< " min 1 max 1024\n";
             std::cout << "option name Ponder type check default " << engine->engine_options.PONDERING << "\n";
             if (token == "uci_dev") {std::cout << std::endl;} // line break
-            // stats tracking
-            std::cout << "option name ShowStats type check default " << Logging::track_search_stats << "\n";
             // Required for lichess
             std::cout << "option name UCI_ShowWDL type check default " << engine->engine_options.UCI_SHOW_WDL << "\n";
             
@@ -82,11 +80,6 @@ void UCI::handleCommand(const std::string& line) {
             // logging
             std::cout << "option name log_dir type string default " << Logging::log_dir << "\n";
             std::cout << "option name uci_logging type check default " << Logging::track_uci << "\n";
-            std::cout << "option name timer_logging type check default " << Logging::track_timers << "\n";
-            std::cout << "option name root_moves_logging type check default " << Logging::track_root_moves << "\n";
-            std::cout << "option name stats_logging type check default " << Logging::track_search_stats << "\n";
-            std::cout << "option name stats_nodes_only type check default " << Logging::track_search_nodes << "\n";
-            std::cout << "option name game_logging type check default " << Logging::track_game_log << "\n";
 
             std::cout << "uciok\n";
     }
@@ -217,10 +210,14 @@ void UCI::handleCommand(const std::string& line) {
         std::cout << "allgamemoves.size: " << engine->game_board.allGameMoves.size() << "\tzobrist_history.sum: " << sum << "\tzobrist_vec.size: " << engine->search_board.zobrist_history.size() << std::endl;
     }
     else if (token == "dump_tt") {
-        std::cout << "\n(Last search) Stores:     " << g_stats.tt_stores << std::endl;
-        std::cout << "\n(Last search) Hits:       " << g_stats.tt_hits << std::endl;
-        std::cout << "\n(Last search) Overwrites: " << g_stats.tt_overwritten << std::endl;
-        std::cout << "\n(Full game)   Fill %:     " << round_to_n_decimals(100*engine->tt.fillRatio(),2) << " %" << std::endl;
+        #ifdef DEV
+            std::cout << "\n(Last search) Stores:     " << g_stats.tt_stores << std::endl;
+            std::cout << "\n(Last search) Hits:       " << g_stats.tt_hits << std::endl;
+            std::cout << "\n(Last search) Overwrites: " << g_stats.tt_overwritten << std::endl;
+            std::cout << "\n(Full game)   Fill %:     " << round_to_n_decimals(100*engine->tt.fillRatio(),2) << " %" << std::endl;
+        #else 
+            std::cout << "\nPROD engine ... no stats tracking" << std::endl;
+        #endif
     }
     else if (token == "dumpstats") {
         dumpSearchStats(); // print collected stats to console for last search
@@ -239,9 +236,7 @@ void UCI::handleCommand(const std::string& line) {
     else if (token == "flip") {
         engine->search_board.is_white_move = !engine->search_board.is_white_move;
     }
-    else if (token == "print") {
-        engine->print_info();
-    } else if (token == "print_board") {
+    else if (token == "print_board") {
         engine->game_board.print_board();
     }
     // else ignore unknown commands or add more handlers
@@ -351,13 +346,9 @@ void UCI::handleGo(std::istringstream& iss) {
     engine->settings.movetime = movetime;
     engine->settings.infinite = infinite;
 
-    if (sendEval) {
-        engine->evaluate_position();   // just evaluate the current position
-        return;
-    }
-
     // Otherwise start a normal search
     engine->trackGame();
     engine->startSearch();
+    engine->sendBestMove(engine->bestMove, sendEval);
 }
 

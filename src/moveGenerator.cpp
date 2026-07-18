@@ -24,7 +24,9 @@ MoveGenerator::MoveGenerator(const Board& _board) {
 
 // fill in move info arrays
 int MoveGenerator::generateMoves(const Board& _board, bool _quiescence) {
-    ScopedTimer timer(T_MOVEGEN);
+    #ifdef DEV
+        ScopedTimer timer(T_MOVEGEN);
+    #endif
 
     // load movegen at given state
     updateBitboards(_board);

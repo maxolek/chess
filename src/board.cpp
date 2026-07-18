@@ -39,7 +39,9 @@ Board::Board(const Board& other) {
 // Move execution / undo
 // ------------------------------------------------------------
 void Board::MakeMove(Move move) {
-    ScopedTimer timer(T_MAKEMOVE);
+    #ifdef DEV
+        ScopedTimer timer(T_MAKEMOVE);
+    #endif
 
     //currentGameState.was_in_check = is_in_check;
 
@@ -56,7 +58,6 @@ void Board::MakeMove(Move move) {
     int moved_piece = getMovedPiece(start_square);
     int captured_piece = is_enpassant ? 0 : getCapturedPiece(target_square);
     int promotion_piece = move.PromotionPieceType();
-
 
     MovePiece(moved_piece, start_square, target_square);
 
@@ -125,6 +126,18 @@ void Board::MakeMove(Move move) {
     zobrist_hash ^= zobristCastlingHash(old_castling);
     zobrist_hash ^= zobristCastlingHash(currentGameState.castlingRights);
 
+    if ((pieceBitboards[king] & colorBitboards[0]) == 0 || (pieceBitboards[king] & colorBitboards[1]) == 0) {
+        std::cerr << "\n\nKING MISSING after unmake: ";
+        move.PrintMove();
+        std::cerr << "captured_piece: " << captured_piece << " move_color=" << move_color << "\n\n";
+        print_board(); 
+        std::cerr << "\nmoves: " << allGameMoves.size() << "\n\n" << std::endl;
+        for (int i = allGameMoves.size() - 1; i >= 0; i--) {
+            allGameMoves[i].PrintMove();
+        }
+        assert(false);
+    }
+
     is_in_check = inCheck(false);
     plyCount++;
     allGameMoves.push_back(move);
@@ -139,7 +152,9 @@ void Board::MakeMove(Move move) {
 }
 
 void Board::UnmakeMove(Move move) {
-    ScopedTimer timer(T_UNMAKE_MOVE);
+    #ifdef DEV
+        ScopedTimer timer(T_UNMAKE_MOVE);
+    #endif
 
     auto it = hash_history.find(zobrist_hash);
     if (it != hash_history.end()) {
@@ -169,6 +184,11 @@ void Board::UnmakeMove(Move move) {
                       ? pawn : getMovedPiece(moved_to);
     int captured_piece = currentGameState.capturedPieceType;
     int promotion_piece = move.PromotionPieceType();
+
+    // restore pawn_endgame flag for NMP
+    if (pawn_endgame && (captured_piece > pawn && captured_piece < king)) {
+        pawn_endgame = false;
+    }
 
     // --- Remove old EP hash (set by move being undone) ---
     if (currentGameState.enPassantFile != -1) // note: opposite side
@@ -240,42 +260,56 @@ void Board::UnmakeMove(Move move) {
 void Board::MakeNullMove() {
     //ScopedTimer timer(T_MAKENULLMOVE);
 
-    //zobrist_hash ^= zobrist_side_to_move;
+    // clear EP + captured_piece
+    currentGameState.capturedPieceType = -1;
+    if (currentGameState.enPassantFile != -1) {
+        zobrist_hash ^= zobrist_enpassant[currentGameState.enPassantFile];
+        currentGameState.enPassantFile = -1;
+    }
+
+    // flipp side to move
+    zobrist_hash ^= zobrist_side_to_move;
     is_white_move = !is_white_move;
     move_color = 1 - move_color;
 
-    currentGameState.enPassantFile = -1; // clear EP square on null move
-    currentGameState.capturedPieceType = -1; // clear last capture on null move
-
-    //hash_history[zobrist_hash]++;
-    //zobrist_history.push_back(zobrist_hash);
+    // track history for NMP-tree TT
+    // wont plague regular TT since STM is flipped so hash's will never match
+    gameStateHistory.push_back(currentGameState);
+    hash_history[zobrist_hash]++;
+    zobrist_history.push_back(zobrist_hash);
+    allGameMoves.push_back(Move::NullMove());
     //gameStateHistory.push_back(currentGameState);
+
+    is_in_check = false;
+    plyCount++;
 }
 
 void Board::UnmakeNullMove() {
     //ScopedTimer timer(T_UNMAKENULLMOVE);
 
-    //auto it = hash_history.find(zobrist_hash);
-    //if (it != hash_history.end()) {
-    //    it->second--;
-    //   if (it->second <= 0)
-    //        hash_history.erase(it);
-    //    zobrist_history.pop_back();
-    //} //else {
-        // Optional: error check
-        //std::cerr << "UnmakeNullMove: hash not found in history!\n";
-        // Maybe abort or handle gracefully
-    //}
+    // undo hash history
+    auto it = hash_history.find(zobrist_hash);
+    if (it != hash_history.end()) {
+        it->second--;
+       if (it->second <= 0)
+            hash_history.erase(it);
+    }
+    zobrist_history.pop_back();
 
-    //zobrist_hash ^= zobrist_side_to_move;
+    // flip STM back
+    zobrist_hash ^= zobrist_side_to_move;
     is_white_move = !is_white_move;
     move_color = 1 - move_color;
 
-    //gameStateHistory.pop_back();
+    // restore gamestate and re-add EP hash if the original state had one
+    allGameMoves.pop_back();
+    gameStateHistory.pop_back(); // post-null-move gameState
+    currentGameState = gameStateHistory.back(); // gameState after last real move
+    if (currentGameState.enPassantFile != -1)
+        zobrist_hash ^= zobrist_enpassant[currentGameState.enPassantFile];
 
-    // since we never touch the gameStateHistory() in null move
-    // we dont need to .pop_back() and can just restore the previous state
-    currentGameState = gameStateHistory.back();
+    is_in_check = false;
+    plyCount--;
 }
 
 // ------------------------------------------------------------
@@ -322,12 +356,10 @@ void Board::CapturePiece(int piece, int target_square, bool is_enpassant, bool c
 
     if (
         !pawn_endgame
-        && (
-            pieceBitboards[knight] == 0
-            && pieceBitboards[bishop] == 0
-            && pieceBitboards[rook] == 0
-            && pieceBitboards[queen] == 0
-        )
+        && !(pieceBitboards[knight]
+                | pieceBitboards[bishop]
+                | pieceBitboards[rook]
+                | pieceBitboards[queen])
     ) {
         pawn_endgame = true;
     }
@@ -438,7 +470,7 @@ bool Board::inCheck(bool init) {
     if ((colorBitboards[side] & pieceBitboards[knight]) & PrecomputedMoveData::blankKnightAttacks[king_sq])
         return true;
 
-    // Pawns
+    // Pawns                                 use king-side to basically say "if this king was a pawn, could it capture an enemy pawn" as the check
     if ((colorBitboards[side] & pieceBitboards[pawn]) & PrecomputedMoveData::fullPawnAttacks[king_sq][king_side])
         return true;
 

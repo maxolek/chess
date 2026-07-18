@@ -17,10 +17,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 # --- Config ---
-ENGINES = [
-    "engines/0.1.0.exe",
-    "engines/0.2.2.exe",
-]
+ENGINES = []
 
 POSITIONS = [
     ("startpos",                                                                  "Starting position"),
@@ -31,49 +28,56 @@ POSITIONS = [
 ]
 
 MOVETIME_MS  = 1000
+DEPTH = None
 RUNS_PER_POS = 1
 
 # All stats from dumpstats and their display config
 # (key, label, format, higher_is_better)
 STAT_DEFS = [
-    ("time_ms",          "Time (ms)",            ",.0f", None),
-    ("depth",            "Completed Depth",      ".1f",  True),
-    ("nps",              "NPS",                  ",.0f", True),
-    ("nodes",            "Nodes",                ",.0f", True),
-    ("qnodes",           "QNodes",               ",.0f", True),
-    ("q_ratio",          "Q Ratio %",            ".1f",  False),
-    ("tt_hit_rate",      "TT Hit Rate %",        ".1f",  True),
-    ("tt_fill",          "TT Fill %",            ".2f",  False),
-    ("fh_first_pct",     "FH First %",           ".1f",  True),
-    ("fail_highs",       "Fail Highs",           ",.0f", True),
-    ("fail_lows",        "Fail Lows",            ",.0f", True),
-    ("see_pruned",       "SEE Pruned",           ",.0f", True),
-    ("delta_pruned",     "Delta Pruned",         ",.0f", True),
-    ("nmp_attempts",     "NMP Attempts",         ",.0f", True),
-    ("nmp_success_pct",  "NMP Success %",        ".1f",  True),
-    ("pvs_researches",   "PVS Re-searches",      ",.1f", False),
-    ("asp_failhigh",     "Asp Fail High",        ",.1f", False),
-    ("asp_faillow",      "Asp Fail Low",         ",.1f", False),
+    ("time_ms",                 "Time (ms)",                ",.0f", None),
+    ("depth",                   "Completed Depth",          ".1f",  True),
+    ("nps",                     "NPS",                      ",.0f", True),
+    ("nodes",                   "Nodes",                    ",.0f", True),
+    ("qnodes",                  "QNodes",                   ",.0f", True),
+    ("q_ratio",                 "Q Ratio %",                ".1f",  False),
+    ("tt_hit_rate",             "TT Hit Rate %",            ".1f",  True),
+    ("tt_return_rate",          "TT Return Rate %",         ".1f",  True),
+    ("tt_fill",                 "TT Fill %",                ".2f",  False),
+    ("fh_first_pct",            "FH First %",               ".1f",  True),
+    ("fail_highs",              "Fail Highs",               ",.0f", True),
+    ("fail_lows",               "Fail Lows",                ",.0f", True),
+    ("see_pruned",              "SEE Pruned",               ",.0f", True),
+    ("delta_pruned",            "Delta Pruned",             ",.0f", True),
+    ("nmp_attempts",            "NMP Attempts",             ",.0f", True),
+    ("nmp_success_pct",         "NMP Success %",            ".1f",  True),
+    ("pvs_researches_full",     "PVS Re-searches (FULL)",   ",.1f", False),
+    ("pvs_researches_lmr",      "PVS Re-searches (LMR)",    ",.1f", False),
+    ("pvs_researches_root",     "PVS Re-searches (ROOT)",   ",.1f", False),
+    ("asp_failhigh",            "Asp Fail High",            ",.1f", False),
+    ("asp_faillow",             "Asp Fail Low",             ",.1f", False),
 ]
 
 STAT_PATTERNS = {
-    "depth":           r"Completed Depth\s*:\s*(\d+)",
-    "nps":             r"NPS\s*:\s*(\d+)",
-    "nodes":           r"Total\s*:\s*(\d+)",
-    "qnodes":          r"QNodes\s*:\s*(\d+)",
-    "time_ms":         r"Time \(ms\)\s*:\s*(\d+)",
-    "tt_hit_rate":     r"Hit Rate\s*:\s*([\d.]+)%",
-    "tt_fill":         r"Fill Ratio\s*:\s*([\d.]+)%",
-    "fh_first_pct":    r"FH First %\s*:\s*([\d.]+)%",
-    "fail_highs":      r"Fail Highs\s*:\s*(\d+)",
-    "fail_lows":       r"Fail Lows\s*:\s*(\d+)",
-    "see_pruned":      r"SEE\s*:\s*(\d+)",
-    "delta_pruned":    r"Delta\s*:\s*(\d+)",
-    "nmp_attempts":    r"Attempts\s*:\s*(\d+)",
-    "nmp_success_pct": r"Success %\s*:\s*([\d.]+)%",
-    "pvs_researches":  r"PVS\s*:\s*(\d+)",
-    "asp_failhigh":    r"Fail High Re\s*:\s*(\d+)",
-    "asp_faillow":     r"Fail Low Re\s*:\s*(\d+)",
+    "depth":                r"Completed Depth\s+(\d+)",
+    "nps":                  r"NPS\s+(\d+)",
+    "nodes":                r"Total\s+(\d+)",
+    "qnodes":               r"QNodes\s+(\d+)",
+    "time_ms":              r"Time \(ms\)\s+(\d+)",
+    "tt_return_rate":       r"Return Rate\s+([\d.]+)%",
+    "tt_hit_rate":          r"Hit Rate\s+([\d.]+)%",
+    "tt_fill":              r"Fill Ratio\s+([\d.]+)%",
+    "fh_first_pct":         r"FH % at \[0\]\s+([\d.]+)%",
+    "fail_highs":           r"Fail Highs\s+(\d+)",
+    "fail_lows":            r"Fail Lows\s+(\d+)",
+    "see_pruned":           r"SEE Prunes\s+(\d+)",
+    "delta_pruned":         r"Delta Prunes\s+(\d+)",
+    "nmp_attempts":         r"NMP Attempts\s+(\d+)",
+    "nmp_success_pct":      r"NMP FH %\s+([\d.]+)%",
+    "pvs_researches_full":  r"PVS full\s+(\d+)",
+    "pvs_researches_lmr":   r"PVS w/ LMR\s+(\d+)",
+    "pvs_researches_root":  r"PVS @ root\s+(\d+)",
+    "asp_failhigh":         r"Aspiration FH Re\s+(\d+)",
+    "asp_faillow":          r"Aspiration FL Re\s+(\d+)",
 }
 
 
@@ -92,12 +96,13 @@ def parse_dumpstats(output: str) -> dict:
 def collect_dumpstats(proc, movetime: int) -> dict:
     """Wait for bestmove then send dumpstats and collect output."""
     start = time.time()
-    while time.time() - start < (movetime / 1000) + 5:
+    wait_time = movetime if movetime else 5000 # 5s
+    while time.time() - start < (wait_time / 1000) + 5:
         line = proc.stdout.readline().strip()
         if line.startswith("bestmove"):
             break
 
-    proc.stdin.write("dumpstats\n")
+    proc.stdin.write("dumpstats\nisready\n")
     proc.stdin.flush()
 
     dump_output = []
@@ -106,14 +111,14 @@ def collect_dumpstats(proc, movetime: int) -> dict:
         line = proc.stdout.readline()
         if not line:
             break
-        dump_output.append(line)
-        if "----" in line and len(dump_output) > 10:
+        if line.strip() == "readyok":
             break
+        dump_output.append(line)
 
     return parse_dumpstats("".join(dump_output))
 
 
-def run_cold(engine_path: str, position: str, movetime: int, runs: int) -> list[dict]:
+def run_cold(engine_path: str, position: str, movetime: int, depth: int, runs: int) -> list[dict]:
     """Fresh engine per search — cold TT."""
     results = []
     for _ in range(runs):
@@ -132,7 +137,7 @@ def run_cold(engine_path: str, position: str, movetime: int, runs: int) -> list[
                     break
 
             pos_cmd = "position startpos" if position == "startpos" else f"position fen {position}"
-            proc.stdin.write(f"{pos_cmd}\ngo movetime {movetime}\n")
+            proc.stdin.write(f"{pos_cmd}\ngo {"movetime" if movetime else "depth"} {movetime if movetime else depth}\n")
             proc.stdin.flush()
 
             stats = collect_dumpstats(proc, movetime)
@@ -146,7 +151,7 @@ def run_cold(engine_path: str, position: str, movetime: int, runs: int) -> list[
     return results
 
 
-def run_warm(engine_path: str, moves: list[str], movetime: int, side: int) -> list[dict]:
+def run_warm(engine_path: str, moves: list[str], movetime: int, depth: int, side: int) -> list[dict]:
     """Single engine process, TT persists across positions."""
     results = []
     try:
@@ -174,7 +179,7 @@ def run_warm(engine_path: str, moves: list[str], movetime: int, side: int) -> li
             if current_side == side:
                 pos_cmd = f"position startpos moves {' '.join(played)}" if played else "position startpos"
                 send(pos_cmd)
-                send(f"go movetime {movetime}")
+                send(f"go {"movetime" if movetime else "depth"} {movetime if movetime else depth}")
                 stats = collect_dumpstats(proc, movetime)
                 stats["ply"] = i
                 stats["move_num"] = len(played)
@@ -213,43 +218,40 @@ def delta_str(base_val, cand_val, higher_is_better, fmt):
     return f"{diff:+{fmt}} ({pct:+.1f}%) {symbol}"
 
 
-def print_comparison(
-    results: dict,       # results[engine] = list of stat dicts
-    engines: list[str],
-    label: str,
-):
+def print_comparison(results: dict, engines: list[str], label: str):
     names = [e.split("/")[-1].replace(".exe", "") for e in engines]
-    baseline = engines[0]
-    candidate = engines[1] if len(engines) > 1 else None
 
     col = 20
+
     print(f"\n{'='*80}")
     print(f"  {label}")
     print(f"{'='*80}")
-    print(f"  {'Stat':<25} {names[0]:>{col}}", end="")
-    if candidate:
-        print(f"  {names[1]:>{col}}  {'Delta':>{col}}", end="")
+
+    print(f"  {'Stat':<25}", end="")
+    for name in names:
+        print(f"{name:>{col}}", end="")
     print()
-    print(f"  {'-'*25} {'-'*col}", end="")
-    if candidate:
-        print(f"  {'-'*col}  {'-'*col}", end="")
+
+    print(f"  {'-'*25}", end="")
+    for _ in engines:
+        print(f" {'-'*col}", end="")
     print()
+
+    baseline = engines[0]
 
     for key, label_str, fmt, hib in STAT_DEFS:
         base_val = avg(results[baseline], key)
         if base_val is None:
             continue
 
-        base_str = format(base_val, fmt)
-        row = f"  {label_str:<25} {base_str:>{col}}"
+        print(f"  {label_str:<25}", end="")
 
-        if candidate:
-            cand_val = avg(results[candidate], key)
-            cand_str = format(cand_val, fmt) if cand_val is not None else "--"
-            d_str = delta_str(base_val, cand_val, hib, fmt)
-            row += f"  {cand_str:>{col}}  {d_str:>{col}}"
+        for engine in engines:
+            val = avg(results[engine], key)
+            val_str = format(val, fmt) if val is not None else "--"
+            print(f"{val_str:>{col}}", end="")
 
-        print(row)
+        print()
 
 
 def load_game_moves(path: str) -> list[str]:
@@ -274,6 +276,7 @@ def load_game_moves(path: str) -> list[str]:
 if __name__ == "__main__":
     engines     = ENGINES
     movetime_ms = MOVETIME_MS
+    depth = DEPTH
     runs        = RUNS_PER_POS
     game_path   = None
     side        = 0
@@ -289,6 +292,11 @@ if __name__ == "__main__":
     if "--time" in sys.argv:
         idx = sys.argv.index("--time")
         movetime_ms = int(float(sys.argv[idx+1]) * 1000)
+
+    if "--depth" in sys.argv:
+        idx = sys.argv.index("--depth")
+        depth = int(sys.argv[idx+1])
+        movetime_ms = None
 
     if "--runs" in sys.argv:
         idx = sys.argv.index("--runs")
@@ -316,7 +324,7 @@ if __name__ == "__main__":
                 else:
                     positions.append((line, line[:40]))
 
-    print(f"Engines: {[e.split('/')[-1] for e in engines]} | Time: {movetime_ms}ms")
+    print(f"Engines: {[e.split('/')[-1] for e in engines]} | Time: {movetime_ms}{"ms" if movetime_ms else ""} | Depth: {depth}")
 
     if game_path: # warm TT
         moves = load_game_moves(game_path)
@@ -326,7 +334,7 @@ if __name__ == "__main__":
         for engine in engines:
             name = engine.split("/")[-1].replace(".exe", "")
             print(f"Running {name}...")
-            all_results[engine] = run_warm(engine, moves, movetime_ms, side)
+            all_results[engine] = run_warm(engine, moves, movetime_ms, depth, side)
 
         print_comparison(all_results, engines, f"Warm TT — avg over {len(all_results[engines[0]])} positions")
 
@@ -336,7 +344,7 @@ if __name__ == "__main__":
             for engine in engines:
                 name = engine.split("/")[-1].replace(".exe", "")
                 print(f"  {name} | {pos_name}...", end="\r")
-                all_results[engine] = run_cold(engine, pos_fen, movetime_ms, runs)
+                all_results[engine] = run_cold(engine, pos_fen, movetime_ms, depth, runs)
             print_comparison(all_results, engines, f"Cold TT — {pos_name}")
 
         # aggregate cold summary

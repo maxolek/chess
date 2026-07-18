@@ -74,11 +74,11 @@ struct EngineOptions {
     bool PONDERING        = false;
     bool UCI_SHOW_WDL     = false;
 
-    fs::path opening_pst_path  = Logging::project_root / "bin/pst/pst_opening.txt";
-    fs::path endgame_pst_path  = Logging::project_root / "bin/pst/pst_endgame.txt";
-    fs::path nnue_weight_path  = Logging::project_root / "bin/nnue_wgts/768_128x2.bin";
-    fs::path opening_book_path = Logging::project_root / "bin/Titans.bin";
-    fs::path syzygy_path       = Logging::project_root;
+    fs::path opening_pst_path  = fs::path(PROJECT_ROOT) / "bin/pst/pst_opening.txt";
+    fs::path endgame_pst_path  = fs::path(PROJECT_ROOT) / "bin/pst/pst_endgame.txt";
+    fs::path nnue_weight_path  = fs::path(PROJECT_ROOT) / "bin/nnue_wgts/768_128x2.bin";
+    fs::path opening_book_path = fs::path(PROJECT_ROOT) / "bin/Titans.bin";
+    fs::path syzygy_path       = fs::path(PROJECT_ROOT);
 };
 
 // ------------------
@@ -100,13 +100,6 @@ public:
     SearchSettings settings;
     SearchLimits limits;
 
-    // iteration-local eval table
-    static constexpr int INVALID = MATE_SCORE + 10000;
-    int last_eval_table[1 << 16];   // keyed by Move.Value()
-    // book keeping
-    void store_last_result(const SearchResult& res);
-    int get_prev_eval(Move m) const;
-
     // constructors
     Engine();
 
@@ -127,6 +120,7 @@ public:
     Move legal_moves[MAX_MOVES];
 
     // output
+    SearchResult result;
     Move bestMove = Move::NullMove();
     int bestEval = -MATE_SCORE;
     std::vector<Move> pv_line;
@@ -144,16 +138,12 @@ public:
     void ponderHit();
     void print_info();
 
-    // --- Search Helpers ---
+    // --- Search  ---
     void startSearch();
     void stopSearch();
-
-    // --- Search ---
     void computeSearchTime(const SearchSettings& settings); // defines the settings for it_dp
-    void iterativeDeepening(); // main search
-    void evaluate_position(); // for testing
-    // --- Search Result ---
-    void sendBestMove(Move bestMove, Move ponder = Move::NullMove()); // output of it_dp
+    //  Result
+    void sendBestMove(Move bestMove, bool eval = false, bool ponder = false); // output of it_dp
 
     // --- Games ---
     void newGame();

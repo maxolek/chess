@@ -15,11 +15,6 @@ inline RunContext g_run_context{};
 
 struct Logging {
     // ---- toggles ----
-    static inline bool track_timers        = false;
-    static inline bool track_root_moves    = true;
-    static inline bool track_search_stats  = true;
-    static inline bool track_search_nodes  = false; // node/qnode counts only
-    static inline bool track_game_log      = true;
     static inline bool track_uci           = false;
 
     // ---- directory ----
@@ -82,57 +77,9 @@ struct Logging {
         initFiles();
     }
 
-    static void setTrackTimers(bool v) {
-        if (track_timers == v) return;
-        track_timers = v;
-        reopenFiles();
-    }
-
-    static void setTrackRootMoves(bool v) {
-        if (track_root_moves == v) return;
-        track_root_moves = v;
-        reopenFiles();
-    }
-
-    static void setTrackSearchStats(bool v) {
-        if (track_search_stats == v) return;
-        track_search_stats = v;
-        reopenFiles();
-    }
-
-    static void setTrackSearchNodes(bool v) {
-        if (track_search_nodes == v) return;
-        track_search_nodes = v;
-        reopenFiles();
-    }
-
-    static void setTrackGameLog(bool v) {
-        if (track_game_log == v) return;
-        track_game_log = v;
-        reopenFiles();
-    }
-
     static void setTrackUCI(bool v) {
         if (track_uci == v) return;
         track_uci = v;
         reopenFiles();
-    }
-
-    static inline void disableAll() {
-        track_timers        = false;
-        track_root_moves    = false;
-        track_search_stats  = false;
-        track_search_nodes  = false;
-        track_game_log      = false;
-        track_uci           = true;
-    }
-
-    static inline void enableAll() {
-        track_timers        = true;
-        track_root_moves    = true;
-        track_search_stats  = true;
-        track_search_nodes  = false; // search stats covers the nodes
-        track_game_log      = true;
-        track_uci           = true;
     }
 };

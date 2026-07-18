@@ -20,13 +20,13 @@ Engine::Engine() {
     search_board = game_board; //Board(game_board);
 
     movegen = std::make_unique<MoveGenerator>(search_board);
+    tt.clear();
 
     nnue.load(engine_options.nnue_weight_path);
     evaluator.loadOpeningPST(engine_options.opening_pst_path);
     evaluator.loadEndgamePST(engine_options.endgame_pst_path);
 
-    searcher = std::make_unique<Searcher>(*this, search_board, evaluator, nnue);
-    tt.clear();
+    searcher = std::make_unique<Searcher>(search_board, *movegen, evaluator, nnue, tt);
 
     book.load(engine_options.opening_book_path);
 
@@ -47,6 +47,7 @@ void Engine::clearState() {
     increment[0] = increment[1] = 0;
     //evaluator = Evaluator(&precomp);
     //stats = SearchStats();
+    g_stats = SearchStats();
     tt.clear();
     game_board.setFromFEN(STARTPOS_FEN);
     search_board = game_board;
@@ -85,10 +86,6 @@ void Engine::setOption(const std::string& name, const std::string& value) {
         engine_options.UCI_SHOW_WDL = boolFromString(value);
         std::cout << "info string set UCI_ShowWDL = " << (engine_options.UCI_SHOW_WDL ? "true" : "false") << std::endl;
     } 
-    else if (name == "ShowStats") {
-        Logging::track_search_stats = boolFromString(value);
-        std::cout << "info string set ShowStats = " << (Logging::track_search_stats ? "true" : "false") << std::endl;
-    }
 
     // -------- search params --------
     else if (name == "delta_prune_threshold") {
@@ -136,12 +133,12 @@ void Engine::setOption(const std::string& name, const std::string& value) {
         std::cout << "info string set lmr_depth_threshold = " << searcher->params.LMR_DEPTH_THRESHOLD << std::endl;
     }
     else if (name == "r_lmr_const") {
-        searcher->params.R_LMR_CONST = std::stoi(value);
-        std::cout << "info string set r_lmr_const = " << searcher->params.R_LMR_CONST << std::endl;
+        searcher->params.R_LMR_CONST = std::stof(value)/100.000;
+        std::cout << "info string set r_lmr_const = " << static_cast<int>(100*searcher->params.R_LMR_CONST) << std::endl;
     }
     else if (name == "r_lmr_denom") {
-        searcher->params.R_LMR_DENOM = std::stoi(value);
-        std::cout << "info string set r_lmr_denom = " << searcher->params.R_LMR_DENOM << std::endl;
+        searcher->params.R_LMR_DENOM = std::stof(value)/100.000;
+        std::cout << "info string set r_lmr_denom = " << static_cast<int>(100*searcher->params.R_LMR_DENOM) << std::endl;
     }
 
     // -------- books / paths --------
@@ -186,25 +183,10 @@ void Engine::setOption(const std::string& name, const std::string& value) {
     }
 
     // -------- logging --------
+    #ifdef DEV
     else if (name == "log_dir") {
         Logging::setLogDir(value);
         std::cout << "info string log_dir loaded successfully: " << Logging::log_dir << std::endl;
-    }
-    else if (name == "timer_logging") {
-        if (Logging::track_timers != boolFromString(value)) {Logging::setTrackTimers(boolFromString(value));}
-    }
-    else if (name == "root_moves_logging") {
-        if (Logging::track_root_moves != boolFromString(value)) {Logging::setTrackRootMoves(boolFromString(value));}
-    }
-    else if (name == "stats_logging") {
-        if (Logging::track_search_stats != boolFromString(value)) {Logging::setTrackSearchStats(boolFromString(value));}
-    }
-    else if (name == "stats_nodes_only") {
-        if (Logging::track_search_nodes != boolFromString(value)) {Logging::setTrackSearchNodes(boolFromString(value));}
-        if (Logging::track_search_stats == true && Logging::track_search_nodes == true) {Logging::setTrackSearchStats(false);}
-    }
-    else if (name == "game_logging") {
-        if (Logging::track_game_log != boolFromString(value)) {Logging::setTrackGameLog(boolFromString(value));}
     }
     else if (name == "uci_logging") {
          if (Logging::track_uci != boolFromString(value)) {Logging::setTrackUCI(boolFromString(value));}
@@ -212,44 +194,11 @@ void Engine::setOption(const std::string& name, const std::string& value) {
     else {
         std::cout << "info string ignoring unknown option: " << name << std::endl;
     }
+    #endif
 
     std::cout.flush();
 }
 
-
-void Engine::print_info() {
-    // UCI options
-    std::cout << "option name Hash type spin value "
-              << engine_options.HASH_SIZE_MB << " min 1 max 8192\n";
-    std::cout << "option name Threads type spin value "
-              << engine_options.MAX_THREADS << " min 1 max 64\n";
-    std::cout << "option name Move Overhead type spin value "
-              << engine_options.MOVE_OVERHEAD_MS << " min 0 max 5000\n";
-    std::cout << "option name Ponder type check value "
-              << (engine_options.PONDERING ? "true" : "false") << "\n";
-    std::cout << "option name UCI_ShowWDL type check value "
-              << (engine_options.UCI_SHOW_WDL ? "true" : "false") << "\n";
-    std::cout << "option name ShowStats type check value "
-              << (Logging::track_search_stats ? "true" : "false") << "\n";
-    // paths
-    std::cout << "option name OpeningPST type string value "
-              << engine_options.opening_pst_path << "\n";
-
-    std::cout << "option name EndgamePST type string value "
-              << engine_options.endgame_pst_path << "\n";
-
-    std::cout << "option name NNUEWeights type string value "
-              << engine_options.nnue_weight_path << "\n";
-
-    std::cout << "option name OpeningBook type string value "
-              << engine_options.opening_book_path << "\n";
-
-    std::cout << "option name SyzygyPath type string value "
-              << engine_options.syzygy_path << "\n";
-
-    std::cout << "option name LogsDir type string value "
-              << Logging::log_dir << "\n";
-}
 
 void Engine::setPosition(const std::string& fen,
                          const std::vector<std::string>& moveStrs)
@@ -267,6 +216,13 @@ void Engine::setPosition(const std::string& fen,
     // --- Apply moves ---
     // must interpret uci in context of the board state for ep
     for (const auto& moveStr : moveStrs) {
+
+        if (moveStr == "null" || moveStr == "NULL" || moveStr == "Null") {
+            Move m = Move::NullMove();
+            game_board.MakeMove();
+            ply++;
+            continue;
+        }
 
         int start  = algebraic_to_square(moveStr.substr(0, 2));
         int target = algebraic_to_square(moveStr.substr(2, 2));
@@ -315,6 +271,8 @@ void Engine::setPosition(const std::string& fen,
         ply++;
     }
 
+    game_board.is_in_check = game_board.inCheck(true);
+
     // --- Sync search board ---
     search_board = game_board; //Board(game_board);
 
@@ -327,25 +285,6 @@ void Engine::setPosition(const std::string& fen,
     game_over = checkGameEnd();
 }
 
-
-// ------------------------
-// -- Local Eval Storage --
-// ------------------------
-
-void Engine::store_last_result(const SearchResult& res) {
-    // clear table
-    std::fill(std::begin(last_eval_table), std::end(last_eval_table), INVALID);
-
-    // write moves/evals from last depth
-    for (int i = 0; i < res.root_count; ++i) {
-        last_eval_table[res.root_moves[i].move.Value()] = res.root_moves[i].eval;
-    }
-}
-
-inline int Engine::get_prev_eval(Move m) const {
-    int v = last_eval_table[m.Value()];
-    return (v == INVALID) ? -MATE_SCORE : v;
-}
 
 // --------------------
 // -- Search Control --
@@ -394,6 +333,7 @@ void Engine::computeSearchTime(const SearchSettings& settings) {
 
 
 void Engine::startSearch() {
+    // set nnue
     nnue.build_accumulators(search_board);
 
     // book probe
@@ -419,12 +359,12 @@ void Engine::startSearch() {
                 bestBookMove = "e8c8"; 
             }
 
-            sendBestMove(bestBookMove); // ponder move empty
+            bestMove = bestBookMove;
             return; // skip search entirely
         }
     }
 
-    // normal search
+    // search time / params
     search_depth = settings.depth;
     time_left[0] = settings.wtime;
     time_left[1] = settings.btime;
@@ -432,10 +372,49 @@ void Engine::startSearch() {
     increment[1] = settings.binc;
     pondering = settings.infinite;
 
+    // stats tracking
+    auto start_time = std::chrono::steady_clock::now();
+    g_run_context.search_uuid = generate_uuid();
+    #ifdef DEV 
+        resetSearchStats();  
+    #endif
+    
+    // --- generate first moves once ---
+    Move first_moves[MAX_MOVES];
+    int count = movegen->generateMoves(game_board, false);
+    std::copy_n(movegen->moves, count, first_moves);
+
+    // --- run search ---
     computeSearchTime(settings);
-    iterativeDeepening();
-    sendBestMove(bestMove);
+    result = searcher->iterativeDeepening(first_moves, count, limits);
+    bestMove = result.bestMove;
+    bestEval = result.eval; 
+    pv_line = result.best_line.line;
+    //sendBestMove(bestMove);
+
+    // finalize cumulative stats
+    g_stats.time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now() - start_time).count();
+    #ifdef DEV
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        std::chrono::steady_clock::now() - start_time).count();
+        g_stats.game_ply = ply;
+        //g_stats.nps = elapsed > 0 ? (1000.0 * g_stats.nodes / elapsed) : 0.0;
+        g_stats.eval = result.eval;
+        g_stats.move = result.bestMove;
+        g_stats.principal_variation = result.best_line.line;
+
+        //g_stats.ebf = pow(double(g_stats.nodes) / 1.0, 1.0 / g_stats.maxDepth); // rough estimate
+        //g_stats.qratio = double(g_stats.qnodes) / g_stats.nodes;
+
+        tracker.bestMoves.push_back(bestMove);
+        tracker.evals.push_back(bestEval);
+
+        logSearchStats(game_board.getBoardFEN());  // JSON written once at end
+        logTimingStats(game_board.getBoardFEN());
+    #endif 
 }
+
 
 void Engine::stopSearch() {
     limits.stopped = true;
@@ -448,147 +427,14 @@ void Engine::ponderHit() {
 }
 
 
-// --------------------------------
-// -- Iterative Deepening Search --
-// --------------------------------
-
-// -- accounts for time / depth requirements
-// -- uses previous search information
-// ------ transposition table
-// ------ principle move ordering
-
-void Engine::iterativeDeepening() {
-    //ScopedTimer timer(T_ROOT);
-    auto start_time = std::chrono::steady_clock::now();
-    g_run_context.search_uuid = generate_uuid();
-
-    // reset global stats
-    if (Logging::track_search_stats) {
-        resetSearchStats();           // global-level
-    }
-
-    SearchResult last_result;
-    SearchResult result;
-
-    // generate first moves once
-    Move first_moves[MAX_MOVES];
-    int count = movegen->generateMoves(game_board, false);
-    std::copy_n(movegen->moves, count, first_moves);
-
-    std::fill(std::begin(last_eval_table), std::end(last_eval_table), INVALID);
-
-    int depth = 1;
-    Move prevBest = Move::NullMove();
-
-    // --- iterative deepening loop ---
-    while (!limits.should_stop(depth)) {
-        auto depth_start = std::chrono::steady_clock::now();
-        g_stats.max_depth = depth;
-
-        // --- move ordering ---
-        if (depth > 1) { // sort by prev iteration elos
-            std::sort(first_moves, first_moves + count,
-                      [&](Move a, Move b) { return get_prev_eval(a) > get_prev_eval(b); });
-        } else { // first search: order like typical mid-tree ordering
-            searcher->orderedMoves(first_moves, count, game_board, 0, {});
-        }
-
-        // --- search ---
-        result = searcher->search(first_moves, count, depth, limits,
-                                     last_result.best_line.line, last_result.eval);
-
-
-        // --- store results ---
-        if (!Move::SameMove(result.bestMove, Move::NullMove())) {
-            last_result = result;
-            store_last_result(result);
-        }
-
-        // --- determine best move and eval ---
-        bestMove = last_result.bestMove;
-        bestEval  = last_result.eval;
-
-        // --- update PV line if current result has one ---
-        if (!result.best_line.line.empty()) {
-            pv_line = result.best_line.line;
-        }
-
-        // --- update per-depth stats ---
-        auto depth_end = std::chrono::steady_clock::now();
-
-        // --- logging --- 
-        if (Logging::track_search_stats) {
-            //g_stats.max_completed_depth = depth;
-            g_stats.it_depth_eval[depth] = result.eval;
-            g_stats.it_depth_move[depth] = result.bestMove;
-            g_stats.it_depth_time_ms[depth] = std::chrono::duration<double, std::milli>(depth_end - depth_start).count();
-            //if (Move::SameMove(bestMove, prevBest)) g_stats.bestmoveStable++;
-        }
-        // log per-root-move timing data
-        if (Logging::track_timers && result.root_count > 0) {
-            logRootMoves(result, depth);
-        }
-
-        prevBest = bestMove;
-        if (std::abs(result.eval) >= MATE_SCORE - 10) break;
-        depth++;
-        // if only 1 legal move, perform depth 2 search then play move
-        // depth 2 to get fair eval with recaptures, etc. (very fast)
-        // but quit early since we know what were going to play anyway
-        // still want fair eval for continuation metrics, etc.
-        if ((count == 1) && (depth == 3)) break;
-    }
-
-    // --- finalize cumulative stats ---
-    if (Logging::track_search_stats || Logging::track_search_nodes) {
-        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-                        std::chrono::steady_clock::now() - start_time).count();
-        g_stats.game_ply = ply;
-        g_stats.time_ms = elapsed;
-        //g_stats.nps = elapsed > 0 ? (1000.0 * g_stats.nodes / elapsed) : 0.0;
-        g_stats.eval = last_result.eval;
-        g_stats.move = last_result.bestMove;
-        g_stats.principal_variation = last_result.best_line.line;
-
-        //g_stats.ebf = pow(double(g_stats.nodes) / 1.0, 1.0 / g_stats.maxDepth); // rough estimate
-        //g_stats.qratio = double(g_stats.qnodes) / g_stats.nodes;
-
-        tracker.bestMoves.push_back(bestMove);
-        tracker.evals.push_back(bestEval);
-
-        logSearchStats(game_board.getBoardFEN());  // JSON written once at end
-    }
-    if (Logging::track_timers) {logTimingStats(game_board.getBoardFEN());}
-}
-
-
-void Engine::evaluate_position() {
-    search_board = game_board;
-    //nnue.refresh(search_board);
-
-    search_depth = settings.depth;
-    time_left[0] = settings.wtime;
-    time_left[1] = settings.btime;
-    increment[0] = settings.winc;
-    increment[1] = settings.binc;
-    pondering = settings.infinite;
-
-    computeSearchTime(settings);
-    iterativeDeepening();
-
-    Logging::logUCIout(bestMove.uci());
-    std::cout << "eval " << bestEval << " bestmove " << bestMove.uci() << std::endl;
-}
-
 // -------------------
 // -- Communication --
 // -------------------
 
-void Engine::sendBestMove(Move best, Move ponder) {
+void Engine::sendBestMove(Move best, bool eval, bool ponder) {
+    if (eval) std::cout << "eval " << bestEval << " ";
     std::cout << "bestmove " << best.uci();
-    if (!ponder.IsNull()) {
-        std::cout << " ponder " << ponder.uci();
-    }
+    if (ponder) std::cout << " ponder";
     std::cout << std::endl;
 
     game_board.MakeMove(best);

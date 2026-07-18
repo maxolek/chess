@@ -51,7 +51,9 @@ std::string PolyglotBook::pick_weighted_move(const std::vector<BookEntry> & move
 }
 
 std::string PolyglotBook::probeBestMove(uint64_t key) {
-    ScopedTimer timer(T_BOOK_PROBE);
+    #ifdef DEV
+        ScopedTimer timer(T_BOOK_PROBE);
+    #endif
     return pick_weighted_move(get_moves(key));
 }
 

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from .paths import GAME_JSON, SEARCH_JSON, TIMING_JSON, ROOT_MOVES_JSON, GAMES_LOG_DIR, LOG_DIRS, get_jsonl_paths
 from .utils import safe_val, safe, consolidate_instance_logs
-from .db import get_engine_id, clear_log_dir, extract_engine_id_from_search, probe_engine_metadata, save_engine_config
+from .db import get_engine_id, clear_log_dir, extract_engine_id_from_search, probe_engine_metadata, save_engine_config, register_engine
 
 def _iter_json_objects_from_path(path):
     with open(path, "r", encoding="utf-8") as f:
@@ -25,6 +25,44 @@ def _iter_json_objects_from_path(path):
 
             yield data
 
+def _count_jsonl_rows(path):
+    """Count non-empty lines in a JSONL file."""
+    with open(path) as f:
+        return sum(1 for line in f if line.strip())
+    
+def _prompt_register_engine(cnxn, version, sample_record):
+    """Ask the user whether to register a new, unrecognized engine version.
+
+    Uses fields from `sample_record` (the JSONL row that referenced this
+    version) to suggest what to register, rather than guessing a fake path.
+    """
+    print(f"\n[ACTION NEEDED] Engine version '{version}' is not registered.")
+    print(f"  Sample record: {sample_record}")
+
+    suggested_path = sample_record.get("engine_path")
+    if suggested_path:
+        print(f"  Found engine_path in log: {suggested_path}")
+
+    answer = input(f"Register engine '{version}'? [y/N]: ").strip().lower()
+    if answer != "y":
+        print(f"[INFO] Skipping engine '{version}' — not registered.")
+        return None
+
+    engine_path = suggested_path or input(f"  Enter engine_path for '{version}': ").strip()
+
+    register_engine(cnxn, {"engine_path": engine_path, "version": version})
+
+    row = cnxn.execute(
+        "SELECT id FROM engines WHERE version=?", (version,)
+    ).fetchone()
+
+    if row is None:
+        print(f"[ERROR] Registration failed for '{version}' — skipping.")
+        return None
+
+    print(f"[INFO] Registered '{version}' -> engine id {row[0]}")
+    return row[0]
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Top-level directory ingestion
@@ -39,6 +77,7 @@ def ingest_log_dir(cnxn, log_dir, clear=True):
     """Ingest all JSONL files from a given log directory."""
     paths = get_jsonl_paths(log_dir)
     game_map = {}
+    search_ok = False
 
     consolidate_instance_logs(log_dir)
 
@@ -48,18 +87,26 @@ def ingest_log_dir(cnxn, log_dir, clear=True):
         print(f"[INFO] No game log found: {paths['game']}")
 
     if paths["search"].is_file():
-        bulk_log_search_and_timing(
+        expected = _count_jsonl_rows(paths['search'])
+        counts = bulk_log_search_and_timing(
             cnxn,
             paths["search"],
             game_map,
             timing_path=paths["timing"] if paths["timing"].is_file() else None,
             root_moves_path=paths["root_moves"] if paths["root_moves"].is_file() else None
         )
+        accouted_for = counts['searches'] + counts['skipped']
+        search_ok = accouted_for == expected
+        if not search_ok:
+            print(
+                    f"[WARN] Search log row mismatch: {expected} rows in file, "
+                    f"only {accouted_for} inserted+skipped ({counts})"
+                )
     else:
         print(f"[INFO] No search log found: {paths['search']}")
 
     # clear only if searches+games
-    if clear and paths["search"].is_file() and paths["game"].is_file():
+    if clear and search_ok and paths["search"].is_file():
         clear_log_dir(log_dir)
 
 
@@ -117,245 +164,8 @@ def update_experiment(cnxn, experiment_id, info=None):
 # Single-row logging
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _int_option(options, key):
-    def _get_option(options, key):
-        # try variants to handle different naming conventions
-        candidates = [
-            key,
-            key.lower(),
-            key.upper(),
-            key.replace("_", " "),
-            key.replace("_", " ").lower(),
-            key.replace("_", " ").title(),
-        ]
-        for c in candidates:
-            if c in options:
-                return options[c]
-        return None
 
-    value = _get_option(options, key)
-    if value is None:
-        return None
-    raw = value.get("default")
-    if raw is None:
-        return None
-    try:
-        return int(raw)
-    except (TypeError, ValueError):
-        try:
-            return int(float(raw))
-        except Exception:
-            return None
-
-
-def _float_option(options, key):
-    def _get_option(options, key):
-        candidates = [
-            key,
-            key.lower(),
-            key.upper(),
-            key.replace("_", " "),
-            key.replace("_", " ").lower(),
-            key.replace("_", " ").title(),
-        ]
-        for c in candidates:
-            if c in options:
-                return options[c]
-        return None
-
-    value = _get_option(options, key)
-    if value is None:
-        return None
-    raw = value.get("default")
-    if raw is None:
-        return None
-    try:
-        return float(raw)
-    except (TypeError, ValueError):
-        return None
-
-
-def _float_option_scaled(options, key, scale=100):
-    v = _float_option(options, key)
-    if v is None:
-        return None
-    try:
-        return float(v) / scale
-    except Exception:
-        return None
-
-
-def _bool_option(options, key):
-    def _get_option(options, key):
-        candidates = [
-            key,
-            key.lower(),
-            key.upper(),
-            key.replace("_", " "),
-            key.replace("_", " ").lower(),
-            key.replace("_", " ").title(),
-        ]
-        for c in candidates:
-            if c in options:
-                return options[c]
-        return None
-
-    value = _get_option(options, key)
-    if value is None:
-        return None
-    raw = value.get("default")
-    if raw is None:
-        return None
-    if isinstance(raw, str):
-        return raw.lower() in {"1", "true", "yes", "on"}
-    return bool(raw)
-
-
-def register_engine(cnxn, engine):
-    """Register an engine and return its row ID.
-    
-    If an engine with the same version is already registered, returns its ID instead.
-    Prompts the user for a description if one is not provided
-    """
-    # First, extract version to check for duplicates
-    if engine.get("engine_path"):
-        engine_path = engine["engine_path"]
-        print(f"[ETL] Probing engine UCI at: {engine_path}")
-        engine_meta = probe_engine_metadata(engine_path)
-        options = engine_meta.get("options", {})
-        print(f"[ETL] Probed option keys: {list(options.keys())}")
-        version = engine.get("version") or engine_meta.get("version")
-        name = engine.get("name") or Path(engine_path).name.removesuffix('.exe')
-        #description = engine.get("description") or f"Auto-registered from {engine_path}"
-
-        # prompt user for description instead of auto-filling
-        if engine.get("description"): 
-            description = engine['description']
-        else:
-            print(f"\n[ETL] Registering new engine: {name} ({version})")
-            name        = input("  Enter a name for this engine version (or press Enter to skip): ").strip()
-            description = input("  Enter a description for this engine version (or press Enter to skip): ").strip()
-            if not description: 
-                description = f"Auto-registered from {engine_path}"
-
-        move_overhead_ms = _int_option(options, "Move Overhead")
-        max_threads = _int_option(options, "Threads")
-        hash_size_mb = _int_option(options, "Hash")
-        pondering = _bool_option(options, "Ponder")
-
-        delta_prune_threshold = _int_option(options, "DELTA_PRUNE_THRESHOLD")
-        see_prune_threshold = _int_option(options, "SEE_PRUNE_THRESHOLD")
-        aspiration_window = _int_option(options, "ASPIRATION_WINDOW")
-        aspiration_start_depth = _int_option(options, "ASPIRATION_START_DEPTH")
-        aspiration_depth_scale = _int_option(options, "ASPIRATION_DEPTH_SCALE")
-        aspiration_research_scale = _float_option(options, "ASPIRATION_RESEARCH_SCALE")
-        draw_eval = _int_option(options, "DRAW_EVAL")
-        contempt = _int_option(options, "CONTEMPT")
-        r_nmp = _int_option(options, "R_NMP")
-        r_lmr_const = _float_option_scaled(options, "R_LMR_CONST", 100)
-        r_lmr_denom = _float_option_scaled(options, "R_LMR_DENOM", 100)
-        lmr_move_order_threshold = _int_option(options, "LMR_MOVE_ORDER_THRESHOLD")
-        lmr_depth_threshold = _int_option(options, "LMR_DEPTH_THRESHOLD")
-
-        # diagnostics: report any missing mapped values
-        mapped = {
-            'delta_prune_threshold': delta_prune_threshold,
-            'see_prune_threshold': see_prune_threshold,
-            'aspiration_window': aspiration_window,
-            'aspiration_start_depth': aspiration_start_depth,
-            'aspiration_depth_scale': aspiration_depth_scale,
-            'aspiration_research_scale': aspiration_research_scale,
-            'draw_eval': draw_eval,
-            'contempt': contempt,
-            'r_nmp': r_nmp,
-            'r_lmr_const': r_lmr_const,
-            'r_lmr_denom': r_lmr_denom,
-            'lmr_move_order_threshold': lmr_move_order_threshold,
-            'lmr_depth_threshold': lmr_depth_threshold,
-        }
-        missing = [k for k, v in mapped.items() if v is None]
-        if missing:
-            print(f"[ETL][WARN] The following mapped engine params were not found or parsed: {missing}")
-
-        if version:
-            print(f"[ETL] Saving engine config as: {version}")
-            save_engine_config(engine_path, version)
-        else:
-            print(f"[WARN] Engine version not found; skipping save_config for {engine_path}")
-    else:
-        version = engine.get("version")
-        name = engine.get("name")
-        description = engine.get("description")
-        move_overhead_ms = engine.get("move_overhead_ms")
-        max_threads = engine.get("max_threads")
-        hash_size_mb = engine.get("hash_size_mb")
-        pondering = engine.get("pondering")
-        delta_prune_threshold = engine.get("delta_prune_threshold")
-        see_prune_threshold = engine.get("see_prune_threshold")
-        aspiration_window = engine.get("aspiration_window")
-        aspiration_start_depth = engine.get("aspiration_start_depth")
-        aspiration_depth_scale = engine.get("aspiration_depth_scale")
-        aspiration_research_scale = engine.get("aspiration_research_scale")
-        draw_eval = engine.get("draw_eval")
-        contempt = engine.get("contempt")
-        r_nmp = engine.get("r_nmp")
-        r_lmr_const = engine.get("r_lmr_const")
-        r_lmr_denom = engine.get("r_lmr_denom")
-        lmr_move_order_threshold = engine.get("lmr_move_order_threshold")
-        lmr_depth_threshold = engine.get("lmr_depth_threshold")
-
-    # Check if engine with this version already exists
-    if version:
-        existing_id = get_engine_id(cnxn, version=version)
-        if existing_id is not None:
-            print(f"[ETL] Engine {name} ({version}) already registered with ID {existing_id}")
-            return existing_id
-
-    cur = cnxn.execute(
-        """
-        INSERT INTO engines (
-            name, version, description, compile_flags,
-            move_overhead_ms, max_threads, hash_size_mb, pondering,
-            delta_prune_threshold, see_prune_threshold,
-            aspiration_window, aspiration_start_depth, aspiration_depth_scale,
-            aspiration_research_scale, draw_eval, contempt,
-            r_nmp, r_lmr_const, r_lmr_denom,
-            lmr_move_order_threshold, lmr_depth_threshold
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            name,
-            version,
-            description,
-            engine.get("compile_flags"),
-            # uci engine options
-            move_overhead_ms,
-            max_threads,
-            hash_size_mb,
-            pondering,
-            # search params
-            delta_prune_threshold,
-            see_prune_threshold,
-            aspiration_window,
-            aspiration_start_depth,
-            aspiration_depth_scale,
-            aspiration_research_scale,
-            draw_eval,
-            contempt,
-            r_nmp,
-            r_lmr_const,
-            r_lmr_denom,
-            lmr_move_order_threshold,
-            lmr_depth_threshold
-        )
-    )
-    cnxn.commit()
-    print(f"[ETL] Registered engine {name} ({version})")
-    return cur.lastrowid
-
-
-def log_perft(cnxn, perft_info):
+def log_perft(cnxn, perft_info) -> int:
     """Log a perft result and return its row ID."""
     cur = cnxn.execute(
         """
@@ -377,7 +187,7 @@ def log_perft(cnxn, perft_info):
     cnxn.commit()
     return cur.lastrowid
 
-def log_engine_ratings(cnxn, engine_id, ratings):
+def log_engine_ratings(cnxn, engine_id, ratings) -> int:
     """Log engine elo ratings by time control category
     
     ratings: dict with keys like 'bullet', 'blitz', 'rapid', 'classical'
@@ -432,7 +242,7 @@ def log_engine_ratings(cnxn, engine_id, ratings):
     cnxn.commit()
     return cur.lastrowid
 
-def log_sprt(cnxn, experiment_id, candidate_engine_id, baseline_engine_id, **kwargs):
+def log_sprt(cnxn, experiment_id, candidate_engine_id, baseline_engine_id, **kwargs) -> int:
     """Log an SPRT experiment result and return its row ID."""
     cur = cnxn.execute(
         """
@@ -485,7 +295,7 @@ def log_sprt(cnxn, experiment_id, candidate_engine_id, baseline_engine_id, **kwa
 # Bulk logging
 # ─────────────────────────────────────────────────────────────────────────────
 
-def bulk_log_sts(cnxn, path, sts_id, **kwargs):
+def bulk_log_sts(cnxn, path, sts_id, **kwargs) -> None:
     """Bulk-load STS results from a JSONL file."""
     rows = []
 
@@ -534,7 +344,7 @@ def bulk_log_sts(cnxn, path, sts_id, **kwargs):
     cnxn.commit()
 
 
-def bulk_log_game(cnxn, path, experiment_id=None, second_engine_id=None):
+def bulk_log_game(cnxn, path, experiment_id=None, second_engine_id=None) -> dict:
     """
     Bulk-load games from a JSONL file. Returns {game_uuid: game_id} mapping.
     
@@ -633,7 +443,7 @@ def bulk_log_search_and_timing(
     timing_path=None,
     root_moves_path=None,
     sts_id=None
-):
+) -> dict:
     """Bulk-load searches, per-depth iterations, tree stats, and timing from JSONL.
 
     Supports search logs that mix multiple engines: each record's engine is
@@ -650,6 +460,7 @@ def bulk_log_search_and_timing(
 
     # version_string -> db_engine_id, avoids re-querying the DB for every row
     engine_id_cache = {}
+    KNOWN_SKIP_VERSIONS = ['dev','DEV','Dev','debug','DEBUG','Debug','tomahawk','Tomahawk']
 
     def resolve_engine_id(data):
         """Return the DB engine_id (int) for a single record (or None if unresolved)."""
@@ -667,8 +478,21 @@ def bulk_log_search_and_timing(
 
         if version in engine_id_cache:
             return engine_id_cache[version]
+        
+        if version in KNOWN_SKIP_VERSIONS:
+            engine_id_cache[version] = None 
+            return None
+        
+        # Check DB directly 
+        row = cnxn.execute(
+            "SELECT id FROM engines WHERE version=?", (version,)
+        ).fetchone()
 
-        resolved = get_engine_id(cnxn, version)
+        if row is not None:
+            engine_id_cache[version] = row[0]
+            return row[0]
+
+        resolved = _prompt_register_engine(cnxn, version, data)
         engine_id_cache[version] = resolved 
         return resolved
 
@@ -676,7 +500,7 @@ def bulk_log_search_and_timing(
     for data in _iter_json_objects_from_path(search_path):
 
         row_engine_id = resolve_engine_id(data) 
-        if row_engine_id is None: 
+        if row_engine_id in ['dev','test','tomahawk','DEV','TEST','DEBUG','debug','TOMAHAWK',None]: 
             skipped_uuids.add(data.get('search_uuid'))
             continue # unresolved / dev / test
 
@@ -716,7 +540,7 @@ def bulk_log_search_and_timing(
             data.get("see_prunes"),
             data.get("delta_prunes"),
             data.get("nmp"),
-            data.get("nmp_fail"),
+            data.get("nmp_failhigh"),
             data.get("tt_overwritten"),
             data["search_uuid"],   # temp key: uuid mapping
             #engine_version,        # temp key: dev/test filtering
@@ -735,7 +559,7 @@ def bulk_log_search_and_timing(
             principal_variation, nodes, qnodes, tt_stores, tt_hits, tt_fill,
             fail_highs, fail_lows, fail_high_researches, fail_low_researches,
             fh_index_0, fh_index_1, fh_index_2, fh_index_3, fh_index_4to7, fh_index_8plus,
-            see_prunes, delta_prunes, nmp, nmp_fail, tt_overwritten
+            see_prunes, delta_prunes, nmp, nmp_failhigh, tt_overwritten
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
@@ -790,7 +614,7 @@ def bulk_log_search_and_timing(
                 safe(data.get("itdepth_delta_prunes", []), d),
                 safe(data.get("itdepth_pvs_researches", []), d),
                 safe(data.get("itdepth_nmp", []), d),
-                safe(data.get("itdepth_nmp_fail", []), d),
+                safe(data.get("itdepth_nmp_failhigh", []), d),
             ))
 
     cursor.executemany(
@@ -802,7 +626,7 @@ def bulk_log_search_and_timing(
             fail_high_researches, fail_low_researches,
             fh_index_0, fh_index_1, fh_index_2, fh_index_3, fh_index_4to7, fh_index_8plus,
             see_prunes, delta_prunes,
-            pvs_researches, nmp, nmp_fail
+            pvs_researches, nmp, nmp_failhigh
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
@@ -839,7 +663,7 @@ def bulk_log_search_and_timing(
                 safe(data.get("treedepth_delta_prunes", []), d),
                 safe(data.get("treedepth_pvs_researches", []), d),
                 safe(data.get("treedepth_nmp", []), d),
-                safe(data.get("treedepth_nmp_fail", []), d),
+                safe(data.get("treedepth_nmp_failhigh", []), d),
             ))
 
     cursor.executemany(
@@ -849,7 +673,7 @@ def bulk_log_search_and_timing(
             nodes, qnodes, tt_stores, tt_hits, fail_highs, fail_lows,
             fh_index_0, fh_index_1, fh_index_2, fh_index_3, fh_index_4to7, fh_index_8plus,
             see_prunes, delta_prunes,
-            pvs_researches, nmp, nmp_fail
+            pvs_researches, nmp, nmp_failhigh
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
@@ -917,10 +741,22 @@ def bulk_log_search_and_timing(
         )
 
     cnxn.commit()
+
+    counts = {
+        "searches": len(searches_rows),
+        "depth_rows": len(depth_rows),
+        "ply_rows": len(ply_rows),
+        "timing_rows": len(timing_rows),
+        "root_moves_rows": len(root_moves_rows),
+        "skipped": len(skipped_uuids),
+    }
+
     print(
-        f"[INFO] Inserted {len(searches_rows)} searches, "
-        f"{len(depth_rows), len(ply_rows)} depth rows, "
-        f"{len(timing_rows)} timing rows, "
-        f"{len(root_moves_rows)} root move rows. "
-        f"Skipped {len(skipped_uuids)} records with unresolved/dev/test engines. "
+        f"[INFO] Inserted {counts['searches']} searches, "
+        f"{counts['depth_rows']} depth rows, {counts['ply_rows']} ply rows, "
+        f"{counts['timing_rows']} timing rows, "
+        f"{counts['root_moves_rows']} root move rows. "
+        f"Skipped {counts['skipped']} records with unresolved/dev/test engines."
     )
+
+    return counts

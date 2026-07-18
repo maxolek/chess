@@ -8,8 +8,8 @@ import sqlite3
 import argparse
 
 from .paths import RAW_DB
-from .db import get_db
-from .ingest import register_engine, log_games_directory, ingest_log_dir
+from .db import get_db, register_engine
+from .ingest import log_games_directory, ingest_log_dir
 
 
 def main():

@@ -66,7 +66,9 @@ public:
 
     // Probe TT for a given key
     inline TTEntry* probe(U64 key) {
-        ScopedTimer timer(T_TT_PROBE);
+        #ifdef DEV
+            ScopedTimer timer(T_TT_PROBE);
+        #endif
         TTEntry* entry = &table[key & (entriesCount - 1)];
 
         if (entry->key == key && key != 0)
@@ -78,7 +80,9 @@ public:
     // Store an entry
     inline void store(U64 key, int depth, int ply, int score,
                       BoundType flag, Move bestMove) {
-        ScopedTimer timer(T_TT_STORE);
+        #ifdef DEV
+            ScopedTimer timer(T_TT_STORE);
+        #endif
         TTEntry* entry = probe(key);
         
         bool wasEmpty   = (entry->key == 0);
@@ -100,7 +104,9 @@ public:
             entry->age++;
 
             //stats.totalStores++;
-            STATS_TT_STORE(depth+ply, ply);
+            #ifdef DEV
+                STATS_TT_STORE(depth+ply, ply);
+            #endif
         }
     }
 

@@ -71,7 +71,7 @@ struct ScopedTimer {
     bool active;
 
     FORCEINLINE ScopedTimer(TimerID tid) 
-        : id(tid), active(Logging::track_timers) { if (active) t.begin(); }
+        : id(tid) { t.begin(); }
 
     FORCEINLINE ~ScopedTimer() {
         if (!active) return;

@@ -34,6 +34,8 @@ system = platform.system()
 TESTS_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = TESTS_DIR.parent
 ENGINES_DIR = PROJECT_ROOT / "engines"
+ENGINES_DEV_DIR = ENGINES_DIR / "dev"
+ENGINES_PROD_DIR = ENGINES_DIR / "prod"
 LOGS_DIR = PROJECT_ROOT / "logs"
 TOURNAMENT_LOG_DIR = LOGS_DIR / "tournament_logs"
 
@@ -51,31 +53,38 @@ TC_DEFAULTS = {
 ANCHOR_ELO = 1500.0
 RATING_FLOOR = 100.0
 
-def get_all_engines(cnxn, n=3):
+def get_all_engines(cnxn, n=3, first=False):
     """Get last n=3 engine versions ++ first version and their exe paths from the DB."""
+    first_engine_str = """,
+        first_engine AS (                                              -- this is okay since n-1 + first_engine ==> n engines total as desired
+            SELECT id, version FROM engines ORDER BY id ASC LIMIT 1
+        )
+    """
+
     rows = cnxn.execute(
         f"""
         WITH last_n AS (
             SELECT id, version FROM engines ORDER BY id DESC LIMIT {n} -- n --> n-1 due to candidate inclusion and later filtered out
-        ),
-        first_engine AS (                                              -- this is okay since n-1 + first_engine ==> n engines total as desired
-            SELECT id, version FROM engines ORDER BY id ASC LIMIT 1
-        )
-
+        ){first_engine_str if first else ""}
         SELECT id, version FROM last_n
         UNION
         SELECT id, version FROM first_engine
         """
     ).fetchall()
+
     engines = []
     for row in rows:
         engine_id, version = row[0], row[1]
         # Try common exe naming patterns
-        exe_path = ENGINES_DIR / f"{version}.exe"
+        exe_path = ENGINES_PROD_DIR / f"{version}.exe"
+
         if not exe_path.exists():
-            exe_path = ENGINES_DIR / version
+            exe_path = ENGINES_DEV_DIR / f"{version}.exe"
             if not exe_path.exists():
                 continue
+            else:
+                print(f" [TOURNAMENT] Using DEV version of {version} instead (Prod not found)")
+            
         engines.append({"id": engine_id, "version": version, "path": str(exe_path)})
     return engines
 
@@ -100,7 +109,7 @@ def get_engines_by_names(cnxn, names):
     if missing:
         print(f"[TOURNAMENT] WARNING: requested engine(s) not found in DB: {missing}")
         for _ in missing:
-            engine_filepath = f"engines/{_}.exe"
+            engine_filepath = f"engines/dev/{_}.exe"
             print(f"[TOURNAMENT] Engine {_} not registered, registering now...")
             
             _id = etl.register_engine(cnxn, {"engine_path": engine_filepath})
@@ -110,12 +119,16 @@ def get_engines_by_names(cnxn, names):
     engines = []
     for row in rows:
         engine_id, version = row[0], row[1]
-        exe_path = ENGINES_DIR / f"{version}.exe"
+        exe_path = ENGINES_PROD_DIR / f"{version}.exe"
+        
         if not exe_path.exists():
-            exe_path = ENGINES_DIR / version
+            exe_path = ENGINES_DEV_DIR / f"{version}.exe"
             if not exe_path.exists():
                 print(f"[TOURNAMENT] WARNING: exe not found for engine version={version}")
                 continue
+            else:
+                print(f" [TOURNAMENT] Using DEV version of {version} instead (Prod not found)")
+            
         engines.append({"id": engine_id, "version": version, "path": str(exe_path)})
     return engines
 
@@ -361,11 +374,6 @@ def run_cutechess_tournament(candidate_path, opponents, tc, games_per_pair, cute
         cutechess_cli,
     ] + engine_blocks + [
         "-each", "proto=uci", f"tc={tc}",
-        f"option.log_dir={TOURNAMENT_LOG_DIR}",
-        "option.stats_logging=true",
-        "option.timer_logging=true",
-        "option.game_logging=true",
-        "option.root_moves_logging=true",
         "-tournament", "round-robin",
         "-games", str(games_per_pair),
         "-repeat",
@@ -448,7 +456,7 @@ def run_tournament(args, cnxn, engine_id):
 
     if len(listed_opponents) == 0:
         # Get all other engines from DB
-        all_engines = get_all_engines(cnxn, n_engines)
+        all_engines = get_all_engines(cnxn, n_engines, args.first_engine)
         # Exclude the candidate itself
         opponents = [e for e in all_engines if e["id"] != engine_id]
     else:
@@ -645,13 +653,14 @@ def run_tournament(args, cnxn, engine_id):
 
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description="Round-robin tournament runner")
     parser.add_argument("--engine", required=True, help="Candidate engine path")
     parser.add_argument("--opps", nargs="+", default=[],
                         help="Explicit list of opponent engine version names "
                              "(e.g. --opps 1.0 0.9.3). Overrides --n_engines auto-selection.")
     parser.add_argument("--n_engines", default=3, help="Number of last versions in tournament")
+    parser.add_argument("--first_engine", action="store_true", help="Whether to include the first ever PROD engine on top of n_engines")
     parser.add_argument("--tc", nargs="+", default=["blitz"],
                         help="Time controls to run. Accepts category names "
                              "(ultra_fast, bullet, blitz, rapid, classical), which "
@@ -664,7 +673,12 @@ def main():
     parser.add_argument("--cutechess-cli",
                         default=r"C:\Program Files (x86)\Cute Chess\cutechess-cli.exe")
  
-    args = parser.parse_args()
+    # Accept a pre-built Namespace (programmatic callers like release.py)
+    # as well as a raw argv list / sys.argv (CLI callers).
+    if isinstance(argv, argparse.Namespace):
+        args = argv
+    else:
+        args = parser.parse_args(argv)
  
     # Validate --tc entries up front: either a known category name, or a
     # parseable explicit tc string (e.g. "15+0.15", "1:00+0.6").
