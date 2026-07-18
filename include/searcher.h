@@ -29,7 +29,7 @@ struct SearchParams {
     int   DRAW_EVAL              = 0;
     int   CONTEMPT               = 0;
     // reductions
-    int   R_IID                  = 0.5f;     // internal iterative deepening (float = divide, int = subtract)
+    //int   R_IID                  = 0.5f;     // internal iterative deepening (float = divide, int = subtract)
     int   IID_DEPTH_THRESHOLD    = 6;       // iid start depth (>=6  is standard)
     int   R_NMP                  = 3;      // null-move pruning
     float R_LMR_CONST            = 0.99f;  // late move reductions 

@@ -133,12 +133,12 @@ void Engine::setOption(const std::string& name, const std::string& value) {
         std::cout << "info string set lmr_depth_threshold = " << searcher->params.LMR_DEPTH_THRESHOLD << std::endl;
     }
     else if (name == "r_lmr_const") {
-        searcher->params.R_LMR_CONST = std::stoi(value);
-        std::cout << "info string set r_lmr_const = " << searcher->params.R_LMR_CONST << std::endl;
+        searcher->params.R_LMR_CONST = std::stof(value)/100.000;
+        std::cout << "info string set r_lmr_const = " << static_cast<int>(100*searcher->params.R_LMR_CONST) << std::endl;
     }
     else if (name == "r_lmr_denom") {
-        searcher->params.R_LMR_DENOM = std::stoi(value);
-        std::cout << "info string set r_lmr_denom = " << searcher->params.R_LMR_DENOM << std::endl;
+        searcher->params.R_LMR_DENOM = std::stof(value)/100.000;
+        std::cout << "info string set r_lmr_denom = " << static_cast<int>(100*searcher->params.R_LMR_DENOM) << std::endl;
     }
 
     // -------- books / paths --------
