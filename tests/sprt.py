@@ -344,17 +344,17 @@ class LivePlotter:
         self.ax_elo.set_title('ELO')
         self.ax_elo.set_xlabel('Games')
         self.ax_elo.set_ylabel('Elo')
-        self.ax_elo.axhline(0, color='grey', linestyle='-', alpha=0.3)
+        self.ax_elo.axhline(0, color='grey', linestyle=':', alpha=0.3)
         self.ax_elo.axhline(self.elo0, color='red', linestyle=':', alpha=0.5, label=f'elo0={self.elo0}')
         self.ax_elo.axhline(self.elo1, color='green', linestyle=':', alpha=0.5, label=f'elo1={self.elo1}')
         # BayesElo 
         self.line_bayes_elo, = self.ax_elo.plot([], [], color='blue', linewidth=1.0, label='BayesElo')
         self.fill_bayes_elo = None
         # normalized
-        self.line_nelo, = self.ax_elo.plot([], [], color='purple', linewidth=1.0, linestyle='--', alpha=1.0,label='Normalized (nElo)')
+        self.line_nelo, = self.ax_elo.plot([], [], color='purple', linewidth=1.0, alpha=1.0,label='Normalized (nElo)')
         self.fill_nelo = None
         # naive
-        self.line_elo, = self.ax_elo.plot([], [], color='orange', linewidth=1.0, linestyle=':', alpha=1.0, label='Logistic (Elo)')
+        self.line_elo, = self.ax_elo.plot([], [], color='orange', linewidth=1.0, alpha=1.0, label='Logistic (Elo)')
         self.fill_elo = None
         self.ax_elo.legend(loc='upper left', fontsize=7)
         self.ax_elo.set_ylim(-100,100)
@@ -366,8 +366,8 @@ class LivePlotter:
         self.ax_score.axhline(0.5,  color='grey', linestyle='-', alpha=0.3)
         self.s0 = elo_to_score(elo0)
         self.s1 = elo_to_score(elo1)
-        self.ax_score.axhline(s0, color='red', linestyle=':', alpha=0.5, label=f"s(elo0)={s0:.3f}")
-        self.ax_score.axhline(s1, color='green', linestyle=':', alpha=0.5, label=f"s(elo1)={s1:.3f}")
+        self.ax_score.axhline(self.s0, color='red', linestyle=':', alpha=0.5, label=f"s(elo0)={s0:.3f}")
+        self.ax_score.axhline(self.s1, color='green', linestyle=':', alpha=0.5, label=f"s(elo1)={s1:.3f}")
         self.ax_score.legend(loc='upper left', fontsize=7)
         self.line_score, = self.ax_score.plot([], [], 'b-', linewidth=1.5)
         self.ax_score.set_ylim(.3, .7)
