@@ -348,7 +348,7 @@ class LivePlotter:
         self.ax_elo.axhline(self.elo0, color='red', linestyle=':', alpha=0.5, label=f'elo0={self.elo0}')
         self.ax_elo.axhline(self.elo1, color='green', linestyle=':', alpha=0.5, label=f'elo1={self.elo1}')
         # BayesElo 
-        self.line_bayes_elo, = self.ax_elo.plot([], [], color='blue', linewidth=1.0, label='BayesElo')
+        self.line_bayes_elo, = self.ax_elo.plot([], [], color='blue', linewidth=1.5, label='BayesElo')
         self.fill_bayes_elo = None
         # normalized
         self.line_nelo, = self.ax_elo.plot([], [], color='purple', linewidth=1.0, alpha=1.0,label='Normalized (nElo)')
@@ -469,13 +469,13 @@ class LivePlotter:
             self.fill_bayes_elo.remove()
             self.fill_nelo.remove()
         self.fill_elo = self.ax_elo.fill_between(
-            self.games, self.elo_lo_series, self.elo_hi_series, alpha=0.4, color='blue'
+            self.games, self.elo_lo_series, self.elo_hi_series, alpha=0.4, color='orange'
         )
         self.fill_nelo = self.ax_elo.fill_between(
             self.games, self.normalized_elo_lo_series, self.normalized_elo_hi_series, alpha=0.2, color='purple'
         )
         self.fill_bayes_elo = self.ax_elo.fill_between(
-            self.games, self.bayes_elo_lo_series, self.bayes_elo_hi_series, alpha=0.2, color='orange'
+            self.games, self.bayes_elo_lo_series, self.bayes_elo_hi_series, alpha=0.2, color='blue', edgecolor='black'
         )
         self.ax_elo.relim()
         self.ax_elo.autoscale_view()
@@ -533,7 +533,7 @@ class LivePlotter:
             s_min = min(score_tail)
             s_max = max(score_tail)
         else:
-            cut = 2 * n // 3
+            cut = n // 5 # cut out noise start (0<->1 oscillations)
             s_min = min(score_tail[cut:])
             s_max = max(score_tail[cut:])
         s_pad = max(0.02, (s_max - s_min) * 0.5)
