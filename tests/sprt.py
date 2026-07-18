@@ -934,8 +934,8 @@ def main(args=None):
         book_block.append(f"format={os.path.splitext(args.book)[1][1:]}")
         book_block.append("order=random")
         book_block.append(f"plies={args.book_depth}")
-        book_block.append("-srand")
-        book_block.append("42")
+        #book_block.append("-srand")
+        #book_block.append("42")
 
     cmd = [
         args.cutechess_cli,
