@@ -532,6 +532,13 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
     int eval;
     int ply = 0; // root moves are depth=0, ply+1 in arg call makes made moves depth=1
     SearchResult result;
+    int _lmr_R = 0;
+
+    // current board state info
+    bool in_check = board.is_in_check;
+    bool is_pawn_endgame = board.pawn_endgame;
+    bool was_capture = board.currentGameState.capturedPieceType != -1;
+    bool is_capture;
 
     // --- aspiration search ---
     
@@ -575,10 +582,31 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
   
             PV childPV; PV emptyPV; // must be declared per root_move
 
+            // --- LMR ---
+            is_capture = board.getCapturedPiece(m.TargetSquare()) != -1;
+
+            if (
+                // positional conditions apply
+                !is_capture
+                && !m.IsPromotion()
+                && !in_check
+            ) {
+                // obsidian log formula
+                _lmr_R = R_lmr(depth, i);
+            } else {
+                _lmr_R = 0;
+            }
+            
+            eval = -negamax(depth - 1 - _lmr_R, -beta, -alpha, childPV, previousPV, limits, ply + 1, true);
+            if (_lmr_R > 0 && eval > alpha) { // research at full depth if move raises alpha
+                childPV = {};   // don't let the reduced-search line leak into the full-depth result
+                eval = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply+1, true);
+            }
+
             // --- PVS ---
 
             //if (i == 0) {
-                eval = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply+1, true);
+            //    eval = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply+1, true);
             //} else {
                 // null-window
             //    eval = -negamax(depth - 1, -(alpha+1), -alpha, emptyPV, previousPV, limits, ply+1, true);
