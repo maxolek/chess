@@ -636,8 +636,9 @@ def parse_args():
     return p.parse_args()
 
 
-def main():
-    args = parse_args()
+def main(args=None):
+    if args is None:
+        args = parse_args()
 
     # Select parameters to tune
     if args.params:
@@ -1000,6 +1001,8 @@ def main():
 
     if plotter:
         plotter.finalize()
+
+    return final_checkpoint["final_values"]
 
 
 if __name__ == "__main__":

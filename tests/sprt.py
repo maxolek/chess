@@ -838,6 +838,7 @@ def parse_args():
     # Engines
     p.add_argument("--engine-a", required=True, help="Candidate engine path")
     p.add_argument("--engine-b", required=True, help="Baseline engine path")
+    p.add_argument("--params", type=dict, help="Dictionary of parameter and their values to test against the current version of the engine")
 
     # cutechess
     p.add_argument(
@@ -913,6 +914,10 @@ def main(args=None):
         f"option.log_dir={args.logroot}",
         f"option.uci_logging=true",
     ]
+    for name, value in getattr(args, "params", {}): # add tuning result param values
+        log_a_block.append(
+            f"option.{name}={value}"
+        )
     log_b_block = [
         f"option.log_dir={args.logroot}",
         f"option.uci_logging={"true" if should_log else "false"}",
@@ -1075,6 +1080,12 @@ def main(args=None):
     upload_logs(args, cute_chess_stats=stats, runtime=run_time)
 
     print("[SPRT] Completed successfully")
+
+    return {
+        "accepted": stats['result'] == "pass",
+        "elo": stats['elo_diff'],
+        "games": stats['games_played']
+    }
 
 
 if __name__ == "__main__":

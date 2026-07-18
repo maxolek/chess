@@ -12,6 +12,7 @@ import platform
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from data import etl
 from . import perft, sprt, sts, tournament
+from ..tools import spsa_tuner
 
 system = platform.system()
 
@@ -120,10 +121,72 @@ def run_sprt(args):
         plot=True
     )
 
-    sprt.main(sprt_args)
+    return sprt.main(sprt_args)
+
+
+def run_sprt_gate(args, tc, params=None):
+    print("\n============================")
+    print(f"[SPRT] Gate TC: {tc}")
+    print("============================\n")
+
+    gate_args = argparse.Namespace(
+        engine_a=args.prod_engine,
+        engine_b=args.base_engine,
+
+        concurrency=args.concurrency,
+
+        depth=args.sprt_depth,
+        time=args.sprt_time,
+        tc=tc,
+
+        elo0=args.elo0,
+        elo1=args.elo1,
+        alpha=args.alpha,
+        beta=args.beta,
+
+        max_games=args.sprt_games,
+
+        book=args.opening_book,
+        book_depth=args.sprt_book_depth,
+
+        logroot=SPRT_LOG_DIR,
+        cutechess_cli=args.cutechess_cli,
+
+        log=True,
+        plot=True,
+
+        params=params or {}
+    )
+
+    return sprt.main(gate_args)
+
+def run_gated_sprt(args, params=None):
+
+    print("\n################################")
+    print("# SPRT GATING START")
+    print("################################\n")
+
+
+    for i, tc in enumerate(args.sprt_gates):
+        print(f"================================")
+        print(f"SPRT GATE {i+1}/{len(args.sprt_gates)}")
+        print(f"TC: {tc}")
+        print(f"================================")
+
+        result = run_sprt_gate(args, tc, params)
+        if not result["accepted"]:
+            print(
+                f"[SPRT] ❌ Failed gate {tc}. "
+                "Candidate rejected."
+            )
+            return False
+        print( f"[SPRT] ✅ Passed gate {tc}")
+
+    print("[SPRT] 🎉 Candidate passed all gates")
+    return True
 
 # ============================================================
-# SPRT
+# TOURNAMENT
 # ============================================================
 
 def run_tournament(args):
@@ -176,6 +239,25 @@ def run_perft(args):
     perft.main(perft_args)
 
 # ============================================================
+# TUNING
+# ============================================================
+
+def run_tune(args):
+    print("[TUNING] Running SPSA")   
+
+    tune_args = argparse.Namespace(
+        engine=args.dev_engine,
+        baseline=args.dev_engine, 
+        tc="0:20+.2",
+        iterations="5000",
+        games_per_iter=4,
+        concurrency=4,
+        plot=True,
+    )
+
+    return spsa_tuner.main(tune_args)
+
+# ============================================================
 # Main
 # ============================================================
 
@@ -202,6 +284,22 @@ def main():
     parser.add_argument("--sprt_games", type=int, default=1000)
     parser.add_argument("--opening_book", default=os.path.join(BIN_DIR, "opening_books", "8moves_v3.pgn"))
     parser.add_argument("--sprt_book_depth", type=int, default=8)
+    # SPRT gates
+    parser.add_argument(
+        "--sprt_gate",
+        action="store_true",
+        help="Run multi-stage SPRT gating"
+    )
+
+    parser.add_argument(
+        "--sprt_gates",
+        nargs="+",
+        default=[
+            "10+.1",
+            "60+.6"
+        ],
+        help="SPRT gate time controls"
+    )
 
     # STS
     parser.add_argument("--sts_files", nargs="+")
@@ -213,7 +311,7 @@ def main():
     parser.add_argument("--perft_positions", default=os.path.join(BIN_DIR, "test_positions", "perft.epd"))
     parser.add_argument("--perft_depth", type=int, default=5)
 
-    # Tournament (Elo rating)
+    # TOURNAMENT (Elo rating)
     parser.add_argument("--tournament", action="store_true", help="Run rating tournament against all engines in DB")
     parser.add_argument("--tournament_tc", nargs="+", default=["blitz"],
                         choices=["ultra_fast", "bullet", "blitz", "rapid", "classical"],
@@ -222,6 +320,9 @@ def main():
                         help="Games per opponent per time control")
     parser.add_argument("--tournament_engines", type=int, default=1,
                         help="# Engines (1st version + n-1 latest version) to play against")
+
+    # TUNING
+    parser.add_argument("--tune", action="store_true", help="Run SPSA tuning on search parameters after release. Re-run SPRT to see if improvement.")
 
     args = parser.parse_args()
 
@@ -299,10 +400,21 @@ def main():
 
     print('\n============================\n')
 
-    if (args.perft):        run_perft(args)
-    if (args.sprt):         run_sprt(args)
-    if (args.sts_files):    run_sts(args)
-    if (args.tournament):   run_tournament(args)
+    if (args.perft):        run_perft(args)         # prod
+    if (args.sprt):                                 # prod   
+        if args.sprt_gate:
+            passed = run_gated_sprt(args)
+            if not passed: 
+                print("[PIPELINE] Release aborted")
+                return 
+        else:
+            run_sprt(args)
+    if (args.sts_files):    run_sts(args)           # dev
+    if (args.tournament):   run_tournament(args)    # dev
+    if (args.tune):                                 # dev
+        new_params = run_tune(args)
+        passed = run_gated_sprt(args, new_params)
+        if not passed: print("[PIPELINE] Tuning failed to prove improvement over release (which showed improvement over prior version).")
 
     print(f"[PIPELINE] ✅ release complete")
     print(f"[PIPELINE]     dev:   {dev_exe}")
