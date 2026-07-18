@@ -122,7 +122,7 @@ def get_engines_by_names(cnxn, names):
         exe_path = ENGINES_PROD_DIR / f"{version}.exe"
         
         if not exe_path.exists():
-            exe_path = ENGINES_DEV_DIR / version
+            exe_path = ENGINES_DEV_DIR / f"{version}.exe"
             if not exe_path.exists():
                 print(f"[TOURNAMENT] WARNING: exe not found for engine version={version}")
                 continue
@@ -374,11 +374,6 @@ def run_cutechess_tournament(candidate_path, opponents, tc, games_per_pair, cute
         cutechess_cli,
     ] + engine_blocks + [
         "-each", "proto=uci", f"tc={tc}",
-        f"option.log_dir={TOURNAMENT_LOG_DIR}",
-        "option.stats_logging=true",
-        "option.timer_logging=true",
-        "option.game_logging=true",
-        "option.root_moves_logging=true",
         "-tournament", "round-robin",
         "-games", str(games_per_pair),
         "-repeat",
