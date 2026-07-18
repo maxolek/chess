@@ -7,10 +7,11 @@
 #include <cstdint>
 
 struct RootMove {
-    Move move;
-    int eval;
+    Move move = Move::NullMove();
+    int eval = -INF;
     int64_t time_ms = 0;
     uint64_t nodes = 0;
+    bool exact = false; // true only if this came from a full-window (or fail-high full window re-)search
 };
 
 struct PV {

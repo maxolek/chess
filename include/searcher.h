@@ -78,11 +78,9 @@ public:
     MoveScores move_scores;
 
     // iteration-local eval table
-    static constexpr int INVALID = MATE_SCORE + 10000;
-    int last_eval_table[1 << 16];   // keyed by Move.Value()
-    // book keeping
-    void store_last_result(const SearchResult& res);
-    int get_prev_eval(Move m) const;
+    int node_count_table[1 << 16];   // keyed by Move.Value()
+    void store_last_node_counts(const SearchResult& res); // fill node_count_table
+    int get_node_count(Move m) const; // retrieve from table
 
     bool stop = false;
 
@@ -109,7 +107,7 @@ public:
     );
     
     SearchResult search(
-        Move potential_moves[MAX_MOVES],
+        RootMove root_moves[MAX_MOVES],
         int move_count,
         int depth,
         SearchLimits& limits,

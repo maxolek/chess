@@ -51,19 +51,18 @@ bool Searcher::shouldPrune(Move& move, int standPat, int alpha, int search_depth
 // ROOT EVAL STORAGE
 // ============================================================================
 
-void Searcher::store_last_result(const SearchResult& res) {
+void Searcher::store_last_node_counts(const SearchResult& res) {
     // clear table
-    std::fill(std::begin(last_eval_table), std::end(last_eval_table), INVALID);
+    std::fill(std::begin(node_count_table), std::end(node_count_table), 0);
 
     // write moves/evals from last depth
     for (int i = 0; i < res.root_count; ++i) {
-        last_eval_table[res.root_moves[i].move.Value()] = res.root_moves[i].eval;
+        node_count_table[res.root_moves[i].move.Value()] = res.root_moves[i].nodes;
     }
 }
 
-inline int Searcher::get_prev_eval(Move m) const {
-    int v = last_eval_table[m.Value()];
-    return (v == INVALID) ? -MATE_SCORE : v;
+inline int Searcher::get_node_count(Move m) const {
+    return node_count_table[m.Value()];
 }
 
 
@@ -80,7 +79,7 @@ int Searcher::rootMoveScore(const Move& move, const Move& ttMove, const Move& pv
     if (Move::SameMove(move, ttMove))
         score += root_scores.TT_BASE;
 
-    score += get_prev_eval(move);
+    score += get_node_count(move);
 
     if (move.IsPromotion())
         score += root_scores.PROMO_BASE;
@@ -436,11 +435,11 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
             _lmr_R = 0;
         }
 
-        score = -negamax(depth - 1 - _lmr_R, -beta, -alpha, childPV, previousPV, limits, ply + 1, true);
-        if (_lmr_R > 0 && score > alpha) {
-            childPV = {}; // dont let teh reduced-search line leak into the full-depth result
-            score = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply+1, true);
-        }
+        //score = -negamax(depth - 1 - _lmr_R, -beta, -alpha, childPV, previousPV, limits, ply + 1, true);
+        //if (_lmr_R > 0 && score > alpha) {
+        //    childPV = {}; // dont let teh reduced-search line leak into the full-depth result
+        //    score = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply+1, true);
+        //}
 
         // -----------------------------
         // principal variation search 
@@ -450,7 +449,6 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
         // if a move fails high then we can re-search it with a full window 
         // else it fails low and is not going to be a better move than what has been found
         // null window searches are cheap and so the re-searches are worth the speedup
-        /*
         if (i == 0) {
             score = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply + 1, true);
         } else {
@@ -463,7 +461,9 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
             // then full-window gets triggered below with lmr_R == 0
             // if re-search not triggered then neither will trigger as first null-window failed low
             if (_lmr_R > 0 && score > alpha) {
-                STATS_PVS_RESEARCH(depth+ply, ply, 0);
+                #ifdef DEV
+                    STATS_PVS_RESEARCH(depth+ply, ply, 0);
+                #endif
                 emptyPV = {};
                 score = -negamax(depth - 1, -(alpha+1), -alpha, emptyPV, previousPV, limits, ply + 1, true);
             }
@@ -473,12 +473,14 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
             if (score > alpha && beta-alpha > 1) {
                 // beta-alpha > 1 prevents reduandant research of non-PV nodes
                 // if beta = alpha+1, then score > alpha --> score >= beta --> no need for re-search
-                STATS_PVS_RESEARCH(depth+ply, ply, 1);
+                #ifdef DEV
+                    STATS_PVS_RESEARCH(depth+ply, ply, 1);
+                #endif
                 emptyPV = {};
                 score = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply + 1, true);
             }
         }
-        */
+
 
         nnue.on_unmake_move(board, m);
         board.UnmakeMove(m);
@@ -528,11 +530,13 @@ int Searcher::negamax(int depth, int alpha, int beta, PV& pv,
 // ROOT SEARCH
 // ============================================================================
 
-SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth, SearchLimits& limits, std::vector<Move>& previousPV, int previousEval) {
+SearchResult Searcher::search(RootMove root_moves[MAX_MOVES], int count, int depth, SearchLimits& limits, std::vector<Move>& previousPV, int previousEval) {
     int eval;
     int ply = 0; // root moves are depth=0, ply+1 in arg call makes made moves depth=1
     SearchResult result;
     int _lmr_R = 0;
+    int nodes_before = 0;
+    bool exact = false;
 
     // current board state info
     bool in_check = board.is_in_check;
@@ -561,19 +565,19 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
     // root move loop for both aspiration + regular search
     while (true) {
         SearchResult iter_result;
-        // Build NNUE accumulators for root position
-        nnue.build_accumulators(board);
+        int aspAlpha = alpha;
+        int aspBeta = beta;
 
         // explore (our) root moves
-        int i = 0; // for stats check later
-        for (i; i < count; ++i) {
+        for (int i = 0; i < count; ++i) {
             if (limits.out_of_time()) break;
-            Move m = legal_moves[i];
+            Move m = root_moves[i].move;
             if (Move::SameMove(m, Move::NullMove())) continue;
 
             // root move stat tracking
+            exact = false;
+            nodes_before = g_stats.nodes;
             #ifdef DEV
-                uint64_t nodes_before = g_stats.nodes;
                 auto move_start = std::chrono::steady_clock::now();
             #endif
 
@@ -597,37 +601,54 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
                 _lmr_R = 0;
             }
             
-            eval = -negamax(depth - 1 - _lmr_R, -beta, -alpha, childPV, previousPV, limits, ply + 1, true);
-            if (_lmr_R > 0 && eval > alpha) { // research at full depth if move raises alpha
-                childPV = {};   // don't let the reduced-search line leak into the full-depth result
-                eval = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply+1, true);
-            }
+            //eval = -negamax(depth - 1 - _lmr_R, -beta, -alpha, childPV, previousPV, limits, ply + 1, true);
+            //if (_lmr_R > 0 && eval > alpha) { // research at full depth if move raises alpha
+            //    childPV = {};   // don't let the reduced-search line leak into the full-depth result
+            //    eval = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply+1, true);
+            //}
 
             // --- PVS ---
+            if (i == 0) {
+                eval = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply + 1, true);
+                exact = true;
+            } else {
+                // null-window search
+                // lmr =0 OR >0
+                eval = -negamax(depth - 1 - _lmr_R, -(alpha+1), -alpha, emptyPV, previousPV, limits, ply + 1, true);
 
-            //if (i == 0) {
-            //    eval = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply+1, true);
-            //} else {
-                // null-window
-            //    eval = -negamax(depth - 1, -(alpha+1), -alpha, emptyPV, previousPV, limits, ply+1, true);
-            
-            //    if (eval > alpha) {
-            //        STATS_PVS_RESEARCH(depth+ply, ply, 2);
-            //        childPV = {};
-            //        eval = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply+1, true);
-            //    }
-            //}
-            
+                // if lmr_r > 0 then re-search with null-window at full depth
+                // if score > alpha from this re-search,
+                // then full-window gets triggered below with lmr_R == 0
+                // if re-search not triggered then neither will trigger as first null-window failed low
+                if (_lmr_R > 0 && eval > alpha) {
+                    #ifdef DEV
+                        STATS_PVS_RESEARCH(depth+ply, ply, 0); // lmr
+                    #endif
+                    emptyPV = {};
+                    eval = -negamax(depth - 1, -(alpha+1), -alpha, emptyPV, previousPV, limits, ply + 1, true);
+                }
 
+                // if lmr_R == 0 then search with null window
+                // if score > alpha then research with full window
+                if (eval > alpha && beta-alpha > 1) {
+                    // beta-alpha > 1 prevents reduandant research of non-PV nodes
+                    // if beta = alpha+1, then score > alpha --> score >= beta --> no need for re-search
+                    #ifdef DEV
+                        STATS_PVS_RESEARCH(depth+ply, ply, 2); // root full
+                    #endif
+                    emptyPV = {};
+                    eval = -negamax(depth - 1, -beta, -alpha, childPV, previousPV, limits, ply + 1, true);
+                    exact = true;
+                }
+            }
+            
             nnue.on_unmake_move(board, m);
             board.UnmakeMove(m);
 
             #ifdef DEV
                 auto move_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                     std::chrono::steady_clock::now() - move_start).count();
-                int64_t move_nodes = g_stats.nodes - nodes_before;
                 iter_result.root_moves[i].time_ms = move_ms;
-                iter_result.root_moves[i].nodes = move_nodes;
             #endif
 
             // time out is propagated up the tree, so eval and move cannot be trusted
@@ -635,9 +656,11 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
 
             iter_result.root_moves[i].move = m;
             iter_result.root_moves[i].eval = eval;
+            iter_result.root_moves[i].exact = exact;
+            iter_result.root_moves[i].nodes = g_stats.nodes - nodes_before;
             iter_result.root_count++;
 
-           // alpha = std::max(alpha, eval);
+            alpha = std::max(alpha, eval);
             if (i == 0 || eval > iter_result.eval) {
                 iter_result.eval = eval;
                 iter_result.bestMove = m;
@@ -647,26 +670,25 @@ SearchResult Searcher::search(Move legal_moves[MAX_MOVES], int count, int depth,
 
         // aspiration check
         if (!limits.should_stop(depth) && (depth >= params.ASPIRATION_START_DEPTH)) {
-            if (iter_result.eval <= alpha) {
+            if (iter_result.eval <= aspAlpha) {
                 #ifdef DEV
                     STATS_ASPIRATION_FAILLOW(depth);
                 #endif
-                alpha -= delta;
+                alpha = aspAlpha - delta;
+                beta = aspBeta;
                 delta *= params.ASPIRATION_RESEARCH_SCALE;
                 continue;
-            } else if (iter_result.eval >= beta) {
+            } else if (iter_result.eval >= aspBeta) {
                 #ifdef DEV
                     STATS_ASPIRATION_FAILHIGH(depth);
                 #endif
-                beta += delta;
+                beta = aspBeta + delta;
+                alpha = aspAlpha;
                 delta *= params.ASPIRATION_RESEARCH_SCALE;
                 continue;
             }
         } 
 
-        // ran through all root moves 
-        // (= max_search_depth (-1 if last depth is terminated early))
-        if (i >= count - 1) g_stats.max_completed_depth = depth;  
         result = iter_result;
         break;
     }
@@ -678,11 +700,14 @@ SearchResult Searcher::iterativeDeepening(Move first_moves[MAX_MOVES], int move_
     SearchResult last_result;
     SearchResult result;
 
-    // evals from prior iteration INIT
-    std::fill(std::begin(last_eval_table), std::end(last_eval_table), INVALID);
+    // nodes from prior iteration INIT
+    std::fill(std::begin(node_count_table), std::end(node_count_table), 0);
 
     int depth = 1;
     Move prevBest = Move::NullMove();
+
+    // Build NNUE accumulators for root position
+    nnue.build_accumulators(board);
 
     // --- iterative deepening loop ---
     while (!limits.should_stop(depth)) {
@@ -690,10 +715,30 @@ SearchResult Searcher::iterativeDeepening(Move first_moves[MAX_MOVES], int move_
         g_stats.max_depth = depth;
 
         // --- move ordering ---
-        if (depth > 1) { // sort by prev iteration elos
-            std::sort(first_moves, first_moves + move_count,
-                      [&](Move a, Move b) { return get_prev_eval(a) > get_prev_eval(b); });
-        } else { // first search: order like typical mid-tree ordering   
+        if (depth > 1) {
+            Move pvMove = last_result.bestMove;
+            RootMove* root_moves = last_result.root_moves;
+
+            // Force PV move to the front.
+            auto pv_it = std::find_if(root_moves, root_moves + move_count,
+                                    [&](const RootMove& rm) { return Move::SameMove(rm.move, pvMove); });
+            if (pv_it != root_moves + move_count) {
+                std::iter_swap(root_moves, pv_it);
+            }
+
+            // Sort the rest:
+            // - exact scores (PV re-searches / fail-highs) rank by score
+            // - fail-low bounds (unresolved) fall back to node count as effort proxy
+            std::sort(root_moves + 1, root_moves + move_count,
+                [](const RootMove& a, const RootMove& b) {
+                    if (a.exact != b.exact)
+                        return a.exact > b.exact;
+                    if (a.exact && b.exact && a.eval != b.eval)
+                        return a.eval > b.eval;
+                    return a.nodes > b.nodes;
+                });
+        } else {
+            // first search: order like typical mid-tree ordering   
             // tt probe
             TTEntry* ttEntry = tt.probe(board.zobrist_hash);
             Move ttMove = Move::NullMove();
@@ -702,23 +747,25 @@ SearchResult Searcher::iterativeDeepening(Move first_moves[MAX_MOVES], int move_
                 #ifdef DEV
                     STATS_TT_HIT(depth, 0);
                 #endif
-                // grab move for move ordering
-                // do not return from any scores cause then we would just
-                //      abort search a lot and thats not good
                 ttMove = ttEntry->bestMove;
             }
             orderedMoves(first_moves, move_count, board, 0, ttMove, {});
+
+            for (int i = 0; i < move_count; ++i) {
+                last_result.root_moves[i].move = first_moves[i];
+            }
         }
 
         // --- search ---
-        result = search(first_moves, move_count, depth, limits,
+        result = search(last_result.root_moves, move_count, depth, limits,
                                      last_result.best_line.line, last_result.eval);
 
 
         // --- store results ---
         if (!Move::SameMove(result.bestMove, Move::NullMove())) {
             last_result = result;
-            store_last_result(result);
+            store_last_node_counts(result);
+            g_stats.max_completed_depth = depth; 
         }
 
         // --- logging --- 
