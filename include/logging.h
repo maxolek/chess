@@ -20,7 +20,7 @@ struct Logging {
     // ---- directory ----
     // uci is .log, rest are .jsonl
     static inline const fs::path project_root = PROJECT_ROOT; // compile time constant (str)
-    static inline fs::path DEFAULT_LOG_DIR = project_root / "logs/test_logs";
+    static inline fs::path DEFAULT_LOG_DIR = project_root / "../san-jacinto/logs/test_logs";
     static inline fs::path log_dir = DEFAULT_LOG_DIR;
     static inline std::ofstream uci_file;
     static inline std::ofstream search_file;
@@ -71,9 +71,13 @@ struct Logging {
     }
     static void setLogDir(const fs::path& path) {
         fs::path dir = path;
-        if (dir.is_relative()) dir = project_root / dir; 
-        if (log_dir == dir) return; 
-        log_dir = dir; 
+
+        if (dir.is_relative())
+            dir = fs::absolute(dir);
+
+        if (log_dir == dir) return;
+
+        log_dir = dir;
         initFiles();
     }
 
